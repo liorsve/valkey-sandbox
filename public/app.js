@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', (event) => {
             term.writeln(line.trim());  // trim() removes any leading/trailing whitespace
         });
     }
+    else if (type === 'leaderboard') {
+        handleLeaderboardMessage(data);
+    }
 };
 
   term.onData((data) => {
@@ -57,4 +60,51 @@ document.addEventListener('DOMContentLoaded', (event) => {
       term.clear();
       term.writeln('Running code...');
   });
+    // Add leaderboard functionality
+    document.getElementById('fetchLeaderboard').addEventListener('click', () => {
+        ws.send(JSON.stringify({ type: 'leaderboard', data: { action: 'getTopPlayers' } }));
+    });
+
+    document.getElementById('addPlayer').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const playerId = document.getElementById('playerId').value;
+        const screenName = document.getElementById('screenName').value;
+        ws.send(
+            JSON.stringify({
+                type: 'leaderboard',
+                data: { action: 'addPlayer', playerId, screenName }
+            })
+        );
+    });
+
+    document.getElementById('updateScore').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const playerId = document.getElementById('scorePlayerId').value;
+        const score = parseInt(document.getElementById('playerScore').value, 10);
+        ws.send(
+            JSON.stringify({
+                type: 'leaderboard',
+                data: { action: 'updateScore', playerId, score }
+            })
+        );
+    });
+
+    // Handle leaderboard data
+    function handleLeaderboardMessage(data) {
+        const leaderboardTable = document.getElementById('leaderboardTableBody');
+        leaderboardTable.innerHTML = ''; // Clear the table
+        if (Array.isArray(data)) {
+            data.forEach((player) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${player.rank}</td>
+                    <td>${player.screenName}</td>
+                    <td>${player.score}</td>
+                `;
+                leaderboardTable.appendChild(row);
+            });
+        } else {
+            term.writeln(`Leaderboard message: ${data}`);
+        }
+    }
 });
