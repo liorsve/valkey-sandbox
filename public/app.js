@@ -22,11 +22,14 @@ document.addEventListener('DOMContentLoaded', (event) => {
   };
 
   ws.onmessage = (event) => {
-      const { type, data } = JSON.parse(event.data);
-      if (type === 'terminal') {
-          term.writeln(data);
-      }
-  };
+    const { type, data } = JSON.parse(event.data);
+    if (type === 'terminal') {
+        // Split the data by newlines and write each line separately
+        data.split('\n').forEach(line => {
+            term.writeln(line.trim());  // trim() removes any leading/trailing whitespace
+        });
+    }
+};
 
   term.onData((data) => {
       ws.send(JSON.stringify({ type: 'terminal', data }));
