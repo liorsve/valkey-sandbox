@@ -25,4 +25,10 @@ RUN apt-get update && apt-get install -y redis-server
 EXPOSE 6379
 
 # Start Redis server in the background and then run the node app
-CMD redis-server --daemonize yes && node
+#CMD redis-server --daemonize yes && redis-cli ping && node
+
+COPY entrypoint.sh ./
+RUN chmod +x ./entrypoint.sh
+
+# Use the entrypoint script to start the app
+ENTRYPOINT ["./entrypoint.sh"]
