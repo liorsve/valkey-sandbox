@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const { VM } = require('vm2');
+const { exec } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,22 +13,23 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         const { type, data } = JSON.parse(message);
         if (type === 'run') {
-            try {
-                const vm = new VM({
-                    timeout: 1000,
-                    sandbox: {
-                        console: {
-                            log: (...args) => {
-                                ws.send(JSON.stringify({ type: 'terminal', data: args.join(' ') + '\n' }));
-                            }
-                        }
-                    }
-                });
-                vm.run(data);
-                ws.send(JSON.stringify({ type: 'terminal', data: 'Code execution completed.\n' }));
-            } catch (error) {
-                ws.send(JSON.stringify({ type: 'terminal', data: 'Error: ' + error.message + '\n' }));
-            }
+            const containerName = `playground_container_${Date.now()}`;
+            const scriptFile = `lior.js`;
+
+            // Write the submitted code to a temporary file
+            require('fs').writeFileSync(scriptFile, data);
+
+            // Run the code inside a Docker container
+            const command = `
+                sudo docker run --rm -v ${scriptFile}:/app/script.js valkey-try node /app/script.js
+            `;
+            exec(command, (error, stdout, stderr) => {
+                if (error) {
+                    ws.send(JSON.stringify({ type: 'terminal', data: `Error: ${stderr}\n` }));
+                    return;
+                }
+                ws.send(JSON.stringify({ type: 'terminal', data: stdout }));
+            });
         }
     });
 });
