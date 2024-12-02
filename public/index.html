@@ -1,0 +1,48 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shoham hamalka</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.js"></script>
+</head>
+<body>
+    <div id="editor"></div>
+    <button id="runButton">Run</button>
+    <div id="terminal"></div>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        #editor {
+            height: 65%;
+            width: 100%;
+            border-bottom: 1px solid #ccc;
+        }
+        #runButton {
+            height: 5%;
+            width: 100%;
+            font-size: 1em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #runButton:hover {
+            background-color: #45a049;
+        }
+        #terminal {
+            height: 30%;
+            width: 100%;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/loader.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
