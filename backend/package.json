@@ -1,0 +1,22 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@valkey/valkey-glide": "1.2.0",
+    "child_process": "^1.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "16.4.7",
+    "express": "5.0.1",
+    "iovalkey": "0.2.1",
+    "socket.io": "^4.0.1",
+    "ws": "8.18.0"
+  },
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

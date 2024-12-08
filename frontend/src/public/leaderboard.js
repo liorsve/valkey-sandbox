@@ -1,29 +1,30 @@
-// leaderboard.js
-
 // Import Valkey-Glide
-const { GlideClient } = require("@valkey/valkey-glide");
+import { GlideClient } from '@valkey/valkey-glide';
 
 // Initialize the Valkey client
 let client;
 
-async function initializeClient() {
+async function initializeClient(mode = 'standalone') {
   try {
     if (!client) {
+      const host = mode === 'cluster' ? 'valkey-cluster' : 'valkey-standalone';
+      const port = mode === 'cluster' ? 7000 : 6379;
+
       client = await GlideClient.createClient({
         addresses: [
           {
-            host: "localhost", // Replace with your Valkey server address
-            port: 6379,        // Default Valkey port
+            host: host, // Replace with your Valkey server address
+            port: port,  // Appropriate Valkey port based on mode
           },
         ],
-        clientName: "leaderboard_client",
-        // useTLS: true,       // Uncomment if using TLS
+        clientName: 'leaderboard_client',
+        // useTLS: true, // Uncomment if using TLS
       });
 
-      console.log("Connected to Valkey server");
+      console.log('Connected to Valkey server');
     }
   } catch (error) {
-    console.error("Error initializing Valkey client:", error);
+    console.error('Error initializing Valkey client:', error);
     throw error;
   }
 }
@@ -60,7 +61,7 @@ async function updatePlayerScore(playerId, score) {
   await initializeClient();
   try {
     console.log(`Updating score: leaderboard, score=${score}, playerId=${playerId}`);
-    await client.customCommand(["ZADD", "leaderboard", score.toString(), playerId]);
+    await client.customCommand(['ZADD', 'leaderboard', score.toString(), playerId]);
   } catch (error) {
     console.error(`Error updating score for player ${playerId}:`, error);
     throw error;
@@ -71,7 +72,7 @@ async function updatePlayerScore(playerId, score) {
 async function getPlayerRank(playerId) {
   await initializeClient();
   try {
-    const rank = await client.customCommand(["ZREVRANK", "leaderboard", playerId]);
+    const rank = await client.customCommand(['ZREVRANK', 'leaderboard', playerId]);
     console.log(`Rank for player ${playerId}:`, rank);
     return rank !== null ? parseInt(rank) + 1 : null; // Ranks are zero-based
   } catch (error) {
@@ -82,36 +83,36 @@ async function getPlayerRank(playerId) {
 
 // Function to get top N players
 async function getTopPlayers(n) {
-    await initializeClient();
-    try {
-      const response = await client.customCommand([
-        "ZREVRANGE",
-        "leaderboard",
-        "0",
-        (n - 1).toString(),
-        "WITHSCORES",
-      ]);
-  
-      console.log("Raw leaderboard data:", response);
-  
-      const players = [];
-      for (const [playerId, scoreStr] of response) {
-        const score = parseFloat(scoreStr);
-        const data = await getPlayerData(playerId);
-        console.log(`Fetched data for playerId=${playerId}, score=${score}:`, data);
-        players.push({
-          rank: players.length + 1,
-          playerId,
-          score,
-          ...data,
-        });
-      }
-      return players;
-    } catch (error) {
-      console.error(`Error getting top ${n} players:`, error);
-      return [];
+  await initializeClient();
+  try {
+    const response = await client.customCommand([
+      'ZREVRANGE',
+      'leaderboard',
+      '0',
+      (n - 1).toString(),
+      'WITHSCORES',
+    ]);
+
+    console.log('Raw leaderboard data:', response);
+
+    const players = [];
+    for (const [playerId, scoreStr] of response) {
+      const score = parseFloat(scoreStr);
+      const data = await getPlayerData(playerId);
+      console.log(`Fetched data for playerId=${playerId}, score=${score}:`, data);
+      players.push({
+        rank: players.length + 1,
+        playerId,
+        score,
+        ...data,
+      });
     }
+    return players;
+  } catch (error) {
+    console.error(`Error getting top ${n} players:`, error);
+    return [];
   }
+}
 
 // Function to close the client connection
 async function closeClient() {
@@ -120,6 +121,7 @@ async function closeClient() {
     client = null;
   }
 }
+
 module.exports = {
   setPlayerData,
   getPlayerData,

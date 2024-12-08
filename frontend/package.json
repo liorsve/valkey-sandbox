@@ -1,0 +1,33 @@
+{
+    "name": "frontend",
+    "version": "1.0.0",
+    "dependencies": {
+        "@vue/compat": "^3.3.0",
+        "@xterm/xterm": "5.5.0",
+        "axios": "1.7.9",
+        "backend": "file:../backend",
+        "mitt": "^3.0.1",
+        "monaco-editor": "0.52.0",
+        "serve": "^14.2.1",
+        "vue": "^3.3.0"
+    },
+    "devDependencies": {
+        "@babel/eslint-parser": "^7.22.15",
+        "@vue/cli-plugin-babel": "^5.0.8",
+        "@vue/cli-plugin-eslint": "^5.0.8",
+        "@vue/cli-service": "^5.0.8",
+        "@vue/compiler-sfc": "^3.3.0",
+        "consolidate": "^1.0.4",
+        "eslint": "^8.0.0",
+        "eslint-plugin-vue": "^9.0.0",
+        "monaco-editor-webpack-plugin": "^7.1.0",
+        "path-browserify": "^1.0.1",
+        "vue-loader": "^17.4.2",
+        "worker-loader": "^3.0.8"
+    },
+    "scripts": {
+        "serve": "vue-cli-service serve",
+        "build": "vue-cli-service build",
+        "lint": "vue-cli-service lint"
+    }
+}
