@@ -1,0 +1,15 @@
+FROM node:latest
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install iovalkey @valkey/valkey-glide
+
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 \
+    CMD nc -z localhost 3001 || exit 1
+
+EXPOSE 3001
+
+CMD ["node", "-e", "import('http').then(http => http.createServer().listen(3001))"]

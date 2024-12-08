@@ -1,0 +1,105 @@
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      valkey-standalone:
+        condition: service_healthy
+      valkey-cluster:
+        condition: service_healthy
+    networks:
+      - valkey-net
+    environment:
+      - NODE_ENV=production
+      - EXECUTION_MODE=standalone   # Default mode
+      - VALKEY_HOST_STANDALONE=valkey-standalone
+      - VALKEY_PORT_STANDALONE=6379
+      - VALKEY_HOST_CLUSTER=valkey-cluster
+      - VALKEY_PORT_CLUSTER_START=7000
+      - VALKEY_PORT_CLUSTER_END=7005
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    networks:
+      - valkey-net
+
+  valkey-standalone:
+    image: valkey/valkey:8.0.1
+    ports:
+      - "6379:6379"
+    networks:
+      - valkey-net
+    volumes:
+      - valkey-standalone-data:/data
+    command: ["sh", "-c", "valkey-server --port 6379 --dir /data"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    privileged: true
+
+  valkey-cluster:
+    image: valkey/valkey:8.0.1
+    ports:
+      - "7000-7005:7000-7005"
+    networks:
+      - valkey-net
+    volumes:
+      - ./backend/cluster-setup.sh:/usr/local/bin/cluster-setup.sh:ro
+      - valkey-cluster-data:/data
+    command: ["sh", "/usr/local/bin/cluster-setup.sh"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-p", "7000", "cluster", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    privileged: true
+
+  python-executor:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.python
+    image: valkey-python:latest
+    ports:
+      - "3002:3002"
+    networks:
+      - valkey-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3002"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  valkey-node:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.node
+    ports:
+      - "3001:3001"
+    networks:
+      - valkey-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3001"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+networks:
+  valkey-net:
+    driver: bridge
+
+volumes:
+  valkey-standalone-data:
+  valkey-cluster-data:
