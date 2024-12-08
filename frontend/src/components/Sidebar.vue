@@ -52,7 +52,7 @@
             recommendation
           </option>
           <option value="session">
-            session
+            session caching
           </option>
         </select>
       </div>
