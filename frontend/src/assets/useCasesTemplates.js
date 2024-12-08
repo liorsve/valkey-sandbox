@@ -8,18 +8,17 @@ let client;
 async function initializeClient(mode = 'standalone') {
   try {
     if (!client) {
-      const host = mode === 'cluster' ? 'valkey-cluster' : 'valkey-standalone';
-      const port = mode === 'cluster' ? 7000 : 6379;
+      const host = process.env.VALKEY_HOST || 'localhost';
+      const port = process.env.VALKEY_PORT || 6379;
 
       client = await GlideClient.createClient({
         addresses: [
           {
-            host: host, // Replace with your Valkey server address
-            port: port,  // Appropriate Valkey port based on mode
+            host: host,
+            port: port,
           },
         ],
         clientName: 'leaderboard_client',
-        // useTLS: true, // Uncomment if using TLS
       });
 
       console.log('Connected to Valkey server');
@@ -123,14 +122,51 @@ async function closeClient() {
   }
 }
 
-module.exports = {
-  setPlayerData,
-  getPlayerData,
-  updatePlayerScore,
-  getPlayerRank,
-  getTopPlayers,
-  closeClient,
-};`}},
+async function exampleUsage() {
+  try {
+    // 1. Initialize player data
+    console.log("Initializing player data...");
+    await setPlayerData("player1", { name: "Alice", level: 5 });
+    await setPlayerData("player2", { name: "Bob", level: 8 });
+    await setPlayerData("player3", { name: "Charlie", level: 3 });
+
+    // 2. Get player data
+    console.log("Fetching player data...");
+    const player1Data = await getPlayerData("player1");
+    console.log("Player 1 Data:", player1Data);
+
+    const player2Data = await getPlayerData("player2");
+    console.log("Player 2 Data:", player2Data);
+
+    // 3. Update player scores
+    console.log("Updating player scores...");
+    await updatePlayerScore("player1", 1500);
+    await updatePlayerScore("player2", 1800);
+    await updatePlayerScore("player3", 1200);
+
+    // 4. Get player rank
+    console.log("Getting player ranks...");
+    const player1Rank = await getPlayerRank("player1");
+    console.log("Player 1 Rank:", player1Rank);
+
+    const player2Rank = await getPlayerRank("player2");
+    console.log("Player 2 Rank:", player2Rank);
+
+    // 5. Fetch top 2 players
+    console.log("Fetching top 2 players...");
+    const topPlayers = await getTopPlayers(2);
+    console.log("Top Players:", JSON.stringify(topPlayers, null, 2));
+  } catch (error) {
+    console.error("Error during example usage:", error);
+  } finally {
+    // Ensure the client is closed
+    console.log("Closing Valkey client...");
+    await closeClient();
+  }
+}
+
+// Run the example usage
+await exampleUsage();`}},
 recommendation: {"valkey-glide (Python)": {Standalone: `import json
 import numpy as np
 import asyncio
