@@ -43,10 +43,19 @@
         Run
       </button>
 
-      <button id="usecasesButton">
-        <img src="../assets/images/icons/usecases.png" alt="Usecases Icon">
-        UseCases
-      </button>
+      <div class="dropdown-container">
+        <select id="useCaseDropdown" v-model="$parent.useCase" @change="$parent.updateUseCase">
+          <option value="leaderboard">
+            leaderboard
+          </option>
+          <option value="recommendation">
+            recommendation
+          </option>
+          <option value="session">
+            session
+          </option>
+        </select>
+      </div>
 
       <button id="watchActionButton">
         <img src="../assets/images/icons/action.png" alt="Action Icon">
@@ -189,6 +198,12 @@ export default {
 
 #modeDropdown {
   background-image: url('../assets/images/icons/cluster.png');
+  background-size: 32px 32px;
+  /* Increased from 24px */
+}
+
+#useCaseDropdown {
+  background-image: url('../assets/images/icons/usecases.png');
   background-size: 32px 32px;
   /* Increased from 24px */
 }

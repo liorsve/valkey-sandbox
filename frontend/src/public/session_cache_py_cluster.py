@@ -1,8 +1,8 @@
 import asyncio
 from glide import (
     NodeAddress,
-    GlideClient,
-    GlideClientConfiguration,
+    GlideClusterClient,
+    GlideClusterClientConfiguration,
 )
 
 async def session_cache_example(client, username):
@@ -24,11 +24,11 @@ async def session_cache_example(client, username):
 username = 'john_doe'
 
 async def main():
-    # Create Glide client
-    host = os.getenv('VALKEY_HOST', 'localhost')
-    port = int(os.getenv('VALKEY_PORT', '6379'))
-    config = GlideClientConfiguration([NodeAddress(host, port)])
-    client = await GlideClient.create(config)
+    # Create Glide cluster client
+    host = os.getenv('VALKEY_CLUSTER_HOST', 'localhost')
+    port = int(os.getenv('VALKEY_CLUSTER_PORT', '7000'))
+    config = GlideClusterClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClusterClient.create(config)
 
     result = await session_cache_example(client, username)
     print(result)

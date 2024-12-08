@@ -13,6 +13,7 @@ import Editor from './components/Editor.vue';
 import AppTerminal from './components/Terminal.vue';
 import Sidebar from './components/Sidebar.vue';
 import { codeTemplates } from './assets/codeTemplates';
+import { useCasesTemplates } from './assets/useCasesTemplates';
 
 export default {
   name: 'App',
@@ -27,6 +28,7 @@ export default {
     return {
       selectedClient: 'valkey-glide (Python)',
       executionMode: 'Standalone',
+      useCase: "",
       clients: [
         'valkey-glide (Java)',
         'valkey-glide (Python)',
@@ -112,6 +114,7 @@ export default {
       const template = this.getTemplate();
       this.$refs.editor?.setValue(template);
       this.updateLanguage();
+      this.useCase = 'useCases';
     },
 
     getTemplate() {
@@ -120,6 +123,20 @@ export default {
         return '// No template available for selected client';
       }
       return selectedTemplate[this.executionMode] || '// No template available for selected mode';
+    },
+
+    updateUseCase() {
+      const template = this.getUseCase();
+      this.$refs.editor?.setValue(template);
+      this.updateLanguage();
+    },
+
+    getUseCase() {
+      const selectedTemplate = useCasesTemplates[this.useCase];
+      if (!selectedTemplate) {
+        return '// No use case available for selected client';
+      }
+      return selectedTemplate[this.selectedClient][this.executionMode] || '// No template available for selected mode';
     },
 
     updateLanguage() {
@@ -137,7 +154,9 @@ export default {
 
     runCode() {
       const code = this.$refs.editor?.getValue() || '';
+      console.log("code is: ", code)
       const language = this.language;
+      console.log("lang: ", language)
 
       this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
 
