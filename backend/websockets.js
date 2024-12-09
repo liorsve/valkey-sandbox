@@ -4,9 +4,9 @@ import executeCode from './utils/dockerExecutor.js';
 export function setupWebSocket(server) {
   const wss = new WebSocketServer({ 
     server,
-    path: '/appws', // Changed from '/ws' to '/appws'
-    perMessageDeflate: false, // Disable compression for simpler debugging
-    clientTracking: true,     // Track connected clients
+    path: '/appws',
+    perMessageDeflate: false,
+    clientTracking: true,
     handleProtocols: () => true,
     setKeepAlive: true,
   });
@@ -75,4 +75,12 @@ export function setupWebSocket(server) {
   });
 
   return wss;
+}
+
+export function broadcast(data) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === client.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
 }

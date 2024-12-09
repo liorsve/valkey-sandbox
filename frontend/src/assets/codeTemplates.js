@@ -1,6 +1,7 @@
 export const codeTemplates = {
     'valkey-glide (Python)': {
-        Standalone: `# Valkey Glide Example (Python)
+        Standalone: `# Valkey Glide Standalone Python Template
+# Valkey Glide Example (Python)
 import asyncio
 from glide import NodeAddress, GlideClient, GlideClientConfiguration
 import os
@@ -19,7 +20,8 @@ async def main():
     await client.close()
 
 asyncio.run(main())`,
-        Cluster: `# Valkey Glide Example (Python) - Cluster Mode
+        Cluster: `# Valkey Glide Cluster Python Template
+# Valkey Glide Example (Python) - Cluster Mode
 import asyncio
 from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
 import os
@@ -37,10 +39,17 @@ async def main():
     
     await client.close()
 
-asyncio.run(main())`
+asyncio.run(main())`,
+        Leaderboard: `# Leaderboard Use Case in Python
+# ...code for leaderboard use case...`,
+        'Session Cache': `# Session Cache Use Case in Python
+# ...code for session cache use case...`,
+        'Recommendation System': `# Recommendation System Use Case in Python
+# ...code for recommendation system use case...`
     },
     'valkey-glide (Node)': {
-        Standalone: `// Valkey Glide Example (Node)
+        Standalone: `// Valkey Glide Standalone Node.js Template
+// Valkey Glide Example (Node)
 import { GlideClient } from '@valkey/valkey-glide';
 
 async function main() {
@@ -60,7 +69,8 @@ async function main() {
 }
 
 await main();`,
-        Cluster: `// Valkey Glide Example (Node) - Cluster Mode
+        Cluster: `// Valkey Glide Cluster Node.js Template
+// Valkey Glide Example (Node) - Cluster Mode
 import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function main() {
@@ -79,10 +89,13 @@ async function main() {
     await client.close();
 }
 
-await main();`
+await main();`,
+        Leaderboard: `// Leaderboard Use Case in Node.js
+// ...code for leaderboard use case...`
     },
     'valkey-glide (Java)': {
-        Standalone: `// Valkey Glide Example (Java)
+        Standalone: `// Valkey Glide Standalone Java Template
+// Valkey Glide Example (Java)
 import io.valkey.glide.*;
 import java.util.Arrays;
 
@@ -103,7 +116,8 @@ public class Example {
         }
     }
 }`,
-        Cluster: `// Valkey Glide Example (Java) - Cluster Mode
+        Cluster: `// Valkey Glide Cluster Java Template
+// Valkey Glide Example (Java) - Cluster Mode
 import io.valkey.glide.*;
 import java.util.Arrays;
 
@@ -123,7 +137,9 @@ public class Example {
             System.out.println("Retrieved value: " + value);
         }
     }
-}`
+}`,
+        Leaderboard: `// Leaderboard Use Case in Java
+// ...code for leaderboard use case...`
     },
     'valkey-py (Python)': {
         Standalone: `# Valkey Example

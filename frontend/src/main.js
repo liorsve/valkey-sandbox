@@ -1,11 +1,13 @@
-import { createApp } from 'vue'
-import App from './App.vue'
-import * as monaco from 'monaco-editor';
+import { createApp } from 'vue';
+import App from './App.vue';
+import { install as VueMonacoEditorPlugin } from '@guolao/vue-monaco-editor';
 
-// Optionally, register additional languages
-monaco.languages.register({ id: 'python' });
-monaco.languages.register({ id: 'java' });
-monaco.languages.register({ id: 'go' });
+const app = createApp(App);
 
-const app = createApp(App)
-app.mount('#app')
+app.use(VueMonacoEditorPlugin, {
+  paths: {
+    vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs',
+  },
+});
+
+app.mount('#app');

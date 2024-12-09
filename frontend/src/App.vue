@@ -1,17 +1,54 @@
 <template>
   <div id="app" class="appContainer">
+    <TopTabs :activeTab="currentTab" @change-tab="switchTab" />
     <div class="mainContent">
-      <Editor class="codeEditor" ref="editor" :language="language" />
-      <AppTerminal class="terminal" ref="terminal" />
+      <div v-if="currentTab === 'playground'" class="content">
+        <!-- Playground content -->
+        <Editor class="codeEditor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
+        <AppTerminal class="terminal" ref="terminal" />
+      </div>
+      <div v-else-if="currentTab === 'commonUseCases'" class="content">
+        <!-- Common UseCases content -->
+        <Editor class="codeEditor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
+        <AppTerminal class="terminal" ref="terminal" />
+      </div>
+      <div v-else-if="currentTab === 'watchInAction'" class="content">
+        <!-- Watch in Action content -->
+        <div class="action-selection">
+          <button @click="selectAction('leaderboard')">Leaderboard</button>
+          <button @click="selectAction('taskManager')">Task Manager</button>
+        </div>
+        <div v-if="selectedAction" class="glide-selection">
+          <button @click="selectGlide('valkey-glide (Node)')">Glide - Nodejs</button>
+          <button @click="selectGlide('valkey-glide (Python)')">Glide - Python</button>
+          <button @click="selectGlide('valkey-glide (Java)')">Glide - Java</button>
+        </div>
+        <div v-if="selectedAction && selectedGlide" class="watch-content">
+          <div class="editor-terminal">
+            <Editor ref="editor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
+            <AppTerminal ref="terminal" />
+          </div>
+          <div class="visualization">
+            <LeaderboardComponent v-if="selectedAction === 'leaderboard'" />
+            <TaskManager v-else-if="selectedAction === 'taskManager'" />
+          </div>
+        </div>
+      </div>
+      <!-- ...other tabs... -->
+      <AppSidebar class="sidebar" :currentTab="currentTab" :selectedClient="selectedClient"
+        :executionMode="executionMode" @run-code="runCode" @navigate="navigate" @select-usecase="selectUseCase"
+        @update-client="updateClient" @update-mode="updateMode" />
     </div>
-    <Sidebar class="sidebar" @run-code="runCode" />
   </div>
 </template>
 
 <script>
 import Editor from './components/Editor.vue';
-import AppTerminal from './components/Terminal.vue';
-import Sidebar from './components/Sidebar.vue';
+import AppTerminal from './components/AppTerminal.vue';
+import AppSidebar from './components/Sidebar.vue';
+import LeaderboardComponent from './components/Leaderboard.vue';
+import TaskManager from './components/TaskManager.vue';
+import TopTabs from './components/TopTabs.vue';
 import { codeTemplates } from './assets/codeTemplates';
 
 export default {
@@ -20,11 +57,15 @@ export default {
   components: {
     Editor,
     AppTerminal,
-    Sidebar,
+    AppSidebar,
+    LeaderboardComponent,
+    TaskManager,
+    TopTabs,
   },
 
   data() {
     return {
+      currentTab: 'playground',
       selectedClient: 'valkey-glide (Python)',
       executionMode: 'Standalone',
       clients: [
@@ -42,6 +83,11 @@ export default {
       wsConnected: false,
       wsBaseUrl: `/appws`,
       language: 'javascript',
+      currentView: 'editor',
+      selectedUseCase: null,
+      selectedAction: null,
+      selectedGlide: null,
+      code: '',
     };
   },
 
@@ -53,6 +99,12 @@ export default {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+    }
+    try {
+      this.$refs.editor?.dispose();
+      this.$refs.terminal?.dispose();
+    } catch (error) {
+      console.error('Error during cleanup:', error);
     }
   },
 
@@ -109,8 +161,14 @@ export default {
     },
 
     updateTemplate() {
-      const template = this.getTemplate();
-      this.$refs.editor?.setValue(template);
+      const selectedTemplate = codeTemplates[this.selectedClient];
+      let template;
+      if (this.currentTab === 'commonUseCases' && this.selectedUseCase) {
+        template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
+      } else {
+        template = selectedTemplate[this.executionMode] || '// No template available';
+      }
+      this.code = template;
       this.updateLanguage();
     },
 
@@ -136,7 +194,7 @@ export default {
     },
 
     runCode() {
-      const code = this.$refs.editor?.getValue() || '';
+      const code = this.code;
       const language = this.language;
 
       this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
@@ -172,6 +230,55 @@ export default {
         this.$refs.terminal?.write('Not connected to server\n');
       }
     },
+
+    navigate(view) {
+      this.currentView = view;
+    },
+
+    switchTab(tabName) {
+      this.currentTab = tabName;
+      this.selectedUseCase = null;
+      this.updateTemplate();
+    },
+
+    selectUseCase(useCase) {
+      this.selectedUseCase = useCase;
+      this.updateTemplate();
+    },
+
+    selectAction(action) {
+      this.selectedAction = action;
+      this.selectedGlide = null;
+    },
+
+    selectGlide(glide) {
+      this.selectedGlide = glide;
+      this.updateTemplateForAction();
+    },
+
+    updateTemplateForAction() {
+      const selectedTemplate = codeTemplates[this.selectedGlide];
+      const templateKey =
+        this.selectedAction.charAt(0).toUpperCase() + this.selectedAction.slice(1);
+      const template =
+        selectedTemplate[templateKey] || '// No template available for selected action';
+      this.code = template;
+      this.updateLanguage();
+    },
+
+    onContentChange(newCode) {
+      this.code = newCode;
+    },
+    updateClient(newClient, newMode) {
+      this.selectedClient = newClient;
+      this.executionMode = newMode;
+      this.updateTemplate();
+    },
+    updateMode(newClient, newMode) {
+      this.selectedClient = newClient;
+      this.executionMode = newMode;
+      this.updateTemplate();
+    },
   },
 };
 </script>
@@ -185,7 +292,6 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* App layout */
 #app {
   position: fixed;
   top: 0;
@@ -193,47 +299,91 @@ body {
   right: 0;
   bottom: 0;
   display: flex;
-  flex-direction: row;
-  /* Ensure row direction for sidebar and main content */
+  flex-direction: column;
+  /* Changed from row to column */
 }
 
 .appContainer {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  /* Changed from row to column */
   width: 100%;
   height: 100%;
-  /* Ensure full height */
 }
 
+/* Adjust mainContent to fill available space and arrange children horizontally */
 .mainContent {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  /* Changed to row to arrange children horizontally */
   padding: 15px;
   gap: 15px;
-  /* Space between editor and terminal */
   overflow: hidden;
-  /* Prevent content overflow */
+  position: relative;
+  /* Added for stacking context */
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .codeEditor {
   flex: 2;
-  /* Allocate less space to the editor */
   min-height: 0;
-
 }
 
 .terminal {
   flex: 1;
   background-color: #1e1e1e;
   min-height: 0;
-  /* Allow shrinking */
 }
 
-/* Sidebar */
 .sidebar {
   width: 250px;
   flex-shrink: 0;
-  /* Prevent sidebar from shrinking */
+  /* Ensure sidebar is on the right */
+  order: 2;
+}
+
+/* Optional: Ensure editor and terminal take full height */
+.editor-terminal,
+.visualization {
+  height: 100%;
+}
+
+.action-selection,
+.glide-selection {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.editor-terminal {
+  display: flex;
+  flex: 1;
+}
+
+.visualization {
+  flex: 1;
+}
+
+/* Adjust Z-Index if overlapping occurs */
+.sidebar {
+  z-index: 10;
+}
+
+/* Media Queries for Responsiveness */
+@media (max-width: 768px) {
+  .mainContent {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    order: 1;
+  }
 }
 </style>

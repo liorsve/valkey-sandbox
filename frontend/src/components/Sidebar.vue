@@ -1,70 +1,84 @@
 <template>
   <div class="sidebar">
     <div class="top-section">
+      <!-- Client Dropdown -->
       <div class="dropdown-container">
-        <select id="clientDropdown" v-model="$parent.selectedClient" @change="$parent.updateTemplate">
-          <option value="valkey-glide (Python)">
-            valkey-glide (Python)
-          </option>
-          <option value="valkey-glide (Java)">
-            valkey-glide (Java)
-          </option>
-          <option value="valkey-glide (Node)">
-            valkey-glide (Node)
-          </option>
-          <option value="valkey-py (Python)">
-            valkey-py (Python)
-          </option>
-          <option value="iovalkey (Node)">
-            iovalkey (Node)
-          </option>
-          <option value="valkey-go (Go)">
-            valkey-go (Go)
-          </option>
-          <option value="valkey-java (Java)">
-            valkey-java (Java)
+        <select id="clientDropdown" :value="selectedClient" @change="onClientChange">
+          <option v-for="client in availableClients" :key="client" :value="client">
+            {{ client }}
           </option>
         </select>
       </div>
-
+      <!-- Mode Dropdown -->
       <div class="dropdown-container">
-        <select id="modeDropdown" v-model="$parent.executionMode" @change="$parent.updateTemplate">
-          <option value="Standalone">
-            Standalone
-          </option>
-          <option value="Cluster">
-            Cluster
-          </option>
+        <select id="modeDropdown" :value="executionMode" @change="onModeChange">
+          <option value="Standalone">Standalone</option>
+          <option value="Cluster">Cluster</option>
         </select>
       </div>
-
-      <button id="runButton" @click="$emit('run-code')">
-        <img src="../assets/images/icons/run.png" alt="Run Icon">
+      <!-- Buttons -->
+      <button v-if="currentTab === 'playground'" @click="$emit('run-code')">
         Run
       </button>
-
-      <button id="usecasesButton">
-        <img src="../assets/images/icons/usecases.png" alt="Usecases Icon">
-        UseCases
-      </button>
-
-      <button id="watchActionButton">
-        <img src="../assets/images/icons/action.png" alt="Action Icon">
-        Watch in Action
-      </button>
+      <div v-if="currentTab === 'commonUseCases'" class="usecase-buttons">
+        <button v-for="useCase in commonUseCases" :key="useCase" @click="$emit('select-usecase', useCase)">
+          {{ useCase }}
+        </button>
+      </div>
     </div>
-
-    <!-- Logo at the Bottom -->
     <div class="logo">
-      <img src="../assets/images/logo.png" alt="Logo">
+      <img src="@/assets/images/logo.png" alt="Logo" />
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: "SideBar",
-  emits: ["run-code"],
+  name: 'AppSidebar',
+  props: {
+    currentTab: {
+      type: String,
+      required: true,
+    },
+    selectedClient: {
+      type: String,
+      required: true,
+    },
+    executionMode: {
+      type: String,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      commonUseCases: [
+        'Leaderboard',
+        'Queue',
+        'Lock',
+        'Session Cache',
+        'Recommendation System',
+        'Search Engine',
+        'Web App Cache',
+      ],
+    };
+  },
+  computed: {
+    availableClients() {
+      if (this.currentTab === 'commonUseCases') {
+        return ['valkey-glide (Python)', 'valkey-glide (Java)', 'valkey-glide (Node)'];
+      } else {
+        return this.$parent.clients;
+      }
+    },
+  },
+  methods: {
+    onClientChange(event) {
+      this.$emit('update-client', event.target.value, this.executionMode);
+    },
+    onModeChange(event) {
+      this.$emit('update-mode', this.selectedClient, event.target.value);
+    },
+  },
 };
 </script>
 
@@ -75,15 +89,18 @@ export default {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  height: 100vh;
+  height: calc(100vh - 40px);
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .sidebar .top-section {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 20px;
   flex-direction: column;
+  margin-bottom: 20px;
 }
 
 .sidebar button,
@@ -95,43 +112,32 @@ export default {
   align-items: center;
   width: 100%;
   background-color: #555;
-  /* Even lighter background */
   color: #ffffff;
-  /* White text color */
   border: 1rem solid;
-  border-color: rgb(75, 75, 160);
-  /* Lighter border color */
+  border-color: rgb(34, 34, 62);
   border-radius: 25px;
-  /* More rounded corners */
   box-sizing: border-box;
   transition: all 0.3s ease;
   cursor: pointer;
   overflow: hidden;
-  /* Ensure inner content respects border radius */
 }
 
 .sidebar button:hover,
 .sidebar select:hover {
   background-color: #666;
-  /* Lighter on hover */
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   border-color: rgb(95, 95, 180);
-  /* Even lighter border color on hover */
 }
 
 .sidebar select option {
   background-color: #555;
-  /* Match select background */
   color: #ffffff;
-  /* White text */
   padding: 10px;
-  /* Add some padding */
 }
 
 .sidebar select option:hover {
   background-color: #666;
-  /* Lighter on hover */
 }
 
 .sidebar select {
@@ -147,59 +153,67 @@ export default {
 .sidebar button img {
   margin-right: 10px;
   width: 32px;
-  /* Increased from 24px */
   height: 32px;
-  /* Increased from 24px */
 }
 
 .sidebar .dropdown-container {
   display: flex;
   align-items: center;
   margin-bottom: 15px;
+  margin-right: 10px;
   width: 100%;
 }
 
 .sidebar .dropdown-container select {
   flex: 1;
-  padding: 15px;
+  padding: 15px 45px 15px 45px;
   font-size: 16px;
   background-color: #555;
-  /* Match other elements */
-  color: #ffffff;
-  /* White text */
+  color: #d3daef;
   border: 1rem solid;
-  border-color: rgb(75, 75, 160);
-  /* Match other elements */
+  border-color: rgb(34, 34, 62);
   border-radius: 5px;
-  /* Fixed border radius */
   background-repeat: no-repeat;
   background-position: 10px center;
-  padding-left: 40px;
-  padding-right: 40px;
+  background-size: 24px 24px;
   box-sizing: border-box;
   overflow: hidden;
-  /* Ensure inner content respects border radius */
+  text-indent: 5px;
+  appearance: menulist;
 }
 
 #clientDropdown {
-  background-image: url('../assets/images/icons/client.png');
+  background-image: url('@/assets/images/icons/client.png');
   background-size: 32px 32px;
-  /* Increased from 24px */
 }
 
 #modeDropdown {
-  background-image: url('../assets/images/icons/cluster.png');
+  background-image: url('@/assets/images/icons/cluster.png');
   background-size: 32px 32px;
-  /* Increased from 24px */
+}
+
+.logo {
+  flex-shrink: 0;
+  padding: 10px;
+  margin-top: auto;
+  position: relative;
+  bottom: 80px;
+  overflow: hidden;
 }
 
 .logo img {
   width: 100%;
   height: auto;
-  max-width: 500px;
+  max-width: 220px;
+  display: block;
+  margin: 0 auto;
+  border: 3px solid #505050;
+  border-radius: 8px;
+  padding: 5px;
+  background-color: #4a4a4a;
+  object-fit: contain;
 }
 
-/* Responsive Adjustments */
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
@@ -221,5 +235,23 @@ export default {
   .sidebar .logo {
     display: none;
   }
+}
+
+.usecase-buttons button {
+  margin-bottom: 10px;
+  padding: 10px;
+  width: 100%;
+  background-color: #595757;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+}
+
+.usecase-buttons button:hover {
+  background-color: #888;
+}
+
+.some-class {
+  text-decoration: none;
 }
 </style>
