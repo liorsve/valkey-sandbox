@@ -134,39 +134,49 @@ export default {
   outline: 2px solid #9333ea; /* Accessibility focus */
   outline-offset: 3px; /* Better visibility */
 }
-.sidebar select {
-  margin-bottom: 15px;
-  padding: 15px;
+.sidebar .dropdown-container select {
+  padding: 12px 30px;
   font-size: 16px;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  background-color: #555;
+  font-weight: bold;
   color: #ffffff;
-  border: 1rem solid;
-  border-color: rgb(34, 34, 62);
-  border-radius: 25px;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  overflow: hidden;
+  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Clearer gradient */
+  border: 2px solid #9333ea; /* Make border clear and bold */
+  border-radius: 12px; /* Rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+  cursor: pointer; /* Indicate clickable */
+  appearance: none; /* Hide default arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); /* Custom arrow */
+  background-repeat: no-repeat;
+  background-position: right 10px center; /* Move arrow further right */
+  background-size: 16px;
+  transition: box-shadow 0.2s ease; /* Remove background transition */
+  width: 100%; /* Make the width 100% to ensure equal size */
 }
 
-.sidebar select:hover {
-  background-color: #666;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  border-color: rgb(95, 95, 180);
+.sidebar .dropdown-container {
+  width: 100%; /* Ensure both dropdowns take equal space */
 }
 
-.sidebar select option {
-  background-color: #555;
+.sidebar .dropdown-container select:hover {
+  background-color: #444; /* Darker background when hovering */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
+}
+
+.sidebar .dropdown-container select:focus {
+  outline: 2px solid #9333ea; /* Accessibility outline */
+  outline-offset: 2px;
+  border: 2px solid #9333ea; /* Strong border when focused */
+}
+
+.sidebar .dropdown-container select option {
+  background-color: #555; /* Consistent option background */
   color: #ffffff;
   padding: 10px;
 }
 
-.sidebar select option:hover {
-  background-color: #666;
+.sidebar .dropdown-container select option:hover {
+  background-color: #666; /* Option hover effect */
 }
 
 .sidebar select {
@@ -185,40 +195,44 @@ export default {
   height: 32px;
 }
 
-.sidebar .dropdown-container {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  margin-right: 10px;
-  width: 100%;
-}
-
 .sidebar .dropdown-container select {
-  flex: 1;
-  padding: 15px 45px 15px 45px;
+  padding: 12px 30px;
   font-size: 16px;
-  background-color: #555;
-  color: #d3daef;
-  border: 1rem solid;
-  border-color: rgb(34, 34, 62);
-  border-radius: 5px;
+  font-weight: bold;
+  color: #ffffff;
+  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Clearer gradient */
+  border: 2px solid #9333ea; /* Make border clear and bold */
+  border-radius: 12px; /* Rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+  cursor: pointer; /* Indicate clickable */
+  appearance: none; /* Hide default arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); /* Custom arrow */
   background-repeat: no-repeat;
-  background-position: 10px center;
-  background-size: 24px 24px;
-  box-sizing: border-box;
-  overflow: hidden;
-  text-indent: 5px;
-  appearance: menulist;
+  background-position: right 10px center; /* Move arrow further right */
+  background-size: 16px;
+  transition: box-shadow 0.2s ease; /* Remove background transition */
 }
 
-#clientDropdown {
-  background-image: url('@/assets/images/icons/client.png');
-  background-size: 32px 32px;
+.sidebar .dropdown-container select:hover {
+  background-color: #444; /* Darker background when hovering */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
 }
 
-#modeDropdown {
-  background-image: url('@/assets/images/icons/cluster.png');
-  background-size: 32px 32px;
+.sidebar .dropdown-container select:focus {
+  outline: 2px solid #9333ea; /* Accessibility outline */
+  outline-offset: 2px;
+  border: 2px solid #9333ea; /* Strong border when focused */
+}
+
+.sidebar .dropdown-container select option {
+  background-color: #555; /* Consistent option background */
+  color: #ffffff;
+  padding: 10px;
+}
+
+.sidebar .dropdown-container select option:hover {
+  background-color: #666; /* Option hover effect */
 }
 
 .logo {
