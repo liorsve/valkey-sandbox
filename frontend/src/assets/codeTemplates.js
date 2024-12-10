@@ -287,6 +287,7 @@ func main() {
     }
     fmt.Println("key", val)
 }`,
+
         Cluster: `// Valkey Go Example - Cluster Mode
 package main
 
@@ -321,6 +322,6 @@ func main() {
         panic(err)
     }
     fmt.Println("key", val)
-}`
+}`,
     }
 };

@@ -1,89 +1,80 @@
 <template>
   <div ref="editorContainer" class="editor-container">
-    <vue-monaco-editor ref="editorRef" v-model="localModelValue" :language="language" theme="vs-dark"
-      :options="MONACO_EDITOR_OPTIONS" @mounted="onEditorMounted" />
+    <vue-monaco-editor v-model:value="code" :language="language" theme="vs-dark" :options="MONACO_EDITOR_OPTIONS"
+      @mount="handleMount" @change="onChange" />
   </div>
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, nextTick } from 'vue';
-import VueMonacoEditor from '@guolao/vue-monaco-editor';
-
+import { defineComponent, watch, shallowRef } from 'vue';
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 export default defineComponent({
+  components: {
+    VueMonacoEditor,
+  },
   name: 'CodeEditor',
-  components: { VueMonacoEditor },
   props: {
     language: {
       type: String,
       default: 'javascript',
     },
-    modelValue: {
+    content: {
       type: String,
       default: '',
     },
   },
-  emits: ['update:modelValue'],
+  emits: ['update:content'],
   setup(props, { emit }) {
-    const editorRef = ref(null);
-    const isEditorMounted = ref(false);
-
-    const localModelValue = computed({
-      get: () => props.modelValue,
-      set: (value) => emit('update:modelValue', value),
-    });
 
     const MONACO_EDITOR_OPTIONS = {
       automaticLayout: true,
       formatOnType: true,
       formatOnPaste: true,
       fixedOverflowWidgets: true,
-      minimap: { enabled: false },
-      scrollBeyondLastLine: false,
-      wordWrap: "on",
-      wrappingIndent: "indent",
-      glyphMargin: false,
+      glyphMargin: true,
       scrollbar: {
         vertical: 'auto',
         horizontal: 'auto',
       },
       fontSize: 14,
-      lineHeight: 20,
     };
-
+    const editorRef = shallowRef()
+    const code = shallowRef(props.content);
     const handlePaste = () => {
-      editorRef.value?.editor?.getAction('editor.action.formatDocument').run();
+      editorRef.value?.getAction('editor.action.formatDocument').run();
     };
 
     const handleBlur = () => {
-      editorRef.value?.editor?.getAction('editor.action.formatDocument').run();
+      editorRef.value?.getAction('editor.action.formatDocument').run();
     };
 
-    const onEditorMounted = () => {
-      nextTick(() => {
-        isEditorMounted.value = true;
-        editorRef.value?.editor?.layout();
-      });
+    const handleMount = editor => {
+      editorRef.value = editor;
+      code.value = props.content;
+    }
+
+    const onChange = (value) => {
+      emit('update:content', value);
     };
 
-    watch(localModelValue, (newVal) => {
-      if (isEditorMounted.value) {
-        editorRef.value?.editor?.setValue(newVal);
+    watch(() => props.content, (newContent) => {
+      if (code.value !== newContent) {
+        code.value = newContent;
       }
     });
 
     watch(() => props.language, (newLang) => {
-      if (isEditorMounted.value) {
-        monaco.editor.setModelLanguage(editorRef.value?.editor?.getModel(), newLang);
-      }
+      editorRef.value?.updateOptions({ language: newLang });
     });
 
     return {
       MONACO_EDITOR_OPTIONS,
       handlePaste,
       handleBlur,
-      onEditorMounted,
+      handleMount,
       editorRef,
-      localModelValue,
+      code,
+      onChange
     };
   },
 });

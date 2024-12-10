@@ -1,5 +1,4 @@
 const path = require('path')
-const webpack = require('webpack')
 const { defineConfig } = require('@vue/cli-service')
 
 module.exports = defineConfig({
@@ -44,16 +43,6 @@ module.exports = defineConfig({
       globalObject: 'self',
       filename: '[name].js'
     },
-    plugins: [
-      new webpack.DefinePlugin({
-        __VUE_PROD_DEVTOOLS__: false,
-        __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
-        'process.env': {
-          NODE_ENV: JSON.stringify(process.env.NODE_ENV),
-          BASE_URL: JSON.stringify(process.env.NODE_ENV === 'production' ? './' : '/')
-        }
-      })
-    ]
   },
   pages: {
     index: {

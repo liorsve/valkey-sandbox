@@ -2,14 +2,8 @@
   <div id="app" class="appContainer">
     <TopTabs :activeTab="currentTab" @change-tab="switchTab" />
     <div class="mainContent">
-      <div v-if="currentTab === 'playground'" class="content">
-        <!-- Playground content -->
-        <Editor class="codeEditor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
-        <AppTerminal class="terminal" ref="terminal" />
-      </div>
-      <div v-else-if="currentTab === 'commonUseCases'" class="content">
-        <!-- Common UseCases content -->
-        <Editor class="codeEditor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
+      <div v-if="['playground', 'commonUseCases'].includes(currentTab)" class="content">
+        <Editor class="codeEditor" v-model:content="content" :language="language" />
         <AppTerminal class="terminal" ref="terminal" />
       </div>
       <div v-else-if="currentTab === 'watchInAction'" class="content">
@@ -25,7 +19,7 @@
         </div>
         <div v-if="selectedAction && selectedGlide" class="watch-content">
           <div class="editor-terminal">
-            <Editor ref="editor" v-model:value="code" :language="language" @update:modelValue="onContentChange" />
+            <Editor ref="editor" v-model:content="content" :language="language" />
             <AppTerminal ref="terminal" />
           </div>
           <div class="visualization">
@@ -87,7 +81,7 @@ export default {
       selectedUseCase: null,
       selectedAction: null,
       selectedGlide: null,
-      code: '',
+      content: '',
     };
   },
 
@@ -168,7 +162,16 @@ export default {
       } else {
         template = selectedTemplate[this.executionMode] || '// No template available';
       }
-      this.code = template;
+
+      // Add validation and logging
+      if (typeof template !== 'string') {
+        console.error(`Template for client "${this.selectedClient}" is not a string.`);
+        template = '// Invalid template.';
+      } else {
+        console.log(`Loaded template for client "${this.selectedClient}":`, template);
+      }
+
+      this.content = template;
       this.updateLanguage();
     },
 
@@ -194,7 +197,7 @@ export default {
     },
 
     runCode() {
-      const code = this.code;
+      const code = this.content;
       const language = this.language;
 
       this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
@@ -262,12 +265,12 @@ export default {
         this.selectedAction.charAt(0).toUpperCase() + this.selectedAction.slice(1);
       const template =
         selectedTemplate[templateKey] || '// No template available for selected action';
-      this.code = template;
+      this.content = template;
       this.updateLanguage();
     },
 
     onContentChange(newCode) {
-      this.code = newCode;
+      this.content = newCode;
     },
     updateClient(newClient, newMode) {
       this.selectedClient = newClient;
