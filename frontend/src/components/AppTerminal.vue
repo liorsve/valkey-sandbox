@@ -61,6 +61,7 @@ export default {
     background-color: #0d0d0d;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 :deep(.xterm .xterm-viewport),

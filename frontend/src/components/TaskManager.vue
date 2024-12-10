@@ -79,14 +79,21 @@ export default {
 .task-manager {
     display: flex;
     flex-direction: column;
+    padding: 20px;
     height: 100%;
-    /* Ensure it occupies full height of its container */
+    background-color: #121212;
 }
 
 .task-creation {
     display: flex;
     gap: 10px;
     margin-bottom: 10px;
+}
+
+.task-creation select,
+.task-creation button {
+    padding: 10px;
+    font-size: 16px;
 }
 
 .task-queue {
@@ -99,30 +106,30 @@ export default {
 
 .task-queue li {
     background-color: #333;
-    padding: 5px;
+    padding: 10px;
     margin-bottom: 5px;
-    border-radius: 3px;
+    border-radius: 5px;
+    color: #fff;
 }
 
-.task-manager {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    flex: 1;
-    /* Ensure it occupies full height of its container */
+button {
+    background-color: #444;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #555;
 }
 
 .visualization {
     flex: 2;
-    /* Ensure visualization takes appropriate space */
-    /* ...existing styles... */
+    background-color: #1e1e1e;
+    margin-top: 20px;
+    border-radius: 10px;
+    /* Add your visualization styles here */
 }
-
-/* Ensure fixed heights to prevent resize loops */
-.task-manager {
-    height: 100%;
-    /* ...existing styles... */
-}
-
-/* ...existing styles... */
 </style>

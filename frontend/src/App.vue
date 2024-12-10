@@ -7,16 +7,25 @@
         <AppTerminal class="terminal" ref="terminal" />
       </div>
       <div v-else-if="currentTab === 'watchInAction'" class="content">
-        <!-- Watch in Action content -->
-        <div class="action-selection">
-          <button @click="selectAction('leaderboard')">Leaderboard</button>
-          <button @click="selectAction('taskManager')">Task Manager</button>
+        <!-- Overlay Modal -->
+        <div v-if="!selectedGlide" class="overlay">
+          <!-- Close button -->
+          <button class="close-button" @click="closeOverlay">×</button>
+          <div class="selection-container">
+            <!-- First selection -->
+            <div v-if="!selectedAction">
+              <button class="selection-button" @click="selectAction('leaderboard')">Leaderboard</button>
+              <button class="selection-button" @click="selectAction('taskManager')">Task Manager</button>
+            </div>
+            <!-- Second selection -->
+            <div v-else>
+              <button class="selection-button" @click="selectGlide('valkey-glide (Node)')">Glide - Node.js</button>
+              <button class="selection-button" @click="selectGlide('valkey-glide (Python)')">Glide - Python</button>
+              <button class="selection-button" @click="selectGlide('valkey-glide (Java)')">Glide - Java</button>
+            </div>
+          </div>
         </div>
-        <div v-if="selectedAction" class="glide-selection">
-          <button @click="selectGlide('valkey-glide (Node)')">Glide - Nodejs</button>
-          <button @click="selectGlide('valkey-glide (Python)')">Glide - Python</button>
-          <button @click="selectGlide('valkey-glide (Java)')">Glide - Java</button>
-        </div>
+        <!-- Content after selections -->
         <div v-if="selectedAction && selectedGlide" class="watch-content">
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" />
@@ -274,6 +283,11 @@ export default {
       this.executionMode = newMode;
       this.updateTemplate();
     },
+    closeOverlay() {
+      this.selectedAction = null;
+      this.selectedGlide = null;
+      this.currentTab = this.previousTab || 'playground';
+    },
   },
 };
 </script>
@@ -379,5 +393,88 @@ body {
     width: 100%;
     order: 1;
   }
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.selection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.selection-button {
+  padding: 20px 40px;
+  font-size: 24px;
+  background: linear-gradient(45deg, #6a11cb, #2575fc);
+  color: #fff;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.selection-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.close-button {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 36px;
+  background: none;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  color: #ccc;
+}
+
+.watch-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 15px;
+}
+
+.editor-terminal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-terminal > * {
+  flex: 1;
+  overflow: hidden;
+}
+
+.visualization {
+  flex: 1;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Adjust content and mainContent styles */
+.content, .mainContent {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
 }
 </style>

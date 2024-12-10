@@ -109,46 +109,55 @@ export default {
     width: 100%;
     height: 100%;
     overflow-y: auto;
+    padding: 20px;
+    background-color: #121212;
 }
 
 .player-box {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
-    padding: 10px;
-    background-color: #222;
-    border-radius: 5px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #1e1e1e;
+    border-radius: 10px;
 }
 
 .player-rank {
-    width: 30px;
+    width: 50px;
     text-align: center;
+    font-size: 24px;
     font-weight: bold;
 }
 
 .player-image {
-    width: 50px;
-    height: 50px;
-    border-radius: 25px;
-    margin: 0 10px;
+    width: 70px;
+    height: 70px;
+    border-radius: 35px;
+    margin: 0 20px;
 }
 
-.player-info {
-    flex: 1;
+.player-info .player-name {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.player-info .player-score {
+    font-size: 16px;
+    color: #888;
 }
 
 .score-buttons {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 5px;
 }
 
 .score-buttons button {
-    margin: 2px 0;
-    padding: 5px;
+    padding: 8px 12px;
     background-color: #555;
     color: #fff;
     border: none;
-    border-radius: 3px;
+    border-radius: 5px;
     cursor: pointer;
 }
 
