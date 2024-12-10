@@ -29,12 +29,6 @@
     <div class="logo">
       <img src="@/assets/images/logo.png" alt="Logo" />
     </div>
-    <div class="common-usecases">
-      <h3>Common Use Cases</h3>
-      <ul>
-        <li @click="$emit('select-usecase', 'Task Manager')">Task Manager</li>
-      </ul>
-    </div>
   </div>
 </template>
 
@@ -91,14 +85,14 @@ export default {
     },
     setDefaultClient() {
       if (this.currentTab === 'commonUseCases') {
-        this.$emit('update-client', this.defaultClient, this.executionMode); // Set default client
+        this.$emit('update-client', this.defaultClient, this.executionMode);
       }
     },
   },
   watch: {
     currentTab(newTab) {
       if (newTab === 'commonUseCases') {
-        this.setDefaultClient();  // Set default values when tab changes
+        this.setDefaultClient();
       }
     },
   },

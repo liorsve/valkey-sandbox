@@ -14,8 +14,8 @@
           <div class="selection-container">
             <!-- First selection -->
             <div v-if="!selectedAction">
-              <button class="selection-button" @click="selectAction('leaderboard')">Leaderboard</button>
-              <button class="selection-button" @click="selectAction('taskManager')">Task Manager</button>
+              <button class="selection-button" @click="selectAction('Leaderboard')">Leaderboard</button>
+              <button class="selection-button" @click="selectAction('Task Manager')">Task Manager</button>
             </div>
             <!-- Second selection -->
             <div v-else>
@@ -28,12 +28,12 @@
         <!-- Content after selections -->
         <div v-else class="watch-content">
           <div class="editor-terminal">
-            <Editor ref="editor" v-model:content="content" :language="language" />
+            <Editor ref="editor" v-model:content="content" :language="language" :read-only="isReadOnly" />
             <AppTerminal class="terminal" ref="terminal" />
           </div>
           <div class="visualization">
-            <LeaderboardComponent v-if="selectedAction === 'leaderboard'" />
-            <TaskManager v-else-if="selectedAction === 'taskManager'" />
+            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" />
+            <TaskManager v-else-if="selectedAction === 'Task Manager'" />
           </div>
         </div>
       </div>
@@ -53,6 +53,7 @@ import LeaderboardComponent from './components/Leaderboard.vue';
 import TaskManager from './components/TaskManager.vue';
 import TopTabs from './components/TopTabs.vue';
 import { codeTemplates } from './assets/codeTemplates';
+import { watchInActionTemplates } from './assets/watchInActionTemplates.js';
 
 export default {
   name: 'App',
@@ -92,6 +93,7 @@ export default {
       selectedGlide: null,
       content: '',
       hideSidebar: false,
+      isReadOnly: false,
     };
   },
 
@@ -121,6 +123,17 @@ export default {
       if (newTab !== 'watchInAction') {
         this.resetWatchInAction();
         this.hideSidebar = false;
+      }
+      if (newTab === 'watchInAction') {
+        this.isReadOnly = true;
+        this.updateTemplate();
+      } else {
+        this.isReadOnly = false;
+      }
+    },
+    selectedGlide() {
+      if (this.currentTab === 'watchInAction') {
+        this.updateTemplate();
       }
     },
   },
@@ -174,20 +187,32 @@ export default {
     },
 
     updateTemplate() {
-      const selectedTemplate = codeTemplates[this.selectedClient];
-      let template;
-      if (this.currentTab === 'commonUseCases') {
-        if (this.selectedUseCase) {
-          template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
-        } else {
-          template = selectedTemplate['Leaderboard'];
+      if (this.currentTab === 'watchInAction') {
+        const template = watchInActionTemplates[this.selectedGlide]?.[this.selectedAction] || '';
+        if (template) {
+          this.content = template;
+          this.language = this.getLanguageForGlide(this.selectedGlide);
         }
       } else {
-        template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+        const selectedTemplate = codeTemplates[this.selectedClient];
+        let template;
+        if (this.currentTab === 'commonUseCases') {
+          if (this.selectedUseCase) {
+            if (['Task Manager', 'Leaderboard'].includes(this.selectedUseCase)) {
+              template = watchInActionTemplates[this.selectedClient]?.[this.selectedUseCase] ||
+                '// No template available for selected use case';
+            } else {
+              template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
+            }
+          } else {
+            template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+          }
+        } else {
+          template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+        }
+        this.content = template;
+        this.updateLanguage();
       }
-
-      this.content = template;
-      this.updateLanguage();
     },
 
     getTemplate() {
@@ -286,6 +311,19 @@ export default {
         selectedTemplate[templateKey] || '// No template available for selected action';
       this.content = template;
       this.updateLanguage();
+    },
+
+    getLanguageForGlide(glide) {
+      switch (glide) {
+        case 'valkey-glide (Python)':
+          return 'python';
+        case 'valkey-glide (Node)':
+          return 'javascript';
+        case 'valkey-glide (Java)':
+          return 'java';
+        default:
+          return 'python';
+      }
     },
 
     onContentChange(newContent) {
@@ -453,8 +491,8 @@ body {
   border-radius: 15px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
-  margin-bottom: 20px; /* Add more bottom space between buttons */
-  margin-right: 20px; /* Optional: Add right space between buttons if they are inline */
+  margin-bottom: 20px;
+  margin-right: 20px;
 }
 
 .selection-button:hover {
@@ -503,7 +541,6 @@ body {
   overflow: hidden;
 }
 
-/* Adjust content and mainContent styles */
 .content,
 .mainContent {
   flex: 1;

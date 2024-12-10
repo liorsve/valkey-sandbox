@@ -13,9 +13,10 @@
                 {{ task.action }}
             </li>
         </ul>
-        <button @click="executeTasks">Run</button>
-        <button @click="setTasks">Set</button>
-        <button @click="startExecution">Start</button>
+        <button v-if="buttonState === 'set'" @click="setTasks">Set Task Queue</button>
+        <button v-else-if="buttonState === 'invoke'" @click="invokeTaskManager">Invoke Task Manager</button>
+        <button v-else-if="buttonState === 'cancel'" @click="cancelTaskManager">Cancel</button>
+        <button v-else-if="buttonState === 'tryAgain'" @click="resetTaskManager">Try Again</button>
         <div class="visualization">
             <div ref="triangle" class="triangle"></div>
         </div>
@@ -23,7 +24,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 export default {
     name: 'TaskManager',
@@ -44,6 +45,7 @@ export default {
         const triangle = ref(null);
         let ws;
         const terminalRef = ref(null);
+        const buttonState = ref('set');
 
         const addTask = () => {
             if (taskQueue.value.length < 8) {
@@ -58,33 +60,54 @@ export default {
         };
 
         const setTasks = () => {
-            // Send taskQueue to backend
             ws.send(JSON.stringify({
                 action: 'setTasks',
                 data: taskQueue.value.map(task => task.action)
             }));
-            terminalWrite('Tasks have been set.\n');
+            terminalWrite('📝 Task Queue has been set!\n');
+            buttonState.value = 'invoke';
         };
 
-        const startExecution = () => {
+        const invokeTaskManager = () => {
             ws.send(JSON.stringify({
-                action: 'startTasks'
+                action: 'invokeTaskManager'
             }));
-            terminalWrite('Task execution started.\n');
+            terminalWrite('🚀 Invoking Task Manager...\n');
+            buttonState.value = 'cancel';
+        };
+
+        const cancelTaskManager = () => {
+            ws.send(JSON.stringify({
+                action: 'cancelTaskManager'
+            }));
+            terminalWrite('⛔ Task Manager cancelled.\n');
+            buttonState.value = 'tryAgain';
+        };
+
+        const resetTaskManager = () => {
+            taskQueue.value = [];
+            buttonState.value = 'set';
+            terminalWrite('🔄 Reset complete. Please add tasks.\n');
         };
 
         const handleWebSocketMessage = (event) => {
             const message = JSON.parse(event.data);
             if (message.action === 'taskUpdate') {
-                terminalWrite(`Task Update: ${message.data.status}\n`);
-                performTask(message.data.action);
+                terminalWrite(`🔔 ${message.data.status}\n`);
+                if (message.data.action) {
+                    performTask(message.data.action);
+                }
             } else if (message.action === 'queueStatus') {
-                terminalWrite(`Current Queue: ${message.data}\n`);
+                terminalWrite(`📋 Current Queue:\n${message.data.join('\n')}\n`);
+            } else if (message.action === 'lockStatus') {
+                animateLocking(message.data.locked);
+            } else if (message.action === 'processCompleted') {
+                terminalWrite('✅ All tasks completed!\n');
+                buttonState.value = 'tryAgain';
             }
         };
 
         const terminalWrite = (message) => {
-            // Send message to AppTerminal component
             terminalRef.value?.write(message);
         };
 
@@ -111,7 +134,7 @@ export default {
                     el.classList.add('shrink');
                     break;
                 case 'Confetti':
-                    // Implement confetti animation
+                    createConfetti(el);
                     break;
                 case 'Change Random Color':
                     el.style.backgroundColor = getRandomColor();
@@ -134,6 +157,21 @@ export default {
             }, 1000);
         };
 
+        function createConfetti(parent) {
+            const colors = ['#FFD700', '#FF69B4', '#00CED1', '#FF4500', '#9370DB'];
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 1000 + 'ms';
+                confetti.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.8)';
+                confetti.style.filter = 'brightness(1.5) contrast(1.2)';
+                parent.appendChild(confetti);
+                setTimeout(() => parent.removeChild(confetti), 2000);
+            }
+        }
+
         const getRandomColor = () => {
             const letters = '0123456789ABCDEF';
             let color = '#';
@@ -141,6 +179,18 @@ export default {
                 color += letters[Math.floor(Math.random() * 16)];
             }
             return color;
+        };
+
+        const animateLocking = (isLocked) => {
+            const el = triangle.value;
+            if (!el) return;
+            if (isLocked) {
+                el.classList.add('locked');
+                terminalWrite('🔒 Lock acquired.\n');
+            } else {
+                el.classList.remove('locked');
+                terminalWrite('🔓 Lock released.\n');
+            }
         };
 
         const connectWebSocket = () => {
@@ -151,6 +201,16 @@ export default {
         onMounted(() => {
             triangle.value = document.querySelector('.triangle');
             connectWebSocket();
+            ws.addEventListener('message', handleWebSocketMessage);
+            window.addEventListener('beforeunload', () => {
+                ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
+            });
+        });
+
+        onBeforeUnmount(() => {
+            window.removeEventListener('beforeunload', () => {
+                ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
+            });
         });
 
         return {
@@ -158,11 +218,13 @@ export default {
             selectedTask,
             taskQueue,
             addTask,
-            executeTasks,
             setTasks,
-            startExecution,
+            invokeTaskManager,
+            cancelTaskManager,
+            resetTaskManager,
             terminalRef,
             triangle,
+            buttonState,
         };
     },
 };
@@ -272,5 +334,25 @@ button:hover {
 
 .shrink {
     transform: scale(0.5);
+}
+
+/* Add styles for lock animations */
+.locked {
+    animation: lockAnimation 2s;
+}
+
+@keyframes lockAnimation {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+        background-color: red;
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 </style>

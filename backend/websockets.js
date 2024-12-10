@@ -3,12 +3,17 @@ import executeCode from './utils/dockerExecutor.js';
 import { GlideClusterClient } from '@valkey/valkey-glide';
 
 let client;
-// Initialize Valkey client
-(async () => {
+
+async function initializeClient() {
+    if (!client) {
+    const host = process.env.VALKEY_CLUSTER_HOST || 'localhost';
+    const port = process.env.VALKEY_CLUSTER_PORT || 7000;
     client = await GlideClusterClient.createClient({
-        addresses: [{ host: process.env.VALKEY_CLUSTER_HOST || 'localhost', port: process.env.VALKEY_CLUSTER_PORT || 7000 }],
+        addresses: [{ host, port: parseInt(port) }],
+        clientName: 'in-action-client'
     });
-})();
+    }
+}
 
 const lockKey = 'task-lock';
 const queueKey = 'task-queue';
@@ -36,6 +41,9 @@ export function setupWebSocket(server) {
     ws._socket.setKeepAlive(true, 30000);
     ws._socket.setTimeout(30000);
 
+    ws.isAlive = true;
+    ws.on('pong', () => (ws.isAlive = true));
+
     // Handle socket errors
     ws.on('error', (error) => {
       if (error.code !== 'EPIPE') {
@@ -61,13 +69,20 @@ export function setupWebSocket(server) {
             });
             break;
           case 'setTasks':
-            // Set tasks in Valkey queue
+            await initializeClient();
             await client.del(queueKey);
             await client.rpush(queueKey, data);
             ws.send(JSON.stringify({ action: 'queueStatus', data: data.join(', ') }));
+            ws.send(JSON.stringify({ action: 'tasksSet', data: 'Tasks have been set in ValKey cluster.' }));
             break;
           case 'startTasks':
             checkLock(ws);
+            break;
+          case 'invokeTaskManager':
+            ws.taskManagerInterval = setInterval(() => checkLock(ws), 500);
+            break;
+          case 'cancelTaskManager':
+            await cancelProcess(ws);
             break;
         }
       } catch (error) {
@@ -81,15 +96,16 @@ export function setupWebSocket(server) {
       }
     });
 
-    ws.on('close', () => {
+    ws.on('close', async () => {
       console.log(`[WS] Client disconnected (${clientIp})`);
+      clearInterval(ws.taskManagerInterval);
+      await cancelProcess(ws);
     });
 
     ws.on('error', (error) => {
       console.error(`Client ${clientIp} error:`, error);
     });
 
-    // Handle socket errors
     ws.on('error', (error) => {
       console.error(`WebSocket error: ${error.message}`);
     });
@@ -102,20 +118,37 @@ async function checkLock(ws) {
   try {
     const lockExists = await client.exists(lockKey);
     if (!lockExists) {
-      const task = await client.lpop(queueKey);
-      if (task) {
-        await client.set(lockKey, 'locked', { NX: true, EX: 10 });
-        ws.send(JSON.stringify({ action: 'taskUpdate', data: { status: 'started', action: task } }));
+      const tasks = await client.lrange(queueKey, 0, -1);
+      if (tasks.length > 0) {
+        ws.send(JSON.stringify({ action: 'queueStatus', data: tasks }));
+        const task = await client.lpop(queueKey);
+        await client.set(lockKey, 'locked', { EX: 10 });
+        ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: true } }));
+        ws.send(JSON.stringify({ action: 'taskUpdate', data: { status: `Processing task: ${task}`, action: task } }));
       } else {
-        ws.send(JSON.stringify({ action: 'queueStatus', data: 'All tasks completed.' }));
-        return;
+        ws.send(JSON.stringify({ action: 'processCompleted', data: 'All tasks completed.' }));
+        clearInterval(ws.taskManagerInterval);
+        await client.del(lockKey);
+        await client.quit();
+        client = null;
       }
+    } else {
+      ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: false } }));
     }
   } catch (error) {
     console.error('Error in checkLock:', error);
-  } finally {
-    setTimeout(() => checkLock(ws), 500);
   }
+}
+
+async function cancelProcess(ws) {
+  clearInterval(ws.taskManagerInterval);
+  if (client) {
+    await client.del(lockKey);
+    await client.del(queueKey);
+    await client.close();
+    client = null;
+  }
+  ws.send(JSON.stringify({ action: 'taskManagerCancelled', data: 'Task Manager has been cancelled.' }));
 }
 
 export function broadcast(data) {

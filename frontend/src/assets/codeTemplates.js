@@ -1,7 +1,6 @@
 export const codeTemplates = {
     'valkey-glide (Python)': {
         Standalone: `# Valkey Glide Standalone Python Template
-# Valkey Glide Example (Python)
 import asyncio
 from glide import NodeAddress, GlideClient, GlideClientConfiguration
 import os
@@ -20,8 +19,7 @@ async def main():
     await client.close()
 
 asyncio.run(main())`,
-        Cluster: `# Valkey Glide Cluster Python Template
-# Valkey Glide Example (Python) - Cluster Mode
+        Cluster: `# Valkey Glide Example (Python) - Cluster Mode
 import asyncio
 from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
 import os
@@ -40,154 +38,6 @@ async def main():
     await client.close()
 
 asyncio.run(main())`,
-        Leaderboard: `# Leaderboard Use Case in Python
-# ...code for leaderboard use case...
-import asyncio
-import json
-import os
-from glide import (
-    NodeAddress,
-    GlideClient,
-    GlideClientConfiguration,
-)
-
-client = None
-
-async def initialize_client():
-    global client
-    if client is None:
-        try:
-            host = os.getenv("VALKEY_HOST", "localhost")
-            port = int(os.getenv("VALKEY_PORT", 6379))
-            config = GlideClientConfiguration([NodeAddress(host, port)])
-            client = await GlideClient.create(config)
-            print("Connected to Valkey server")
-        except Exception as e:
-            print(f"Error initializing Valkey client: {e}")
-            raise
-
-# Function to set player data
-async def set_player_data(player_id, data):
-    await initialize_client()
-    try:
-        key = f"player:{player_id}"
-        print(f"Storing player data: key={key}, data={data}")
-        await client.set(key, json.dumps(data))
-    except Exception as e:
-        print(f"Error setting data for player {player_id}: {e}")
-        raise
-
-# Function to get player data
-async def get_player_data(player_id):
-    await initialize_client()
-    try:
-        key = f"player:{player_id}"
-        data = await client.get(key)
-        print(f"Retrieved data for key={key}: {data}")
-        return json.loads(data) if data else None
-    except Exception as e:
-        print(f"Error getting data for player {player_id}: {e}")
-        return None
-
-# Function to update player score
-async def update_player_score(player_id, score):
-    await initialize_client()
-    try:
-        print(f"Updating score: leaderboard, score={score}, playerId={player_id}")
-        await client.custom_command(["ZADD", "leaderboard", str(score), player_id])
-    except Exception as e:
-        print(f"Error updating score for player {player_id}: {e}")
-        raise
-
-# Function to get player rank
-async def get_player_rank(player_id):
-    await initialize_client()
-    try:
-        rank = await client.custom_command(["ZREVRANK", "leaderboard", player_id])
-        print(f"Rank for player {player_id}: {rank}")
-        return int(rank) + 1 if rank is not None else None  # Ranks are zero-based
-    except Exception as e:
-        print(f"Error getting rank for player {player_id}: {e}")
-        return None
-
-# Function to get top N players
-async def get_top_players(n):
-    await initialize_client()
-    try:
-        response = await client.custom_command(
-            ["ZREVRANGE", "leaderboard", "0", str(n - 1), "WITHSCORES"]
-        )
-        print(f"Raw leaderboard data: {response}")
-
-        players = []
-        for i in range(0, len(response), 2):
-            player_id = response[i]
-            score = float(response[i + 1])
-            data = await get_player_data(player_id)
-            print(f"Fetched data for playerId={player_id}, score={score}: {data}")
-            players.append({
-                "rank": len(players) + 1,
-                "playerId": player_id,
-                "score": score,
-                **(data or {})
-            })
-
-        return players
-    except Exception as e:
-        print(f"Error getting top {n} players: {e}")
-        return []
-
-# Function to close the client connection
-async def close_client():
-    global client
-    if client:
-        await client.close()
-        client = None
-
-# Example usage
-async def example_usage():
-    try:
-        # 1. Initialize player data
-        print("Initializing player data...")
-        await set_player_data("player1", {"name": "Alice", "level": 5})
-        await set_player_data("player2", {"name": "Bob", "level": 8})
-        await set_player_data("player3", {"name": "Charlie", "level": 3})
-
-        # 2. Get player data
-        print("Fetching player data...")
-        player1_data = await get_player_data("player1")
-        print(f"Player 1 Data: {player1_data}")
-        player2_data = await get_player_data("player2")
-        print(f"Player 2 Data: {player2_data}")
-
-        # 3. Update player scores
-        print("Updating player scores...")
-        await update_player_score("player1", 1500)
-        await update_player_score("player2", 1800)
-        await update_player_score("player3", 1200)
-
-        # 4. Get player rank
-        print("Getting player ranks...")
-        player1_rank = await get_player_rank("player1")
-        print(f"Player 1 Rank: {player1_rank}")
-        player2_rank = await get_player_rank("player2")
-        print(f"Player 2 Rank: {player2_rank}")
-
-        # 5. Fetch top 2 players
-        print("Fetching top 2 players...")
-        top_players = await get_top_players(2)
-        print(f"Top Players: {json.dumps(top_players, indent=2)}")
-
-    except Exception as e:
-        print(f"Error during example usage: {e}")
-    finally:
-        # Ensure the client is closed
-        print("Closing Valkey client...")
-        await close_client()
-
-# Run the example usage
-asyncio.run(example_usage())
-`,
         'Session Cache': `import asyncio
 from glide import (
   NodeAddress,
@@ -221,7 +71,6 @@ async def main():
   print(result)
 asyncio.run(main())`,
         'Recommendation System': `# Recommendation System Use Case in Python
-# ...code for recommendation system use case...
 import json
 import numpy as np
 import asyncio
@@ -279,46 +128,72 @@ async def main():
   recommendations = await recommend(client, user_embeddings, top_n=3)
   print(recommendations)
 asyncio.run(main())`,
-        'Task Manager': `
-# Task Manager Use Case in Python
-# ...code for task manager use case...
+        'Lock': `# Lock Example using Valkey Glide in Python
 import asyncio
-from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
+from glide import NodeAddress, GlideClient, GlideClientConfiguration
 import os
 
-async def main():
-    host = os.getenv('VALKEY_CLUSTER_HOST', 'localhost')
-    port = int(os.getenv('VALKEY_CLUSTER_PORT', '7000'))
-    config = GlideClusterClientConfiguration([NodeAddress(host, port)])
-    client = await GlideClusterClient.create(config)
-    
-    lock_key = 'task-lock'
-    queue_key = 'task-queue'
+async def lock_example(client, lock_key, resource_key):
+    # Try to acquire lock with 10 second expiry
+    lock_acquired = await client.set(lock_key, 'locked', nx=True, ex=10)
+    if lock_acquired:
+        try:
+            # Critical section - modify resource
+            await client.incr(resource_key)
+            current = await client.get(resource_key)
+            print(f"Modified resource: {current}")
+        finally:
+            # Always release the lock
+            await client.delete(lock_key)
+            print("Lock released")
+    else:
+        print("Lock is held by another process")
 
-    async def process_tasks():
-        while True:
-            lock_exists = await client.exists(lock_key)
-            if not lock_exists:
-                task = await client.lpop(queue_key)
-                if task:
-                    await client.set(lock_key, 'locked', ex=10)
-                    print(f"Processing task: {task.decode()}")
-                    await asyncio.sleep(1)  # Simulate task execution
-                    await client.delete(lock_key)
-                else:
-                    print("All tasks completed.")
-                    break
-            await asyncio.sleep(0.5)
+async def main():
+    host = os.getenv('VALKEY_HOST', 'localhost')
+    port = int(os.getenv('VALKEY_PORT', '6379'))
+    config = GlideClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClient.create(config)
     
-    await process_tasks()
+    await lock_example(client, 'mylock', 'counter')
+    
     await client.close()
 
-asyncio.run(main())
-`,
+asyncio.run(main())`,
+        'Queue': `# Queue Example using Valkey Glide in Python
+import asyncio
+from glide import NodeAddress, GlideClient, GlideClientConfiguration
+import os
+
+async def queue_example(client, queue_key):
+    # Add items to queue
+    tasks = ['task1', 'task2', 'task3']
+    for task in tasks:
+        await client.rpush(queue_key, task)
+        print(f"Added to queue: {task}")
+    
+    # Process queue
+    while True:
+        task = await client.lpop(queue_key)
+        if not task:
+            break
+        print(f"Processing: {task.decode()}")
+        await asyncio.sleep(1)  # Simulate work
+
+async def main():
+    host = os.getenv('VALKEY_HOST', 'localhost')
+    port = int(os.getenv('VALKEY_PORT', '6379'))
+    config = GlideClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClient.create(config)
+    
+    await queue_example(client, 'myqueue')
+    
+    await client.close()
+
+asyncio.run(main())`,
     },
     'valkey-glide (Node)': {
         Standalone: `// Valkey Glide Standalone Node.js Template
-// Valkey Glide Example (Node)
 import { GlideClient } from '@valkey/valkey-glide';
 
 async function main() {
@@ -338,8 +213,7 @@ async function main() {
 }
 
 await main();`,
-        Cluster: `// Valkey Glide Cluster Node.js Template
-// Valkey Glide Example (Node) - Cluster Mode
+        Cluster: `// Valkey Glide Example (Node) - Cluster Mode
 import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function main() {
@@ -359,158 +233,7 @@ async function main() {
 }
 
 await main();`,
-        Leaderboard: `// Leaderboard Use Case in Node.js
-// ...code for leaderboard use case...
-// Import Valkey-Glide
-import { GlideClient } from '@valkey/valkey-glide';
-// Initialize the Valkey client
-let client;
-async function initializeClient(mode = 'standalone') {
-try {
-  if (!client) {
-    const host = process.env.VALKEY_HOST || 'localhost';
-    const port = process.env.VALKEY_PORT || 6379;
-    client = await GlideClient.createClient({
-      addresses: [
-        {
-          host: host,
-          port: port,
-        },
-      ],
-      clientName: 'leaderboard_client',
-    });
-    console.log('Connected to Valkey server');
-  }
-} catch (error) {
-  console.error('Error initializing Valkey client:', error);
-  throw error;
-}
-}
-// Function to set player data
-async function setPlayerData(playerId, data) {
-await initializeClient();
-try {
-  const key = \`player:\${playerId}\`;
-  console.log(\`Storing player data: key=\${key}, data=\${JSON.stringify(data)}\`);
-  await client.set(key, JSON.stringify(data));
-} catch (error) {
-  console.error(\`Error setting data for player \${playerId}:\`, error);
-  throw error;
-}
-}
-// Function to get player data
-async function getPlayerData(playerId) {
-await initializeClient();
-try {
-  const key = \`player:\${playerId}\`;
-  const data = await client.get(key);
-  console.log(\`Retrieved data for key=\${key}:\`, data);
-  return data ? JSON.parse(data) : null;
-} catch (error) {
-  console.error(\`Error getting data for player \${playerId}:\`, error);
-  return null;
-}
-}
-// Function to update player score
-async function updatePlayerScore(playerId, score) {
-await initializeClient();
-try {
-  console.log(\`Updating score: leaderboard, score=\${score}, playerId=\${playerId}\`);
-  await client.customCommand(['ZADD', 'leaderboard', score.toString(), playerId]);
-} catch (error) {
-  console.error(\`Error updating score for player \${playerId}\`, error);
-  throw error;
-}
-}
-// Function to get player rank
-async function getPlayerRank(playerId) {
-await initializeClient();
-try {
-  const rank = await client.customCommand(['ZREVRANK', 'leaderboard', playerId]);
-  console.log(\`Rank for player \${playerId}:\`, rank);
-  return rank !== null ? parseInt(rank) + 1 : null; // Ranks are zero-based
-} catch (error) {
-  console.error(\`Error getting rank for player \${playerId}:\`, error);
-  return null;
-}
-}
-// Function to get top N players
-async function getTopPlayers(n) {
-await initializeClient();
-try {
-  const response = await client.customCommand([
-    'ZREVRANGE',
-    'leaderboard',
-    '0',
-    (n - 1).toString(),
-    'WITHSCORES',
-  ]);
-  console.log('Raw leaderboard data:', response);
-  const players = [];
-  for (const [playerId, scoreStr] of response) {
-    const score = parseFloat(scoreStr);
-    const data = await getPlayerData(playerId);
-    console.log(\`Fetched data for playerId=\${playerId}, score=\${score}:\`, data);
-    players.push({
-      rank: players.length + 1,
-      playerId,
-      score,
-      ...data,
-    });
-  }
-  return players;
-} catch (error) {
-  console.error(\`Error getting top \${n} players:\`, error);
-  return [];
-}
-}
-// Function to close the client connection
-async function closeClient() {
-if (client) {
-  await client.close();
-  client = null;
-}
-}
-async function exampleUsage() {
-try {
-  // 1. Initialize player data
-  console.log("Initializing player data...");
-  await setPlayerData("player1", { name: "Alice", level: 5 });
-  await setPlayerData("player2", { name: "Bob", level: 8 });
-  await setPlayerData("player3", { name: "Charlie", level: 3 });
-  // 2. Get player data
-  console.log("Fetching player data...");
-  const player1Data = await getPlayerData("player1");
-  console.log("Player 1 Data:", player1Data);
-  const player2Data = await getPlayerData("player2");
-  console.log("Player 2 Data:", player2Data);
-  // 3. Update player scores
-  console.log("Updating player scores...");
-  await updatePlayerScore("player1", 1500);
-  await updatePlayerScore("player2", 1800);
-  await updatePlayerScore("player3", 1200);
-  // 4. Get player rank
-  console.log("Getting player ranks...");
-  const player1Rank = await getPlayerRank("player1");
-  console.log("Player 1 Rank:", player1Rank);
-  const player2Rank = await getPlayerRank("player2");
-  console.log("Player 2 Rank:", player2Rank);
-  // 5. Fetch top 2 players
-  console.log("Fetching top 2 players...");
-  const topPlayers = await getTopPlayers(2);
-  console.log("Top Players:", JSON.stringify(topPlayers, null, 2));
-} catch (error) {
-  console.error("Error during example usage:", error);
-} finally {
-  // Ensure the client is closed
-  console.log("Closing Valkey client...");
-  await closeClient();
-}
-}
-// Run the example usage
-await exampleUsage();`,
-'Session Cache': `// Session Cache Use Case in Node.js
-// ...code for session cache use case... 
+        'Session Cache': `// Session Cache Use Case in Node.js
 import { GlideClient } from '@valkey/valkey-glide';
 
 async function sessionCacheExample(client, username) {
@@ -560,7 +283,6 @@ async function main() {
 await main();
 `,
 'Recommendation System': `// Recommendation System Use Case in Node.js
-// ...code for recommendation system use case...
 import { GlideClient } from '@valkey/valkey-glide';
 
 // Utility function to calculate the dot product of two arrays
@@ -647,49 +369,75 @@ async function main() {
 }
 
 // Run the main function
-main().catch((error) => {
-    console.error('Error:', error);
-});
+await main();
 `,
-        'Task Manager': `
-// Task Manager Use Case in Node.js
-// ...code for task manager use case...
-const { GlideClusterClient } = require('@valkey/valkey-glide');
+        'Lock': `// Lock Example using Valkey Glide in Node.js
+import { GlideClient } from '@valkey/valkey-glide';
 
-async function processTasks() {
-    const client = await GlideClusterClient.createClient({
-        addresses: [{ host: 'localhost', port: 7000 }],
-    });
-
-    const lockKey = 'task-lock';
-    const queueKey = 'task-queue';
-
-    while (true) {
-        const lockExists = await client.exists(lockKey);
-        if (!lockExists) {
-            const task = await client.lpop(queueKey);
-            if (task) {
-                await client.set(lockKey, 'locked', { EX: 10 });
-                console.log(\`Processing task: \${task}\`);
-                await new Promise(res => setTimeout(res, 1000)); // Simulate task execution
-                await client.del(lockKey);
-            } else {
-                console.log('All tasks completed.');
-                break;
-            }
+async function lockExample(client, lockKey, resourceKey) {
+    // Try to acquire lock with 10 second expiry
+    const lockAcquired = await client.set(lockKey, 'locked', { NX: true, EX: 10 });
+    if (lockAcquired) {
+        try {
+            // Critical section - modify resource
+            await client.incr(resourceKey);
+            const current = await client.get(resourceKey);
+            console.log('Modified resource:', current);
+        } finally {
+            // Always release the lock
+            await client.del(lockKey);
+            console.log('Lock released');
         }
-        await new Promise(res => setTimeout(res, 500));
+    } else {
+        console.log('Lock is held by another process');
     }
+}
 
+async function main() {
+    const client = await GlideClient.createClient({
+        addresses: [{ host: 'localhost', port: 6379 }],
+    });
+    
+    await lockExample(client, 'mylock', 'counter');
+    
     await client.close();
 }
 
-processTasks();
-`,
+await main();`,
+        'Queue': `// Queue Example using Valkey Glide in Node.js
+import { GlideClient } from '@valkey/valkey-glide';
+
+async function queueExample(client, queueKey) {
+    // Add items to queue
+    const tasks = ['task1', 'task2', 'task3'];
+    for (const task of tasks) {
+        await client.rpush(queueKey, task);
+        console.log('Added to queue:', task);
+    }
+    
+    // Process queue
+    while (true) {
+        const task = await client.lpop(queueKey);
+        if (!task) break;
+        console.log('Processing:', task);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate work
+    }
+}
+
+async function main() {
+    const client = await GlideClient.createClient({
+        addresses: [{ host: 'localhost', port: 6379 }],
+    });
+    
+    await queueExample(client, 'myqueue');
+    
+    await client.close();
+}
+
+await main();`,
     },
     'valkey-glide (Java)': {
         Standalone: `// Valkey Glide Standalone Java Template
-// Valkey Glide Example (Java)
 import io.valkey.glide.*;
 import java.util.Arrays;
 
@@ -710,8 +458,7 @@ public class Example {
         }
     }
 }`,
-        Cluster: `// Valkey Glide Cluster Java Template
-// Valkey Glide Example (Java) - Cluster Mode
+        Cluster: `// Valkey Glide Example (Java) - Cluster Mode
 import io.valkey.glide.*;
 import java.util.Arrays;
 
@@ -732,44 +479,75 @@ public class Example {
         }
     }
 }`,
-        Leaderboard: `// Leaderboard Use Case in Java
-// ...code for leaderboard use case...`,
-        'Task Manager': `
-// Task Manager Use Case in Java
-// ...code for task manager use case...
+        'Lock': `// Lock Example using Valkey Glide in Java
 import io.valkey.glide.*;
 import java.util.Arrays;
 
-public class TaskManager {
+public class LockExample {
     public static void main(String[] args) throws Exception {
-        GlideClusterClientConfiguration config = new GlideClusterClientConfiguration(
-            Arrays.asList(new NodeAddress("localhost", 7000))
+        GlideClientConfiguration config = new GlideClientConfiguration(
+            Arrays.asList(new NodeAddress("localhost", 6379))
         );
-        try (GlideClusterClient client = GlideClusterClient.create(config)) {
-
-            String lockKey = "task-lock";
-            String queueKey = "task-queue";
-
-            while (true) {
-                boolean lockExists = client.exists(lockKey).get();
-                if (!lockExists) {
-                    String task = client.lpop(queueKey).get();
-                    if (task != null) {
-                        client.set(lockKey, "locked", new SetArgs().ex(10)).get();
-                        System.out.println("Processing task: " + task);
-                        Thread.sleep(1000); // Simulate task execution
-                        client.del(lockKey).get();
-                    } else {
-                        System.out.println("All tasks completed.");
-                        break;
-                    }
-                }
-                Thread.sleep(500);
-            }
+        
+        try (GlideClient client = GlideClient.create(config)) {
+            lockExample(client, "mylock", "counter");
         }
     }
-}
-`,
+    
+    private static void lockExample(GlideClient client, String lockKey, String resourceKey) throws Exception {
+        // Try to acquire lock with 10 second expiry
+        boolean lockAcquired = client.set(lockKey, "locked", new SetArgs().nx().ex(10)).get();
+        if (lockAcquired) {
+            try {
+                // Critical section - modify resource
+                client.incr(resourceKey).get();
+                String current = client.get(resourceKey).get();
+                System.out.println("Modified resource: " + current);
+            } finally {
+                // Always release the lock
+                client.del(lockKey).get();
+                System.out.println("Lock released");
+            }
+        } else {
+            System.out.println("Lock is held by another process");
+        }
+    }
+}`,
+        'Queue': `// Queue Example using Valkey Glide in Java
+import io.valkey.glide.*;
+import java.util.Arrays;
+import java.util.List;
+
+public class QueueExample {
+    public static void main(String[] args) throws Exception {
+        GlideClientConfiguration config = new GlideClientConfiguration(
+            Arrays.asList(new NodeAddress("localhost", 6379))
+        );
+        
+        try (GlideClient client = GlideClient.create(config)) {
+            queueExample(client);
+        }
+    }
+    
+    private static void queueExample(GlideClient client) throws Exception {
+        String queueKey = "myqueue";
+        
+        // Add items to queue
+        List<String> tasks = Arrays.asList("task1", "task2", "task3");
+        for (String task : tasks) {
+            client.rpush(queueKey, task).get();
+            System.out.println("Added to queue: " + task);
+        }
+        
+        // Process queue
+        while (true) {
+            String task = client.lpop(queueKey).get();
+            if (task == null) break;
+            System.out.println("Processing: " + task);
+            Thread.sleep(1000); // Simulate work
+        }
+    }
+}`,
     },
     'valkey-py (Python)': {
         Standalone: `# Valkey Example
