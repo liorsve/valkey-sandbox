@@ -30,8 +30,7 @@ import aquamanImg from '@/assets/images/aquaman.jpg';
 
 export default {
     name: 'LeaderboardComponent',
-
-    setup() {
+    setup(props, { emit }) {
         const players = ref([
             { id: 1, name: 'Superman', photo: supermanImg, score: 50 },
             { id: 2, name: 'Batman', photo: batmanImg, score: 40 },
@@ -60,6 +59,10 @@ export default {
             }
         };
 
+        const terminalWrite = (message) => {
+            emit('terminal-write', message.trim() + '\n');
+        };
+
         const connectWebSocket = () => {
             const wsUrl = getWebSocketUrl();
             const ws = new WebSocket(wsUrl);
@@ -70,7 +73,7 @@ export default {
                     const player = players.value.find((p) => p.id === updatedPlayer.id);
                     if (player) {
                         player.score = updatedPlayer.score;
-                        console.log(`Updated score for ${player.name}: ${player.score}`);
+                        terminalWrite(`Updated score for ${player.name}: ${player.score}`);
                     }
                 }
             };

@@ -2,6 +2,10 @@ import { WebSocketServer } from 'ws';
 import executeCode from './utils/dockerExecutor.js';
 import { GlideClusterClient } from '@valkey/valkey-glide';
 
+/** 
+ * @type {GlideClusterClient} 
+ * @description Client instance for interacting with ValKey cluster.
+ */
 let client;
 
 async function initializeClient() {
@@ -28,6 +32,8 @@ export function setupWebSocket(server) {
     setKeepAlive: true,
   });
 
+  console.log('[WSS] WebSocket server initialized');
+
   // Handle server-level errors
   wss.on('error', (error) => {
     console.error('[WSS] Server error:', error);
@@ -35,7 +41,7 @@ export function setupWebSocket(server) {
 
   wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
-    console.log(`Client connected from ${clientIp}`);
+    console.log(`[WSS] Client connected from ${clientIp}`);
 
     // Set socket options
     ws._socket.setKeepAlive(true, 30000);
@@ -55,6 +61,7 @@ export function setupWebSocket(server) {
     ws.on('message', async (message) => {
       try {
         const { action, data } = JSON.parse(message);
+        console.log(`[WSS] Received action: ${action}`, data);
         
         switch (action) {
           case 'runCode':
@@ -69,9 +76,11 @@ export function setupWebSocket(server) {
             });
             break;
           case 'setTasks':
+            console.log('[WSS] Setting tasks:', data);
             await initializeClient();
             await client.del(queueKey);
-            await client.rpush(queueKey, data);
+            await client.rpush(queueKey, ...data);
+            console.log('[WSS] Tasks set successfully');
             ws.send(JSON.stringify({ action: 'queueStatus', data: data.join(', ') }));
             ws.send(JSON.stringify({ action: 'tasksSet', data: 'Tasks have been set in ValKey cluster.' }));
             break;
@@ -79,14 +88,21 @@ export function setupWebSocket(server) {
             checkLock(ws);
             break;
           case 'invokeTaskManager':
+            console.log('[WSS] Task manager invoked');
             ws.taskManagerInterval = setInterval(() => checkLock(ws), 500);
             break;
           case 'cancelTaskManager':
+            console.log('[WSS] Canceling task manager');
             await cancelProcess(ws);
             break;
         }
       } catch (error) {
-        console.error('[WS] Message handling error:', error);
+        console.error('[WSS] Message handling error:', {
+          error: error.message,
+          stack: error.stack,
+          action: message?.action,
+          data: message?.data
+        });
         if (ws.readyState === ws.OPEN) {
           ws.send(JSON.stringify({
             action: 'error',
@@ -117,36 +133,53 @@ export function setupWebSocket(server) {
 async function checkLock(ws) {
   try {
     const lockExists = await client.exists(lockKey);
+    console.log('[WSS] Lock check:', { exists: lockExists });
+
     if (!lockExists) {
       const tasks = await client.lrange(queueKey, 0, -1);
+      console.log('[WSS] Current tasks in queue:', tasks);
+
       if (tasks.length > 0) {
-        ws.send(JSON.stringify({ action: 'queueStatus', data: tasks }));
         const task = await client.lpop(queueKey);
+        console.log('[WSS] Processing task:', task);
         await client.set(lockKey, 'locked', { EX: 10 });
         ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: true } }));
         ws.send(JSON.stringify({ action: 'taskUpdate', data: { status: `Processing task: ${task}`, action: task } }));
       } else {
+        console.log('[WSS] Queue empty, completing process');
         ws.send(JSON.stringify({ action: 'processCompleted', data: 'All tasks completed.' }));
         clearInterval(ws.taskManagerInterval);
         await client.del(lockKey);
-        await client.quit();
+        client.close();
         client = null;
       }
     } else {
       ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: false } }));
     }
   } catch (error) {
-    console.error('Error in checkLock:', error);
+    console.error('[WSS] Lock check error:', {
+      error: error.message,
+      stack: error.stack
+    });
   }
 }
 
 async function cancelProcess(ws) {
+  console.log('[WSS] Canceling process, cleaning up resources');
   clearInterval(ws.taskManagerInterval);
   if (client) {
-    await client.del(lockKey);
-    await client.del(queueKey);
-    await client.close();
-    client = null;
+    try {
+      await client.del(lockKey);
+      await client.del(queueKey);
+      console.log('[WSS] Resources cleaned up successfully');
+    } catch (error) {
+      console.error('[WSS] Error during cleanup:', error);
+    } finally {
+      if (client) {
+        client.close();
+      }
+      client = null;
+    }
   }
   ws.send(JSON.stringify({ action: 'taskManagerCancelled', data: 'Task Manager has been cancelled.' }));
 }

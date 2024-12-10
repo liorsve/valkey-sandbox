@@ -32,12 +32,11 @@
             <AppTerminal class="terminal" ref="terminal" />
           </div>
           <div class="visualization">
-            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" />
-            <TaskManager v-else-if="selectedAction === 'Task Manager'" />
+            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" @terminal-write="handleTerminalWrite" />
+            <TaskManager v-else-if="selectedAction === 'Task Manager'" @terminal-write="handleTerminalWrite" />
           </div>
         </div>
       </div>
-      <!-- ...other tabs... -->
       <AppSidebar class="sidebar" :currentTab="currentTab" :selectedClient="selectedClient"
         :executionMode="executionMode" @run-code="runCode" @navigate="navigate" @select-usecase="selectUseCase"
         @update-client="updateClient" @update-mode="updateMode" />
@@ -347,6 +346,9 @@ export default {
       this.selectedAction = null;
       this.selectedGlide = null;
       this.hideSidebar = false;
+    },
+    handleTerminalWrite(message) {
+      this.$refs.terminal?.write(message);
     },
   },
 };

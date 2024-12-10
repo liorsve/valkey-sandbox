@@ -13,12 +13,19 @@
                 {{ task.action }}
             </li>
         </ul>
-        <button v-if="buttonState === 'set'" @click="setTasks">Set Task Queue</button>
+        <button v-if="buttonState === 'set'" @click="setTasks">Set Tasks Queue</button>
         <button v-else-if="buttonState === 'invoke'" @click="invokeTaskManager">Invoke Task Manager</button>
         <button v-else-if="buttonState === 'cancel'" @click="cancelTaskManager">Cancel</button>
         <button v-else-if="buttonState === 'tryAgain'" @click="resetTaskManager">Try Again</button>
         <div class="visualization">
             <div ref="triangle" class="triangle"></div>
+        </div>
+        <!-- Add Modal -->
+        <div v-if="showEmptyQueuePopup" class="modal-overlay">
+            <div class="modal-content">
+                <p>Please add tasks to the queue before setting it.</p>
+                <button @click="closePopup">OK</button>
+            </div>
         </div>
     </div>
 </template>
@@ -28,7 +35,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 
 export default {
     name: 'TaskManager',
-    setup() {
+    setup(props, { emit }) {
         const tasks = ref([
             { id: 1, action: 'Flip Right' },
             { id: 2, action: 'Flip Left' },
@@ -44,8 +51,8 @@ export default {
         const taskQueue = ref([]);
         const triangle = ref(null);
         let ws;
-        const terminalRef = ref(null);
         const buttonState = ref('set');
+        const showEmptyQueuePopup = ref(false);
 
         const addTask = () => {
             if (taskQueue.value.length < 8) {
@@ -60,6 +67,10 @@ export default {
         };
 
         const setTasks = () => {
+            if (taskQueue.value.length === 0) {
+                showEmptyQueuePopup.value = true;
+                return;
+            }
             ws.send(JSON.stringify({
                 action: 'setTasks',
                 data: taskQueue.value.map(task => task.action)
@@ -93,22 +104,23 @@ export default {
         const handleWebSocketMessage = (event) => {
             const message = JSON.parse(event.data);
             if (message.action === 'taskUpdate') {
-                terminalWrite(`🔔 ${message.data.status}\n`);
+                terminalWrite(`🔔 ${message.data.status}`);
                 if (message.data.action) {
                     performTask(message.data.action);
                 }
             } else if (message.action === 'queueStatus') {
-                terminalWrite(`📋 Current Queue:\n${message.data.join('\n')}\n`);
+                const queueData = typeof message.data === 'string' ? message.data : message.data.join('\n');
+                terminalWrite(`📋 Current Queue:\n${queueData}`);
             } else if (message.action === 'lockStatus') {
                 animateLocking(message.data.locked);
             } else if (message.action === 'processCompleted') {
-                terminalWrite('✅ All tasks completed!\n');
+                terminalWrite('✅ All tasks completed!');
                 buttonState.value = 'tryAgain';
             }
         };
 
         const terminalWrite = (message) => {
-            terminalRef.value?.write(message);
+            emit('terminal-write', message.trim() + '\n');
         };
 
         const performTask = (action) => {
@@ -198,6 +210,10 @@ export default {
             ws.onmessage = handleWebSocketMessage;
         };
 
+        const closePopup = () => {
+            showEmptyQueuePopup.value = false;
+        };
+
         onMounted(() => {
             triangle.value = document.querySelector('.triangle');
             connectWebSocket();
@@ -222,9 +238,10 @@ export default {
             invokeTaskManager,
             cancelTaskManager,
             resetTaskManager,
-            terminalRef,
             triangle,
             buttonState,
+            showEmptyQueuePopup,
+            closePopup,
         };
     },
 };
@@ -354,5 +371,49 @@ button:hover {
     100% {
         transform: scale(1);
     }
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #1e1e1e;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.modal-content p {
+    color: #fff;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.modal-content button {
+    background-color: #6a11cb;
+    color: white;
+    padding: 0.8rem 2rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+.modal-content button:hover {
+    background-color: #2575fc;
 }
 </style>
