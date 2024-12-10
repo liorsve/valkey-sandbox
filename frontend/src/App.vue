@@ -1,7 +1,7 @@
 <template>
   <div id="app" class="appContainer">
     <TopTabs :activeTab="currentTab" @change-tab="switchTab" />
-    <div class="mainContent">
+    <div class="mainContent" :class="{ 'no-sidebar': hideSidebar }">
       <div v-if="['playground', 'commonUseCases'].includes(currentTab)" class="content">
         <Editor class="codeEditor" v-model:content="content" :language="language" />
         <AppTerminal class="terminal" ref="terminal" />
@@ -26,7 +26,7 @@
           </div>
         </div>
         <!-- Content after selections -->
-        <div v-if="selectedAction && selectedGlide" class="watch-content">
+        <div v-else class="watch-content">
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" />
             <AppTerminal ref="terminal" />
@@ -91,6 +91,7 @@ export default {
       selectedAction: null,
       selectedGlide: null,
       content: '',
+      hideSidebar: false,
     };
   },
 
@@ -113,6 +114,15 @@ export default {
 
   mounted() {
     this.updateTemplate();
+  },
+
+  watch: {
+    currentTab(newTab, oldTab) {
+      if (newTab !== 'watchInAction') {
+        this.resetWatchInAction();
+        this.hideSidebar = false;
+      }
+    },
   },
 
   methods: {
@@ -257,6 +267,7 @@ export default {
 
     selectGlide(glide) {
       this.selectedGlide = glide;
+      this.hideSidebar = true;
       this.updateTemplateForAction();
     },
 
@@ -284,9 +295,13 @@ export default {
       this.updateTemplate();
     },
     closeOverlay() {
+      this.resetWatchInAction();
+      this.currentTab = 'playground';
+    },
+    resetWatchInAction() {
       this.selectedAction = null;
       this.selectedGlide = null;
-      this.currentTab = this.previousTab || 'playground';
+      this.hideSidebar = false;
     },
   },
 };
@@ -326,6 +341,14 @@ body {
   gap: 15px;
   overflow: hidden;
   position: static;
+}
+
+.mainContent.no-sidebar .sidebar {
+  display: none;
+}
+
+.mainContent.no-sidebar {
+  padding: 0;
 }
 
 .content {
@@ -459,7 +482,7 @@ body {
   overflow: hidden;
 }
 
-.editor-terminal > * {
+.editor-terminal>* {
   flex: 1;
   overflow: hidden;
 }
@@ -472,7 +495,8 @@ body {
 }
 
 /* Adjust content and mainContent styles */
-.content, .mainContent {
+.content,
+.mainContent {
   flex: 1;
   display: flex;
   overflow: hidden;

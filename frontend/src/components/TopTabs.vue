@@ -4,6 +4,9 @@
             @click="$emit('change-tab', tab.name)">
             {{ tab.label }}
         </button>
+        <button :class="{ active: activeTab === 'watchInAction' }" @click="$emit('change-tab', 'watchInAction')">
+            Watch in Action
+        </button>
     </div>
 </template>
 

@@ -61,7 +61,8 @@ export default {
         };
 
         const connectWebSocket = () => {
-            const ws = new WebSocket('ws://localhost:3000/appws');
+            const wsUrl = getWebSocketUrl();
+            const ws = new WebSocket(wsUrl);
             ws.onmessage = (event) => {
                 const message = JSON.parse(event.data);
                 if (message.action === 'scoreUpdate') {
@@ -73,12 +74,11 @@ export default {
                     }
                 }
             };
-            ws.onopen = () => {
-                console.log('WebSocket connected for Leaderboard');
-            };
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
+        };
+
+        const getWebSocketUrl = () => {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${protocol}//${window.location.host}/appws`;
         };
 
         const leaderboardRef = ref(null);

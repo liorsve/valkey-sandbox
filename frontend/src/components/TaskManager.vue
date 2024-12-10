@@ -39,6 +39,7 @@ export default {
 
         const selectedTask = ref(tasks.value[0]);
         const taskQueue = ref([]);
+        const triangle = ref(null);
 
         const addTask = () => {
             if (taskQueue.value.length < 8) {
@@ -47,11 +48,67 @@ export default {
         };
 
         const executeTasks = () => {
-            // Send tasks to backend and handle lock-and-queue logic
+            if (taskQueue.value.length === 0) return;
+            const task = taskQueue.value.shift();
+            performTask(task.action);
+        };
+
+        const performTask = (action) => {
+            const el = triangle.value;
+            switch (action) {
+                case 'Flip Right':
+                    el.classList.add('flip-right');
+                    break;
+                case 'Flip Left':
+                    el.classList.add('flip-left');
+                    break;
+                case 'Flip Up':
+                    el.classList.add('flip-up');
+                    break;
+                case 'Flip Down':
+                    el.classList.add('flip-down');
+                    break;
+                case 'Grow':
+                    el.classList.add('grow');
+                    break;
+                case 'Shrink':
+                    el.classList.add('shrink');
+                    break;
+                case 'Confetti':
+                    // Implement confetti animation
+                    break;
+                case 'Change Random Color':
+                    el.style.backgroundColor = getRandomColor();
+                    break;
+                default:
+                    break;
+            }
+            setTimeout(() => {
+                el.classList.remove(
+                    'flip-right',
+                    'flip-left',
+                    'flip-up',
+                    'flip-down',
+                    'grow',
+                    'shrink'
+                );
+                if (taskQueue.value.length > 0) {
+                    executeTasks();
+                }
+            }, 1000);
+        };
+
+        const getRandomColor = () => {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
         };
 
         const connectWebSocket = () => {
-            const ws = new WebSocket('ws://localhost:3000');
+            const ws = new WebSocket('ws://localhost:3000/appws');
             ws.onmessage = (event) => {
                 const message = JSON.parse(event.data);
                 if (message.action === 'taskUpdate') {
@@ -70,6 +127,7 @@ export default {
             taskQueue,
             addTask,
             executeTasks,
+            triangle,
         };
     },
 };
@@ -77,6 +135,7 @@ export default {
 
 <style scoped>
 .task-manager {
+    margin-top: 20px;
     display: flex;
     flex-direction: column;
     padding: 20px;
@@ -94,6 +153,19 @@ export default {
 .task-creation button {
     padding: 10px;
     font-size: 16px;
+    background-color: #1e1e1e;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+}
+
+.task-creation button {
+    background-color: #6a11cb;
+    transition: background-color 0.3s;
+}
+
+.task-creation button:hover {
+    background-color: #2575fc;
 }
 
 .task-queue {
@@ -130,6 +202,41 @@ button:hover {
     background-color: #1e1e1e;
     margin-top: 20px;
     border-radius: 10px;
-    /* Add your visualization styles here */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.triangle {
+    width: 0;
+    height: 0;
+    border-left: 60px solid transparent;
+    border-right: 60px solid transparent;
+    border-bottom: 120px solid #6a11cb;
+    transition: transform 1s, background-color 1s;
+}
+
+.flip-right {
+    transform: rotateY(180deg);
+}
+
+.flip-left {
+    transform: rotateY(-180deg);
+}
+
+.flip-up {
+    transform: rotateX(-180deg);
+}
+
+.flip-down {
+    transform: rotateX(180deg);
+}
+
+.grow {
+    transform: scale(1.5);
+}
+
+.shrink {
+    transform: scale(0.5);
 }
 </style>

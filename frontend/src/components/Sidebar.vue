@@ -1,5 +1,5 @@
 <template>
-  <div class="sidebar">
+  <div v-if="!hideSidebar" class="sidebar">
     <div class="top-section">
       <!-- Client Dropdown -->
       <div class="dropdown-container">
@@ -69,6 +69,9 @@ export default {
       } else {
         return this.$parent.clients;
       }
+    },
+    hideSidebar() {
+      return this.currentTab === 'watchInAction' && this.$parent.hideSidebar;
     },
   },
   methods: {

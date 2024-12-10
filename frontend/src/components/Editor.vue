@@ -6,7 +6,7 @@
 </template>
 
 <script>
-import { defineComponent, watch, shallowRef } from 'vue';
+import { defineComponent, watch, shallowRef, onBeforeUnmount } from 'vue';
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
 export default defineComponent({
   components: {
@@ -65,6 +65,10 @@ export default defineComponent({
 
     watch(() => props.language, (newLang) => {
       editorRef.value?.updateOptions({ language: newLang });
+    });
+
+    onBeforeUnmount(() => {
+      editorRef.value?.dispose();
     });
 
     return {
