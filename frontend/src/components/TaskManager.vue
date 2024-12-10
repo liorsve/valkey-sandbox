@@ -14,6 +14,8 @@
             </li>
         </ul>
         <button @click="executeTasks">Run</button>
+        <button @click="setTasks">Set</button>
+        <button @click="startExecution">Start</button>
         <div class="visualization">
             <div ref="triangle" class="triangle"></div>
         </div>
@@ -40,6 +42,8 @@ export default {
         const selectedTask = ref(tasks.value[0]);
         const taskQueue = ref([]);
         const triangle = ref(null);
+        let ws;
+        const terminalRef = ref(null);
 
         const addTask = () => {
             if (taskQueue.value.length < 8) {
@@ -51,6 +55,37 @@ export default {
             if (taskQueue.value.length === 0) return;
             const task = taskQueue.value.shift();
             performTask(task.action);
+        };
+
+        const setTasks = () => {
+            // Send taskQueue to backend
+            ws.send(JSON.stringify({
+                action: 'setTasks',
+                data: taskQueue.value.map(task => task.action)
+            }));
+            terminalWrite('Tasks have been set.\n');
+        };
+
+        const startExecution = () => {
+            ws.send(JSON.stringify({
+                action: 'startTasks'
+            }));
+            terminalWrite('Task execution started.\n');
+        };
+
+        const handleWebSocketMessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.action === 'taskUpdate') {
+                terminalWrite(`Task Update: ${message.data.status}\n`);
+                performTask(message.data.action);
+            } else if (message.action === 'queueStatus') {
+                terminalWrite(`Current Queue: ${message.data}\n`);
+            }
+        };
+
+        const terminalWrite = (message) => {
+            // Send message to AppTerminal component
+            terminalRef.value?.write(message);
         };
 
         const performTask = (action) => {
@@ -109,13 +144,8 @@ export default {
         };
 
         const connectWebSocket = () => {
-            const ws = new WebSocket('ws://localhost:3000/appws');
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                if (message.action === 'taskUpdate') {
-                    // Update visualization based on task execution
-                }
-            };
+            ws = new WebSocket('ws://localhost:3000/appws');
+            ws.onmessage = handleWebSocketMessage;
         };
 
         onMounted(() => {
@@ -129,6 +159,9 @@ export default {
             taskQueue,
             addTask,
             executeTasks,
+            setTasks,
+            startExecution,
+            terminalRef,
             triangle,
         };
     },

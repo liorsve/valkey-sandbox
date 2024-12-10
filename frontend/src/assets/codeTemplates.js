@@ -278,7 +278,43 @@ async def main():
   user_embeddings = [[0.1, 0.3, 0.5], [0.3, 0.4, 0.6]]
   recommendations = await recommend(client, user_embeddings, top_n=3)
   print(recommendations)
-asyncio.run(main())`
+asyncio.run(main())`,
+        'Task Manager': `
+# Task Manager Use Case in Python
+# ...code for task manager use case...
+import asyncio
+from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
+import os
+
+async def main():
+    host = os.getenv('VALKEY_CLUSTER_HOST', 'localhost')
+    port = int(os.getenv('VALKEY_CLUSTER_PORT', '7000'))
+    config = GlideClusterClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClusterClient.create(config)
+    
+    lock_key = 'task-lock'
+    queue_key = 'task-queue'
+
+    async def process_tasks():
+        while True:
+            lock_exists = await client.exists(lock_key)
+            if not lock_exists:
+                task = await client.lpop(queue_key)
+                if task:
+                    await client.set(lock_key, 'locked', ex=10)
+                    print(f"Processing task: {task.decode()}")
+                    await asyncio.sleep(1)  # Simulate task execution
+                    await client.delete(lock_key)
+                else:
+                    print("All tasks completed.")
+                    break
+            await asyncio.sleep(0.5)
+    
+    await process_tasks()
+    await client.close()
+
+asyncio.run(main())
+`,
     },
     'valkey-glide (Node)': {
         Standalone: `// Valkey Glide Standalone Node.js Template
@@ -382,7 +418,7 @@ try {
   console.log(\`Updating score: leaderboard, score=\${score}, playerId=\${playerId}\`);
   await client.customCommand(['ZADD', 'leaderboard', score.toString(), playerId]);
 } catch (error) {
-  console.error(\`Error updating score for player \${playerId}:\`, error);
+  console.error(\`Error updating score for player \${playerId}\`, error);
   throw error;
 }
 }
@@ -614,7 +650,42 @@ async function main() {
 main().catch((error) => {
     console.error('Error:', error);
 });
-`
+`,
+        'Task Manager': `
+// Task Manager Use Case in Node.js
+// ...code for task manager use case...
+const { GlideClusterClient } = require('@valkey/valkey-glide');
+
+async function processTasks() {
+    const client = await GlideClusterClient.createClient({
+        addresses: [{ host: 'localhost', port: 7000 }],
+    });
+
+    const lockKey = 'task-lock';
+    const queueKey = 'task-queue';
+
+    while (true) {
+        const lockExists = await client.exists(lockKey);
+        if (!lockExists) {
+            const task = await client.lpop(queueKey);
+            if (task) {
+                await client.set(lockKey, 'locked', { EX: 10 });
+                console.log(\`Processing task: \${task}\`);
+                await new Promise(res => setTimeout(res, 1000)); // Simulate task execution
+                await client.del(lockKey);
+            } else {
+                console.log('All tasks completed.');
+                break;
+            }
+        }
+        await new Promise(res => setTimeout(res, 500));
+    }
+
+    await client.close();
+}
+
+processTasks();
+`,
     },
     'valkey-glide (Java)': {
         Standalone: `// Valkey Glide Standalone Java Template
@@ -662,7 +733,43 @@ public class Example {
     }
 }`,
         Leaderboard: `// Leaderboard Use Case in Java
-// ...code for leaderboard use case...`
+// ...code for leaderboard use case...`,
+        'Task Manager': `
+// Task Manager Use Case in Java
+// ...code for task manager use case...
+import io.valkey.glide.*;
+import java.util.Arrays;
+
+public class TaskManager {
+    public static void main(String[] args) throws Exception {
+        GlideClusterClientConfiguration config = new GlideClusterClientConfiguration(
+            Arrays.asList(new NodeAddress("localhost", 7000))
+        );
+        try (GlideClusterClient client = GlideClusterClient.create(config)) {
+
+            String lockKey = "task-lock";
+            String queueKey = "task-queue";
+
+            while (true) {
+                boolean lockExists = client.exists(lockKey).get();
+                if (!lockExists) {
+                    String task = client.lpop(queueKey).get();
+                    if (task != null) {
+                        client.set(lockKey, "locked", new SetArgs().ex(10)).get();
+                        System.out.println("Processing task: " + task);
+                        Thread.sleep(1000); // Simulate task execution
+                        client.del(lockKey).get();
+                    } else {
+                        System.out.println("All tasks completed.");
+                        break;
+                    }
+                }
+                Thread.sleep(500);
+            }
+        }
+    }
+}
+`,
     },
     'valkey-py (Python)': {
         Standalone: `# Valkey Example
@@ -789,7 +896,7 @@ import (
 func main() {
     ctx := context.Background()
     host := os.Getenv("VALKEY_HOST")
-    if host == "" {
+    if (host == "") {
         host = "localhost:6379"
     }
     
@@ -824,7 +931,7 @@ import (
 func main() {
     ctx := context.Background()
     host := os.Getenv("VALKEY_CLUSTER_HOST")
-    if host == "" {
+    if (host == "") {
         host = "localhost:7000"
     }
 

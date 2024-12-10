@@ -1,5 +1,17 @@
 import { WebSocketServer } from 'ws';
 import executeCode from './utils/dockerExecutor.js';
+import { GlideClusterClient } from '@valkey/valkey-glide';
+
+let client;
+// Initialize Valkey client
+(async () => {
+    client = await GlideClusterClient.createClient({
+        addresses: [{ host: process.env.VALKEY_CLUSTER_HOST || 'localhost', port: process.env.VALKEY_CLUSTER_PORT || 7000 }],
+    });
+})();
+
+const lockKey = 'task-lock';
+const queueKey = 'task-queue';
 
 export function setupWebSocket(server) {
   const wss = new WebSocketServer({ 
@@ -48,6 +60,15 @@ export function setupWebSocket(server) {
               }
             });
             break;
+          case 'setTasks':
+            // Set tasks in Valkey queue
+            await client.del(queueKey);
+            await client.rpush(queueKey, data);
+            ws.send(JSON.stringify({ action: 'queueStatus', data: data.join(', ') }));
+            break;
+          case 'startTasks':
+            checkLock(ws);
+            break;
         }
       } catch (error) {
         console.error('[WS] Message handling error:', error);
@@ -75,6 +96,26 @@ export function setupWebSocket(server) {
   });
 
   return wss;
+}
+
+async function checkLock(ws) {
+  try {
+    const lockExists = await client.exists(lockKey);
+    if (!lockExists) {
+      const task = await client.lpop(queueKey);
+      if (task) {
+        await client.set(lockKey, 'locked', { NX: true, EX: 10 });
+        ws.send(JSON.stringify({ action: 'taskUpdate', data: { status: 'started', action: task } }));
+      } else {
+        ws.send(JSON.stringify({ action: 'queueStatus', data: 'All tasks completed.' }));
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Error in checkLock:', error);
+  } finally {
+    setTimeout(() => checkLock(ws), 500);
+  }
 }
 
 export function broadcast(data) {

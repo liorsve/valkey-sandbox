@@ -29,6 +29,12 @@
     <div class="logo">
       <img src="@/assets/images/logo.png" alt="Logo" />
     </div>
+    <div class="common-usecases">
+      <h3>Common Use Cases</h3>
+      <ul>
+        <li @click="$emit('select-usecase', 'Task Manager')">Task Manager</li>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -59,8 +65,9 @@ export default {
         'Recommendation System',
         'Search Engine',
         'Web App Cache',
+        'Task Manager',
       ],
-      defaultClient: 'valkey-glide (Python)',  // Set default client for commonUseCases tab
+      defaultClient: 'valkey-glide (Python)',
     };
   },
   computed: {
@@ -121,76 +128,111 @@ export default {
 }
 
 .sidebar button {
-  padding: 12px 24px; /* Better spacing */
-  font-size: 16px; /* Clean font size */
-  font-weight: bold; /* Clear and defined text */
-  color: #ffffff; /* Text color */
-  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Modern gradient */
-  border: none; /* Remove border */
-  border-radius: 12px; /* Smoother corners */
+  padding: 12px 24px;
+  /* Better spacing */
+  font-size: 16px;
+  /* Clean font size */
+  font-weight: bold;
+  /* Clear and defined text */
+  color: #ffffff;
+  /* Text color */
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  /* Modern gradient */
+  border: none;
+  /* Remove border */
+  border-radius: 12px;
+  /* Smoother corners */
   transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-  cursor: pointer; /* Indicate clickable */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+  cursor: pointer;
+  /* Indicate clickable */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* Subtle shadow */
 }
 
 .sidebar button:hover {
-  transform: scale(1.05); /* Slightly enlarge */
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* More pronounced shadow */
-  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
+  transform: scale(1.05);
+  /* Slightly enlarge */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  /* More pronounced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+  /* Slightly darker gradient */
 }
 
 .sidebar button:active {
-  transform: scale(0.97); /* Simulate button press */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Softer shadow */
+  transform: scale(0.97);
+  /* Simulate button press */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  /* Softer shadow */
 }
 
 .sidebar button:focus {
-  outline: 2px solid #9333ea; /* Accessibility focus */
-  outline-offset: 3px; /* Better visibility */
+  outline: 2px solid #9333ea;
+  /* Accessibility focus */
+  outline-offset: 3px;
+  /* Better visibility */
 }
+
 .sidebar .dropdown-container select {
   padding: 12px 30px;
   font-size: 16px;
   font-weight: bold;
   color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Clearer gradient */
-  border: 2px solid #9333ea; /* Make border clear and bold */
-  border-radius: 12px; /* Rounded corners */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
-  cursor: pointer; /* Indicate clickable */
-  appearance: none; /* Hide default arrow */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); /* Custom arrow */
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  /* Clearer gradient */
+  border: 2px solid #9333ea;
+  /* Make border clear and bold */
+  border-radius: 12px;
+  /* Rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* Subtle shadow */
+  cursor: pointer;
+  /* Indicate clickable */
+  appearance: none;
+  /* Hide default arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  /* Custom arrow */
   background-repeat: no-repeat;
-  background-position: right 10px center; /* Move arrow further right */
+  background-position: right 10px center;
+  /* Move arrow further right */
   background-size: 16px;
-  transition: box-shadow 0.2s ease; /* Remove background transition */
-  width: 100%; /* Make the width 100% to ensure equal size */
+  transition: box-shadow 0.2s ease;
+  /* Remove background transition */
+  width: 100%;
+  /* Make the width 100% to ensure equal size */
 }
 
 .sidebar .dropdown-container {
-  width: 100%; /* Ensure both dropdowns take equal space */
+  width: 100%;
+  /* Ensure both dropdowns take equal space */
 }
 
 .sidebar .dropdown-container select:hover {
-  background-color: #444; /* Darker background when hovering */
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
-  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
+  background-color: #444;
+  /* Darker background when hovering */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  /* Enhanced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+  /* Slightly darker gradient */
 }
 
 .sidebar .dropdown-container select:focus {
-  outline: 2px solid #9333ea; /* Accessibility outline */
+  outline: 2px solid #9333ea;
+  /* Accessibility outline */
   outline-offset: 2px;
-  border: 2px solid #9333ea; /* Strong border when focused */
+  border: 2px solid #9333ea;
+  /* Strong border when focused */
 }
 
 .sidebar .dropdown-container select option {
-  background-color: #555; /* Consistent option background */
+  background-color: #555;
+  /* Consistent option background */
   color: #ffffff;
   padding: 10px;
 }
 
 .sidebar .dropdown-container select option:hover {
-  background-color: #666; /* Option hover effect */
+  background-color: #666;
+  /* Option hover effect */
 }
 
 .sidebar select {
@@ -214,39 +256,55 @@ export default {
   font-size: 16px;
   font-weight: bold;
   color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Clearer gradient */
-  border: 2px solid #9333ea; /* Make border clear and bold */
-  border-radius: 12px; /* Rounded corners */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
-  cursor: pointer; /* Indicate clickable */
-  appearance: none; /* Hide default arrow */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); /* Custom arrow */
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  /* Clearer gradient */
+  border: 2px solid #9333ea;
+  /* Make border clear and bold */
+  border-radius: 12px;
+  /* Rounded corners */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* Subtle shadow */
+  cursor: pointer;
+  /* Indicate clickable */
+  appearance: none;
+  /* Hide default arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  /* Custom arrow */
   background-repeat: no-repeat;
-  background-position: right 10px center; /* Move arrow further right */
+  background-position: right 10px center;
+  /* Move arrow further right */
   background-size: 16px;
-  transition: box-shadow 0.2s ease; /* Remove background transition */
+  transition: box-shadow 0.2s ease;
+  /* Remove background transition */
 }
 
 .sidebar .dropdown-container select:hover {
-  background-color: #444; /* Darker background when hovering */
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
-  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
+  background-color: #444;
+  /* Darker background when hovering */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  /* Enhanced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+  /* Slightly darker gradient */
 }
 
 .sidebar .dropdown-container select:focus {
-  outline: 2px solid #9333ea; /* Accessibility outline */
+  outline: 2px solid #9333ea;
+  /* Accessibility outline */
   outline-offset: 2px;
-  border: 2px solid #9333ea; /* Strong border when focused */
+  border: 2px solid #9333ea;
+  /* Strong border when focused */
 }
 
 .sidebar .dropdown-container select option {
-  background-color: #555; /* Consistent option background */
+  background-color: #555;
+  /* Consistent option background */
   color: #ffffff;
   padding: 10px;
 }
 
 .sidebar .dropdown-container select option:hover {
-  background-color: #666; /* Option hover effect */
+  background-color: #666;
+  /* Option hover effect */
 }
 
 .logo {
