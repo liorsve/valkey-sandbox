@@ -106,7 +106,34 @@ export default {
   margin-bottom: 20px;
 }
 
-.sidebar button,
+.sidebar button {
+  padding: 12px 24px; /* Better spacing */
+  font-size: 16px; /* Clean font size */
+  font-weight: bold; /* Clear and defined text */
+  color: #ffffff; /* Text color */
+  background: linear-gradient(135deg, #3b82f6, #9333ea); /* Modern gradient */
+  border: none; /* Remove border */
+  border-radius: 12px; /* Smoother corners */
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  cursor: pointer; /* Indicate clickable */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+}
+
+.sidebar button:hover {
+  transform: scale(1.05); /* Slightly enlarge */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* More pronounced shadow */
+  background: linear-gradient(135deg, #2563eb, #7e22ce); /* Slightly darker gradient */
+}
+
+.sidebar button:active {
+  transform: scale(0.97); /* Simulate button press */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Softer shadow */
+}
+
+.sidebar button:focus {
+  outline: 2px solid #9333ea; /* Accessibility focus */
+  outline-offset: 3px; /* Better visibility */
+}
 .sidebar select {
   margin-bottom: 15px;
   padding: 15px;
@@ -125,7 +152,6 @@ export default {
   overflow: hidden;
 }
 
-.sidebar button:hover,
 .sidebar select:hover {
   background-color: #666;
   transform: translateY(-2px);
