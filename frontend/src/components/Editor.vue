@@ -51,6 +51,10 @@ export default defineComponent({
     const handleMount = editor => {
       editorRef.value = editor;
       code.value = props.content;
+      const editorContainer = editor.getDomNode();
+      if (editorContainer) {
+        editorContainer.style.paddingTop = '10px';
+      }
     }
 
     const onChange = (value) => {

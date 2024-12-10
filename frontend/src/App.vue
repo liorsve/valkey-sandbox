@@ -455,6 +455,8 @@ body {
   border-radius: 15px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 20px; /* Add more bottom space between buttons */
+  margin-right: 20px; /* Optional: Add right space between buttons if they are inline */
 }
 
 .selection-button:hover {
