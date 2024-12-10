@@ -104,13 +104,13 @@ export default defineComponent({
 
 :deep(.xterm .xterm-viewport),
 :deep(.xterm .xterm-screen) {
-  padding: 10px;
+  /* padding: 10px; */
   box-sizing: border-box;
 }
 
 .terminal {
   flex: 1;
-  max-height: 200px;
+  max-height: 250px;
   overflow-y: auto;
 }
 </style>

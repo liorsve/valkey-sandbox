@@ -15,7 +15,7 @@
         </ul>
         <button @click="executeTasks">Run</button>
         <div class="visualization">
-            <!-- Triangle visualization with animations -->
+            <div ref="triangle" class="triangle"></div>
         </div>
     </div>
 </template>
@@ -55,6 +55,7 @@ export default {
 
         const performTask = (action) => {
             const el = triangle.value;
+            if (!el) return;
             switch (action) {
                 case 'Flip Right':
                     el.classList.add('flip-right');
@@ -118,6 +119,7 @@ export default {
         };
 
         onMounted(() => {
+            triangle.value = document.querySelector('.triangle');
             connectWebSocket();
         });
 
@@ -135,12 +137,12 @@ export default {
 
 <style scoped>
 .task-manager {
-    margin-top: 20px;
     display: flex;
     flex-direction: column;
     padding: 20px;
     height: 100%;
     background-color: #121212;
+    overflow: hidden;
 }
 
 .task-creation {
@@ -173,7 +175,6 @@ export default {
     padding: 0;
     margin-bottom: 10px;
     flex: 1;
-    overflow-y: auto;
 }
 
 .task-queue li {

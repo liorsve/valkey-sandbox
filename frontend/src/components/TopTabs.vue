@@ -4,9 +4,6 @@
             @click="$emit('change-tab', tab.name)">
             {{ tab.label }}
         </button>
-        <button :class="{ active: activeTab === 'watchInAction' }" @click="$emit('change-tab', 'watchInAction')">
-            Watch in Action
-        </button>
     </div>
 </template>
 
@@ -43,7 +40,6 @@ export default {
 
 .top-tabs button {
     flex: 1;
-    padding: 15px;
     color: #fff;
     background-color: #444;
     border: none;

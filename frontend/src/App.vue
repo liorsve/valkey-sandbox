@@ -250,6 +250,9 @@ export default {
     },
 
     switchTab(tabName) {
+      if (this.currentTab === 'watchInAction' && tabName === 'watchInAction') {
+        this.resetWatchInAction();
+      }
       this.currentTab = tabName;
       this.selectedUseCase = null;
       this.updateTemplate();
@@ -355,6 +358,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 15px;
 }
 
 .codeEditor {
@@ -401,7 +405,6 @@ body {
   flex: 1;
 }
 
-/* Adjust Z-Index if overlapping occurs */
 .sidebar {
   z-index: 10;
 }
