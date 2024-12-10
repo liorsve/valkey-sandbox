@@ -29,7 +29,7 @@
         <div v-else class="watch-content">
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" />
-            <AppTerminal ref="terminal" />
+            <AppTerminal class="terminal" ref="terminal" />
           </div>
           <div class="visualization">
             <LeaderboardComponent v-if="selectedAction === 'leaderboard'" />
