@@ -163,14 +163,6 @@ export default {
         template = selectedTemplate[this.executionMode] || '// No template available';
       }
 
-      // Add validation and logging
-      if (typeof template !== 'string') {
-        console.error(`Template for client "${this.selectedClient}" is not a string.`);
-        template = '// Invalid template.';
-      } else {
-        console.log(`Loaded template for client "${this.selectedClient}":`, template);
-      }
-
       this.content = template;
       this.updateLanguage();
     },
@@ -269,8 +261,8 @@ export default {
       this.updateLanguage();
     },
 
-    onContentChange(newCode) {
-      this.content = newCode;
+    onContentChange(newContent) {
+      this.content = newContent;
     },
     updateClient(newClient, newMode) {
       this.selectedClient = newClient;
@@ -303,28 +295,23 @@ body {
   bottom: 0;
   display: flex;
   flex-direction: column;
-  /* Changed from row to column */
 }
 
 .appContainer {
   display: flex;
   flex-direction: column;
-  /* Changed from row to column */
   width: 100%;
-  height: 100%;
+  height: 100vh;
 }
 
-/* Adjust mainContent to fill available space and arrange children horizontally */
 .mainContent {
   flex: 1;
   display: flex;
   flex-direction: row;
-  /* Changed to row to arrange children horizontally */
   padding: 15px;
   gap: 15px;
   overflow: hidden;
-  position: relative;
-  /* Added for stacking context */
+  position: static;
 }
 
 .content {
@@ -347,11 +334,9 @@ body {
 .sidebar {
   width: 250px;
   flex-shrink: 0;
-  /* Ensure sidebar is on the right */
   order: 2;
 }
 
-/* Optional: Ensure editor and terminal take full height */
 .editor-terminal,
 .visualization {
   height: 100%;
@@ -366,7 +351,13 @@ body {
 
 .editor-terminal {
   display: flex;
+  flex-direction: column;
   flex: 1;
+}
+
+.editor-terminal>* {
+  flex: 1;
+  min-height: 0;
 }
 
 .visualization {

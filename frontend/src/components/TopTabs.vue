@@ -35,6 +35,7 @@ export default {
 .top-tabs {
     display: flex;
     background-color: #333;
+    height: 50px;
 }
 
 .top-tabs button {

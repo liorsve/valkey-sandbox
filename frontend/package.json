@@ -9,7 +9,6 @@
         "backend": "file:../backend",
         "http-server": "^14.1.1",
         "mitt": "^3.0.1",
-        "monaco-editor": "^0.52.0",
         "resize-observer-polyfill": "^1.5.1",
         "serve": "^14.2.1",
         "vue": "^3.3.0"

@@ -81,15 +81,26 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.editor-container {
+.terminal-container {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  padding: 10px 10px;
+  background-color: #0d0d0d;
   display: flex;
   flex-direction: column;
 }
 
-.vue-monaco-editor {
+:deep(.xterm .xterm-viewport),
+:deep(.xterm .xterm-screen) {
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.terminal {
   flex: 1;
-  min-height: 0;
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>
