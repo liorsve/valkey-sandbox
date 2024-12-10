@@ -30,7 +30,12 @@ export default {
 
         const write = (data) => {
             if (terminal.value) {
-                terminal.value.write(data);
+            // Sanitize the data by removing carriage returns
+            const sanitizedData = data.replace(/\r/g, '');
+            // Split the sanitized data by newlines and write each line to the terminal
+            sanitizedData.split('\n').forEach(line => {
+                terminal.value.writeln(line.trim());
+            });
             }
         };
 

@@ -41,7 +41,153 @@ async def main():
 
 asyncio.run(main())`,
         Leaderboard: `# Leaderboard Use Case in Python
-# ...code for leaderboard use case...`,
+# ...code for leaderboard use case...
+import asyncio
+import json
+import os
+from glide import (
+    NodeAddress,
+    GlideClient,
+    GlideClientConfiguration,
+)
+
+client = None
+
+async def initialize_client():
+    global client
+    if client is None:
+        try:
+            host = os.getenv("VALKEY_HOST", "localhost")
+            port = int(os.getenv("VALKEY_PORT", 6379))
+            config = GlideClientConfiguration([NodeAddress(host, port)])
+            client = await GlideClient.create(config)
+            print("Connected to Valkey server")
+        except Exception as e:
+            print(f"Error initializing Valkey client: {e}")
+            raise
+
+# Function to set player data
+async def set_player_data(player_id, data):
+    await initialize_client()
+    try:
+        key = f"player:{player_id}"
+        print(f"Storing player data: key={key}, data={data}")
+        await client.set(key, json.dumps(data))
+    except Exception as e:
+        print(f"Error setting data for player {player_id}: {e}")
+        raise
+
+# Function to get player data
+async def get_player_data(player_id):
+    await initialize_client()
+    try:
+        key = f"player:{player_id}"
+        data = await client.get(key)
+        print(f"Retrieved data for key={key}: {data}")
+        return json.loads(data) if data else None
+    except Exception as e:
+        print(f"Error getting data for player {player_id}: {e}")
+        return None
+
+# Function to update player score
+async def update_player_score(player_id, score):
+    await initialize_client()
+    try:
+        print(f"Updating score: leaderboard, score={score}, playerId={player_id}")
+        await client.custom_command(["ZADD", "leaderboard", str(score), player_id])
+    except Exception as e:
+        print(f"Error updating score for player {player_id}: {e}")
+        raise
+
+# Function to get player rank
+async def get_player_rank(player_id):
+    await initialize_client()
+    try:
+        rank = await client.custom_command(["ZREVRANK", "leaderboard", player_id])
+        print(f"Rank for player {player_id}: {rank}")
+        return int(rank) + 1 if rank is not None else None  # Ranks are zero-based
+    except Exception as e:
+        print(f"Error getting rank for player {player_id}: {e}")
+        return None
+
+# Function to get top N players
+async def get_top_players(n):
+    await initialize_client()
+    try:
+        response = await client.custom_command(
+            ["ZREVRANGE", "leaderboard", "0", str(n - 1), "WITHSCORES"]
+        )
+        print(f"Raw leaderboard data: {response}")
+
+        players = []
+        for i in range(0, len(response), 2):
+            player_id = response[i]
+            score = float(response[i + 1])
+            data = await get_player_data(player_id)
+            print(f"Fetched data for playerId={player_id}, score={score}: {data}")
+            players.append({
+                "rank": len(players) + 1,
+                "playerId": player_id,
+                "score": score,
+                **(data or {})
+            })
+
+        return players
+    except Exception as e:
+        print(f"Error getting top {n} players: {e}")
+        return []
+
+# Function to close the client connection
+async def close_client():
+    global client
+    if client:
+        await client.close()
+        client = None
+
+# Example usage
+async def example_usage():
+    try:
+        # 1. Initialize player data
+        print("Initializing player data...")
+        await set_player_data("player1", {"name": "Alice", "level": 5})
+        await set_player_data("player2", {"name": "Bob", "level": 8})
+        await set_player_data("player3", {"name": "Charlie", "level": 3})
+
+        # 2. Get player data
+        print("Fetching player data...")
+        player1_data = await get_player_data("player1")
+        print(f"Player 1 Data: {player1_data}")
+        player2_data = await get_player_data("player2")
+        print(f"Player 2 Data: {player2_data}")
+
+        # 3. Update player scores
+        print("Updating player scores...")
+        await update_player_score("player1", 1500)
+        await update_player_score("player2", 1800)
+        await update_player_score("player3", 1200)
+
+        # 4. Get player rank
+        print("Getting player ranks...")
+        player1_rank = await get_player_rank("player1")
+        print(f"Player 1 Rank: {player1_rank}")
+        player2_rank = await get_player_rank("player2")
+        print(f"Player 2 Rank: {player2_rank}")
+
+        # 5. Fetch top 2 players
+        print("Fetching top 2 players...")
+        top_players = await get_top_players(2)
+        print(f"Top Players: {json.dumps(top_players, indent=2)}")
+
+    except Exception as e:
+        print(f"Error during example usage: {e}")
+    finally:
+        # Ensure the client is closed
+        print("Closing Valkey client...")
+        await close_client()
+
+# Run the example usage
+asyncio.run(example_usage())
+`,
         'Session Cache': `# Session Cache Use Case in Python
 # ...code for session cache use case...
 import asyncio
@@ -357,7 +503,149 @@ try {
 }
 }
 // Run the example usage
-await exampleUsage();`
+await exampleUsage();`,
+'Session Cache': `// Session Cache Use Case in Node.js
+// ...code for session cache use case... 
+import { GlideClient } from '@valkey/valkey-glide';
+
+async function sessionCacheExample(client, username) {
+    // Check if the 'visits' field exists in the user's hash
+    const exists = await client.hexists(username, 'visits');
+
+    if (exists) {
+        // Increment the 'visits' field by 1
+        const visits = await client.hincrBy(username, 'visits', 1);
+
+        // Set the expiration for the user session to 10 seconds
+        await client.expire(username, 10);
+
+        return \`Incremented visit count for \${username}. Visits: \${visits}\`;
+    } else {
+        // If the user doesn't exist in the session, create a new session with visit count 0
+        await client.hset(username, { visits: '0' }); // Store '0' as a string
+        await client.expire(username, 10);
+
+        return \`New session created for \${username}. Visits: 0\`;
+    }
+}
+
+async function main() {
+    const host = process.env.VALKEY_HOST || 'localhost';
+    const port = process.env.VALKEY_PORT ? parseInt(process.env.VALKEY_PORT) : 6379;
+
+    // Create the Glide client
+    const client = await GlideClient.createClient({
+        addresses: [{ host, port }],
+        clientName: 'session-cache-client'
+    });
+
+    const username = 'john_doe';
+
+    try {
+        const result = await sessionCacheExample(client, username);
+        console.log(result);
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        await client.close();
+    }
+}
+
+// Run the main function
+await main();
+`,
+'Recommendation System': `// Recommendation System Use Case in Node.js
+// ...code for recommendation system use case...
+import { GlideClient } from '@valkey/valkey-glide';
+
+// Utility function to calculate the dot product of two arrays
+function dotProduct(a, b) {
+    return a.reduce((sum, value, i) => sum + value * b[i], 0);
+}
+
+// Function to store products in Valkey Glide
+async function storeProducts(client, products) {
+    const productKeys = [];
+    for (const product of products) {
+        const productKey = \`product:\${product.id}\`;
+        await client.customCommand([
+            'HSET',
+            productKey,
+            'name',
+            product.name,
+            'embedding',
+            JSON.stringify(product.embedding),
+        ]);
+        productKeys.push(productKey);
+    }
+    await client.customCommand([
+        'HSET',
+        'products:index',
+        'keys',
+        JSON.stringify(productKeys),
+    ]);
+}
+
+// Function to get recommendations
+async function recommend(client, userEmbeddings, topN) {
+    // Calculate the average user embedding
+    const userAvg = userEmbeddings[0].map((_, i) =>
+        userEmbeddings.reduce((sum, embedding) => sum + embedding[i], 0) / userEmbeddings.length
+    );
+
+    const recs = [];
+    // Retrieve keys of all products (assuming 8 products)
+    const productKeys = Array.from({ length: 8 }, (_, i) => \`product:\${i + 1}\`);
+
+    for (const key of productKeys) {
+        const name = await client.customCommand(['HGET', key, 'name']);
+        const embeddingStr = await client.customCommand(['HGET', key, 'embedding']);
+
+        const embedding = JSON.parse(embeddingStr);
+        const sim = dotProduct(userAvg, embedding);
+
+        recs.push({ name, similarity: sim });
+    }
+
+    // Sort by similarity in descending order and return top N recommendations
+    return recs.sort((a, b) => b.similarity - a.similarity).slice(0, topN);
+}
+
+// Main function
+async function main() {
+    const client = await GlideClient.createClient({
+        addresses: [{ host: 'localhost', port: 6379 }],
+    });
+
+    const products = [
+        { id: '1', name: 'Red Scarf', embedding: [0.1, 0.3, 0.5] },
+        { id: '2', name: 'Blue Hat', embedding: [0.4, 0.1, 0.6] },
+        { id: '3', name: 'Green Jacket', embedding: [0.2, 0.5, 0.7] },
+        { id: '4', name: 'Yellow Gloves', embedding: [0.6, 0.1, 0.2] },
+        { id: '5', name: 'Black Shoes', embedding: [0.3, 0.3, 0.8] },
+        { id: '6', name: 'White T-Shirt', embedding: [0.7, 0.6, 0.1] },
+        { id: '7', name: 'Purple Socks', embedding: [0.1, 0.9, 0.4] },
+        { id: '8', name: 'Orange Belt', embedding: [0.5, 0.2, 0.1] },
+    ];
+
+    await storeProducts(client, products);
+
+    const userEmbeddings = [
+        [0.1, 0.3, 0.5],
+        [0.3, 0.4, 0.6],
+    ];
+
+    const recommendations = await recommend(client, userEmbeddings, 3);
+    console.log('Top Recommendations:', recommendations);
+
+    await client.close();
+}
+
+// Run the main function
+main().catch((error) => {
+    console.error('Error:', error);
+});
+`
     },
     'valkey-glide (Java)': {
         Standalone: `// Valkey Glide Standalone Java Template
