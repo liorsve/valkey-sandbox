@@ -10,14 +10,14 @@
         </select>
       </div>
       <!-- Mode Dropdown -->
-      <div class="dropdown-container">
+      <div v-if="currentTab !== 'commonUseCases'" class="dropdown-container">
         <select id="modeDropdown" :value="executionMode" @change="onModeChange">
           <option value="Standalone">Standalone</option>
           <option value="Cluster">Cluster</option>
         </select>
       </div>
       <!-- Buttons -->
-      <button v-if="currentTab === 'playground'" @click="$emit('run-code')">
+      <button v-if="currentTab === 'playground' || currentTab === 'commonUseCases'" @click="$emit('run-code')">
         Run
       </button>
       <div v-if="currentTab === 'commonUseCases'" class="usecase-buttons">
@@ -84,6 +84,7 @@ export default {
   },
 };
 </script>
+
 
 <style scoped>
 .sidebar {
