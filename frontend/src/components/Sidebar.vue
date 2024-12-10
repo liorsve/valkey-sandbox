@@ -60,6 +60,7 @@ export default {
         'Search Engine',
         'Web App Cache',
       ],
+      defaultClient: 'valkey-glide (Python)',  // Set default client for commonUseCases tab
     };
   },
   computed: {
@@ -80,6 +81,18 @@ export default {
     },
     onModeChange(event) {
       this.$emit('update-mode', this.selectedClient, event.target.value);
+    },
+    setDefaultClient() {
+      if (this.currentTab === 'commonUseCases') {
+        this.$emit('update-client', this.defaultClient, this.executionMode); // Set default client
+      }
+    },
+  },
+  watch: {
+    currentTab(newTab) {
+      if (newTab === 'commonUseCases') {
+        this.setDefaultClient();  // Set default values when tab changes
+      }
     },
   },
 };

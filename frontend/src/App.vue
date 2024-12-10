@@ -176,11 +176,17 @@ export default {
     updateTemplate() {
       const selectedTemplate = codeTemplates[this.selectedClient];
       let template;
-      if (this.currentTab === 'commonUseCases' && this.selectedUseCase) {
+      if (this.currentTab === 'commonUseCases') {
+        // Handle the case where a specific use case is selected
+        if (this.selectedUseCase) {
         template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
+        } else {
+        // Default template for 'commonUseCases'
+        template = selectedTemplate['Leaderboard'];
+        }
       } else {
-        template = selectedTemplate[this.executionMode] || '// No template available';
-      }
+        template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+        }
 
       this.content = template;
       this.updateLanguage();
