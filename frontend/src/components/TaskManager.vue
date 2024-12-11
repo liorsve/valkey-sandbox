@@ -242,12 +242,14 @@ export default {
             window.addEventListener('beforeunload', () => {
                 ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
             });
+            emit('terminal-resize', 'double-height');
         });
 
         onBeforeUnmount(() => {
             window.removeEventListener('beforeunload', () => {
                 ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
             });
+            emit('terminal-resize', 'normal-height');
         });
 
         return {

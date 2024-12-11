@@ -4,7 +4,7 @@
     <div class="mainContent" :class="{ 'no-sidebar': hideSidebar }">
       <div v-if="['playground', 'commonUseCases'].includes(currentTab)" class="content">
         <Editor class="codeEditor" v-model:content="content" :language="language" />
-        <AppTerminal class="terminal" ref="terminal" />
+        <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
       </div>
       <div v-else-if="currentTab === 'watchInAction'" class="content">
         <!-- Overlay Modal -->
@@ -29,11 +29,12 @@
         <div v-else class="watch-content">
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" :read-only="isReadOnly" />
-            <AppTerminal class="terminal" ref="terminal" />
+            <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
           </div>
           <div class="visualization">
             <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" @terminal-write="handleTerminalWrite" />
-            <TaskManager v-else-if="selectedAction === 'Task Manager'" @terminal-write="handleTerminalWrite" />
+            <TaskManager v-else-if="selectedAction === 'Task Manager'" @terminal-write="handleTerminalWrite"
+              @terminal-resize="handleTerminalResize" />
           </div>
         </div>
       </div>
@@ -93,6 +94,7 @@ export default {
       content: '',
       hideSidebar: false,
       isReadOnly: false,
+      terminalClass: '',
     };
   },
 
@@ -350,6 +352,9 @@ export default {
     handleTerminalWrite(message) {
       this.$refs.terminal?.write(message);
     },
+    handleTerminalResize(size) {
+      this.terminalClass = size === 'double-height' ? 'double-height' : '';
+    },
   },
 };
 </script>
@@ -548,5 +553,10 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+.double-height {
+  min-height: 500px;
+  /* Adjust this value as needed */
 }
 </style>
