@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    volumes:
+      - ./backend:/home/node/backend
+      - /home/node/backend/node_modules
     depends_on:
       valkey-standalone:
         condition: service_healthy
@@ -13,13 +16,15 @@ services:
     networks:
       - valkey-net
     environment:
-      - NODE_ENV=production
-      - EXECUTION_MODE=standalone   # Default mode
+      - EXECUTION_MODE=standalone
       - VALKEY_HOST_STANDALONE=valkey-standalone
       - VALKEY_PORT_STANDALONE=6379
       - VALKEY_HOST_CLUSTER=valkey-cluster
       - VALKEY_PORT_CLUSTER_START=7000
       - VALKEY_PORT_CLUSTER_END=7005
+      - VUE_APP_WS_URL=ws://localhost:8080/appws
+      - WDS_SOCKET_PORT=443
+      - START_SCRIPT=${START_SCRIPT}
 
   frontend:
     build:
@@ -31,6 +36,10 @@ services:
       - backend
     networks:
       - valkey-net
+    environment:
+      - VUE_APP_BACKEND_URL=http://backend:3000
+      - VUE_APP_WS_URL=ws://localhost:8080/appws
+      - WDS_SOCKET_PORT=443
 
   valkey-standalone:
     image: valkey/valkey:8.0.1
@@ -71,7 +80,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.python
-    image: valkey-python:latest
     ports:
       - "3002:3002"
     networks:

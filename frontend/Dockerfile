@@ -8,7 +8,7 @@ RUN apk add --no-cache wget python3 make g++
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy app source
 COPY . .
@@ -22,7 +22,7 @@ FROM node:20.10.0-alpine3.19
 WORKDIR /app
 
 # Install serve
-RUN npm install -g serve@14.2.1
+RUN npm install -g serve@latest
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist

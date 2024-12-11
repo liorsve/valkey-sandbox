@@ -14,4 +14,4 @@ HEALTHCHECK --interval=5s --timeout=5s --retries=3 \
     CMD nc -z localhost 3000 || exit 1
 
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npm run $START_SCRIPT"]

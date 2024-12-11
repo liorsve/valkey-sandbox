@@ -1,70 +1,98 @@
 <template>
-  <div class="sidebar">
+  <div v-if="!hideSidebar" class="sidebar">
     <div class="top-section">
       <div class="dropdown-container">
-        <select id="clientDropdown" v-model="$parent.selectedClient" @change="$parent.updateTemplate">
-          <option value="valkey-glide (Python)">
-            valkey-glide (Python)
-          </option>
-          <option value="valkey-glide (Java)">
-            valkey-glide (Java)
-          </option>
-          <option value="valkey-glide (Node)">
-            valkey-glide (Node)
-          </option>
-          <option value="valkey-py (Python)">
-            valkey-py (Python)
-          </option>
-          <option value="iovalkey (Node)">
-            iovalkey (Node)
-          </option>
-          <option value="valkey-go (Go)">
-            valkey-go (Go)
-          </option>
-          <option value="valkey-java (Java)">
-            valkey-java (Java)
+        <select id="clientDropdown" :value="selectedClient" @change="onClientChange">
+          <option v-for="client in availableClients" :key="client" :value="client">
+            {{ client }}
           </option>
         </select>
       </div>
-
-      <div class="dropdown-container">
-        <select id="modeDropdown" v-model="$parent.executionMode" @change="$parent.updateTemplate">
-          <option value="Standalone">
-            Standalone
-          </option>
-          <option value="Cluster">
-            Cluster
-          </option>
+      <div v-if="currentTab !== 'commonUseCases'" class="dropdown-container">
+        <select id="modeDropdown" :value="executionMode" @change="onModeChange">
+          <option value="Standalone">Standalone</option>
+          <option value="Cluster">Cluster</option>
         </select>
       </div>
-
-      <button id="runButton" @click="$emit('run-code')">
-        <img src="../assets/images/icons/run.png" alt="Run Icon">
+      <button v-if="currentTab === 'playground' || currentTab === 'commonUseCases'" @click="$emit('run-code')">
         Run
       </button>
-
-      <button id="usecasesButton">
-        <img src="../assets/images/icons/usecases.png" alt="Usecases Icon">
-        UseCases
-      </button>
-
-      <button id="watchActionButton">
-        <img src="../assets/images/icons/action.png" alt="Action Icon">
-        Watch in Action
-      </button>
+      <div v-if="currentTab === 'commonUseCases'" class="usecase-buttons">
+        <button v-for="useCase in commonUseCases" :key="useCase" @click="$emit('select-usecase', useCase)">
+          {{ useCase }}
+        </button>
+      </div>
     </div>
-
-    <!-- Logo at the Bottom -->
     <div class="logo">
-      <img src="../assets/images/logo.png" alt="Logo">
+      <img src="@/assets/images/logo.png" alt="Logo" />
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: "SideBar",
-  emits: ["run-code"],
+  name: 'AppSidebar',
+  props: {
+    currentTab: {
+      type: String,
+      required: true,
+    },
+    selectedClient: {
+      type: String,
+      required: true,
+    },
+    executionMode: {
+      type: String,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      commonUseCases: [
+        'Leaderboard',
+        'Queue',
+        'Lock',
+        'Session Cache',
+        'Recommendation System',
+        'Search Engine',
+        'Web App Cache',
+        'Task Manager',
+      ],
+      defaultClient: 'valkey-glide (Python)',
+    };
+  },
+  computed: {
+    availableClients() {
+      if (this.currentTab === 'commonUseCases') {
+        return ['valkey-glide (Python)', 'valkey-glide (Java)', 'valkey-glide (Node)'];
+      } else {
+        return this.$parent.clients;
+      }
+    },
+    hideSidebar() {
+      return this.currentTab === 'watchInAction' && this.$parent.hideSidebar;
+    },
+  },
+  methods: {
+    onClientChange(event) {
+      this.$emit('update-client', event.target.value, this.executionMode);
+    },
+    onModeChange(event) {
+      this.$emit('update-mode', this.selectedClient, event.target.value);
+    },
+    setDefaultClient() {
+      if (this.currentTab === 'commonUseCases') {
+        this.$emit('update-client', this.defaultClient, this.executionMode);
+      }
+    },
+  },
+  watch: {
+    currentTab(newTab) {
+      if (newTab === 'commonUseCases') {
+        this.setDefaultClient();
+      }
+    },
+  },
 };
 </script>
 
@@ -75,63 +103,92 @@ export default {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  height: 100vh;
+  height: calc(100vh - 40px);
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .sidebar .top-section {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 20px;
   flex-direction: column;
+  margin-bottom: 20px;
 }
 
-.sidebar button,
-.sidebar select {
-  margin-bottom: 15px;
-  padding: 15px;
+.sidebar button {
+  padding: 12px 24px;
   font-size: 16px;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  background-color: #555;
-  /* Even lighter background */
+  font-weight: bold;
   color: #ffffff;
-  /* White text color */
-  border: 1rem solid;
-  border-color: rgb(75, 75, 160);
-  /* Lighter border color */
-  border-radius: 25px;
-  /* More rounded corners */
-  box-sizing: border-box;
-  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  border: none;
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   cursor: pointer;
-  overflow: hidden;
-  /* Ensure inner content respects border radius */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.sidebar button:hover,
-.sidebar select:hover {
-  background-color: #666;
-  /* Lighter on hover */
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  border-color: rgb(95, 95, 180);
-  /* Even lighter border color on hover */
+.sidebar button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
 }
 
-.sidebar select option {
-  background-color: #555;
-  /* Match select background */
+.sidebar button:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar button:focus {
+  outline: 2px solid #9333ea;
+  outline-offset: 3px;
+}
+
+.sidebar .dropdown-container select {
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: bold;
   color: #ffffff;
-  /* White text */
-  padding: 10px;
-  /* Add some padding */
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  border: 2px solid #9333ea;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  transition: box-shadow 0.2s ease;
+  width: 100%;
 }
 
-.sidebar select option:hover {
+.sidebar .dropdown-container {
+  width: 100%;
+}
+
+.sidebar .dropdown-container select:hover {
+  background-color: #444;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+}
+
+.sidebar .dropdown-container select:focus {
+  outline: 2px solid #9333ea;
+  outline-offset: 2px;
+  border: 2px solid #9333ea;
+}
+
+.sidebar .dropdown-container select option {
+  background-color: #555;
+  color: #ffffff;
+  padding: 10px;
+}
+
+.sidebar .dropdown-container select option:hover {
   background-color: #666;
-  /* Lighter on hover */
 }
 
 .sidebar select {
@@ -147,59 +204,71 @@ export default {
 .sidebar button img {
   margin-right: 10px;
   width: 32px;
-  /* Increased from 24px */
   height: 32px;
-  /* Increased from 24px */
-}
-
-.sidebar .dropdown-container {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  width: 100%;
 }
 
 .sidebar .dropdown-container select {
-  flex: 1;
-  padding: 15px;
+  padding: 12px 30px;
   font-size: 16px;
-  background-color: #555;
-  /* Match other elements */
+  font-weight: bold;
   color: #ffffff;
-  /* White text */
-  border: 1rem solid;
-  border-color: rgb(75, 75, 160);
-  /* Match other elements */
-  border-radius: 5px;
-  /* Fixed border radius */
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  border: 2px solid #9333ea;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: 10px center;
-  padding-left: 40px;
-  padding-right: 40px;
-  box-sizing: border-box;
+  background-position: right 10px center;
+  background-size: 16px;
+  transition: box-shadow 0.2s ease;
+}
+
+.sidebar .dropdown-container select:hover {
+  background-color: #444;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+}
+
+.sidebar .dropdown-container select:focus {
+  outline: 2px solid #9333ea;
+  outline-offset: 2px;
+  border: 2px solid #9333ea;
+}
+
+.sidebar .dropdown-container select option {
+  background-color: #555;
+  color: #ffffff;
+  padding: 10px;
+}
+
+.sidebar .dropdown-container select option:hover {
+  background-color: #666;
+}
+
+.logo {
+  flex-shrink: 0;
+  padding: 10px;
+  margin-top: auto;
+  position: relative;
+  bottom: 80px;
   overflow: hidden;
-  /* Ensure inner content respects border radius */
-}
-
-#clientDropdown {
-  background-image: url('../assets/images/icons/client.png');
-  background-size: 32px 32px;
-  /* Increased from 24px */
-}
-
-#modeDropdown {
-  background-image: url('../assets/images/icons/cluster.png');
-  background-size: 32px 32px;
-  /* Increased from 24px */
 }
 
 .logo img {
   width: 100%;
   height: auto;
-  max-width: 500px;
+  max-width: 220px;
+  display: block;
+  margin: 0 auto;
+  border: 3px solid #505050;
+  border-radius: 8px;
+  padding: 5px;
+  background-color: #4a4a4a;
+  object-fit: contain;
 }
 
-/* Responsive Adjustments */
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
@@ -221,5 +290,23 @@ export default {
   .sidebar .logo {
     display: none;
   }
+}
+
+.usecase-buttons button {
+  margin-bottom: 10px;
+  padding: 10px;
+  width: 100%;
+  background-color: #595757;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+}
+
+.usecase-buttons button:hover {
+  background-color: #888;
+}
+
+.some-class {
+  text-decoration: none;
 }
 </style>

@@ -1,14 +1,11 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import executionRouter from './routes/execution.js';
+import executeTasksRouter from './routes/executeTasks.js';
 import { setupWebSocket } from './websockets.js';
 
-dotenv.config();
-
 const app = express();
-const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Server options
 const serverOptions = {
@@ -18,24 +15,28 @@ const serverOptions = {
 
 // CORS configuration
 const corsOptions = {
-  origin: ['http://localhost:8080', 'ws://localhost:8080'],
+  origin: ['http://localhost:8080', 'ws://localhost:8080', 'http://localhost:8081', 'ws://localhost:8081'],
   methods: ['GET', 'POST'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Content-Type-Options', 'X-Requested-With', 'X-XSRF-TOKEN']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/execute', executionRouter);
+app.use('/execute-tasks', executeTasksRouter);
 
-// Create server first
 const server = http.createServer(serverOptions, app);
 
-// Then setup WebSocket after server creation
 const wss = setupWebSocket(server);
 
 const PORT = process.env.PORT || 3000;
-const HOST = isDevelopment ? '0.0.0.0' : '0.0.0.0';
+const HOST = '0.0.0.0';
+
+// Ensure only one listener is active
+server.listen(PORT, HOST, () => {
+  console.log(`Backend server running on ${HOST}:${PORT}`);
+});
 
 // Error handling
 server.on('error', (error) => {
@@ -44,11 +45,6 @@ server.on('error', (error) => {
     console.error(`Port ${PORT} is already in use`);
     process.exit(1);
   }
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`Backend server running on ${HOST}:${PORT}`);
-  console.log(`Development mode: ${isDevelopment}`);
 });
 
 // Handle graceful shutdown
