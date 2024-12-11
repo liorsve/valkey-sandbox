@@ -7,6 +7,11 @@ import { GlideClusterClient } from '@valkey/valkey-glide';
  * @description Client instance for interacting with ValKey cluster.
  */
 let client;
+/** 
+ * @type {GlideClusterClient} 
+ * @description Client instance for interacting with ValKey cluster.
+ */
+let glideClient;
 
 async function initializeClient() {
     if (!client) {
@@ -17,6 +22,60 @@ async function initializeClient() {
         clientName: 'in-action-client'
     });
     }
+}
+
+async function initializeLeaderboard() {
+    const host = process.env.VALKEY_CLUSTER_HOST || 'localhost';
+    const port = process.env.VALKEY_CLUSTER_PORT || 7000;
+    glideClient = await GlideClusterClient.createClient({
+        addresses: [{ host, port: parseInt(port) }],
+        clientName: 'leaderboard-client',
+    });
+    await glideClient.flushall();
+    console.log('[Valkey] Cluster flushed.');
+
+    const players = [
+        { id: 1, name: 'Superman', score: 0 },
+        { id: 2, name: 'Batman', score: 0 },
+        { id: 3, name: 'Wonder Woman', score: 0 },
+        { id: 4, name: 'Flash', score: 0 },
+        { id: 5, name: 'Green Lantern', score: 0 },
+        { id: 6, name: 'Aquaman', score: 0 },
+    ];
+
+    for (const player of players) {
+        await glideClient.zadd('leaderboard', { [`player:${player.id}`]: player.score });
+        await glideClient.set(`player:${player.id}`, JSON.stringify(player));
+        console.log(`[Valkey] Initialized player ${player.name} with score ${player.score}.`);
+    }
+    return players;
+}
+
+async function getLeaderboard() {
+    const response = await glideClient.customCommand([
+        'ZREVRANGE',
+        'leaderboard',
+        '0',
+        '-1',
+        'WITHSCORES',
+    ]);
+
+    console.log('Raw leaderboard data:', response);
+
+    const players = [];
+    for (const [playerId, scoreStr] of response) {
+        const score = parseFloat(scoreStr);
+        const playerDataStr = await glideClient.get(playerId);
+        const data = JSON.parse(playerDataStr);
+        console.log(`Fetched data for playerId=${playerId}, score=${score}:`, data);
+        players.push({
+            rank: players.length + 1,
+            playerId: data.id,
+            score,
+            ...data,
+        });
+    }
+    return players;
 }
 
 const lockKey = 'task-lock';
@@ -113,6 +172,43 @@ export function setupWebSocket(server) {
             console.log('[WSS] Canceling task manager');
             await cancelProcess(ws);
             break;
+          case 'startGame':
+            await initializeLeaderboard();
+            const players = await getLeaderboard();
+            ws.send(JSON.stringify({ action: 'updateLeaderboard', data: { players } }));
+            break;
+          case 'updateScore':
+            const { playerId, change } = data;
+            await glideClient.zincrby('leaderboard', change, `player:${playerId}`);
+            const updatedScore = await glideClient.zscore('leaderboard', `player:${playerId}`);
+            
+            // Preserve the player's name and photo by fetching existing data
+            const playerDataStr = await glideClient.get(`player:${playerId}`);
+            const playerData = JSON.parse(playerDataStr);
+            if (playerData) {
+              playerData.score = parseFloat(updatedScore);
+              
+              // Ensure 'name' and 'photo' are not lost
+              if (!playerData.name || !playerData.photo) {
+                // Fetch the original player data from initialization or another source
+                const originalPlayer = getOriginalPlayerData(playerId);
+                if (originalPlayer) {
+                  playerData.name = originalPlayer.name;
+                  playerData.photo = originalPlayer.photo;
+                } else {
+                  console.error(`[WSS] Original player data not found for ${playerId}`);
+                }
+              }
+              
+              await glideClient.set(`player:${playerId}`, JSON.stringify(playerData));
+            } else {
+              console.error(`[WSS] Player data not found for ${playerId}`);
+            }
+            
+            const updatedPlayers = await getLeaderboard();
+            ws.send(JSON.stringify({ action: 'updateLeaderboard', data: { players: updatedPlayers } }));
+            break;
+          
         }
       } catch (error) {
         console.error('[WSS] Message handling error:', {
@@ -227,4 +323,17 @@ export function broadcast(data) {
       client.send(JSON.stringify(data));
     }
   });
+}
+
+// Helper function to retrieve original player data
+function getOriginalPlayerData(playerId) {
+  const originalPlayers = [
+    { id: 1, name: 'Superman', photo: 'path/to/superman.jpg' },
+    { id: 2, name: 'Batman', photo: 'path/to/batman.jpg' },
+    { id: 3, name: 'Wonder Woman', photo: 'path/to/wonder_woman.jpg' },
+    { id: 4, name: 'Flash', photo: 'path/to/flash.jpg' },
+    { id: 5, name: 'Green Lantern', photo: 'path/to/green_lantern.jpg' },
+    { id: 6, name: 'Aquaman', photo: 'path/to/aquaman.jpg' },
+  ];
+  return originalPlayers.find(player => player.id === playerId);
 }

@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import executionRouter from './routes/execution.js';
-import updateScoreRouter from './routes/updateScore.js';
 import executeTasksRouter from './routes/executeTasks.js';
 import { setupWebSocket } from './websockets.js';
 
@@ -25,7 +24,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/execute', executionRouter);
-app.use('/update-score', updateScoreRouter);
 app.use('/execute-tasks', executeTasksRouter);
 
 const server = http.createServer(serverOptions, app);
