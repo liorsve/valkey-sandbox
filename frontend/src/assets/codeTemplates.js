@@ -76,8 +76,8 @@ import numpy as np
 import asyncio
 from glide import (
   NodeAddress,
-  GlideClient,
-  GlideClientConfiguration,
+  GlideClusterClient,
+  GlideClusterClientConfiguration,
 )
 async def store_products(client, products):
   # Store each product in Valkey
@@ -109,8 +109,8 @@ async def recommend(client, user_embeddings, top_n):
   return sorted(recs, key=lambda x: -x[1])[:top_n]
 async def main():
   # Create Glide client
-  config = GlideClientConfiguration([NodeAddress("localhost", 6379)])
-  client = await GlideClient.create(config)
+  config = GlideClusterClientConfiguration([NodeAddress("localhost", 6379)])
+  client = await GlideClusterClient.create(config)
   # Sample dataset
   products = [
       {"id": "1", "name": "Red Scarf", "embedding": [0.1, 0.3, 0.5], "color": "Red", "price": 20},
@@ -130,7 +130,7 @@ async def main():
 asyncio.run(main())`,
         'Lock': `# Lock Example using Valkey Glide in Python
 import asyncio
-from glide import NodeAddress, GlideClient, GlideClientConfiguration
+from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
 import os
 
 async def lock_example(client, lock_key, resource_key):
@@ -152,8 +152,8 @@ async def lock_example(client, lock_key, resource_key):
 async def main():
     host = os.getenv('VALKEY_HOST', 'localhost')
     port = int(os.getenv('VALKEY_PORT', '6379'))
-    config = GlideClientConfiguration([NodeAddress(host, port)])
-    client = await GlideClient.create(config)
+    config = GlideClusterClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClusterClient.create(config)
     
     await lock_example(client, 'mylock', 'counter')
     
@@ -162,7 +162,7 @@ async def main():
 asyncio.run(main())`,
         'Queue': `# Queue Example using Valkey Glide in Python
 import asyncio
-from glide import NodeAddress, GlideClient, GlideClientConfiguration
+from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
 import os
 
 async def queue_example(client, queue_key):
@@ -183,8 +183,8 @@ async def queue_example(client, queue_key):
 async def main():
     host = os.getenv('VALKEY_HOST', 'localhost')
     port = int(os.getenv('VALKEY_PORT', '6379'))
-    config = GlideClientConfiguration([NodeAddress(host, port)])
-    client = await GlideClient.create(config)
+    config = GlideClusterClientConfiguration([NodeAddress(host, port)])
+    client = await GlideClusterClient.create(config)
     
     await queue_example(client, 'myqueue')
     
@@ -234,7 +234,7 @@ async function main() {
 
 await main();`,
         'Session Cache': `// Session Cache Use Case in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function sessionCacheExample(client, username) {
     // Check if the 'visits' field exists in the user's hash
@@ -262,7 +262,7 @@ async function main() {
     const port = process.env.VALKEY_PORT ? parseInt(process.env.VALKEY_PORT) : 6379;
 
     // Create the Glide client
-    const client = await GlideClient.createClient({
+    const client = await GlideClusterClient.createClient({
         addresses: [{ host, port }],
         clientName: 'session-cache-client'
     });
@@ -283,7 +283,7 @@ async function main() {
 await main();
 `,
 'Recommendation System': `// Recommendation System Use Case in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 // Utility function to calculate the dot product of two arrays
 function dotProduct(a, b) {
@@ -340,7 +340,7 @@ async function recommend(client, userEmbeddings, topN) {
 
 // Main function
 async function main() {
-    const client = await GlideClient.createClient({
+    const client = await GlideClusterClient.createClient({
         addresses: [{ host: 'localhost', port: 6379 }],
     });
 
@@ -372,7 +372,7 @@ async function main() {
 await main();
 `,
         'Lock': `// Lock Example using Valkey Glide in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function lockExample(client, lockKey, resourceKey) {
     // Try to acquire lock with 10 second expiry
@@ -394,7 +394,7 @@ async function lockExample(client, lockKey, resourceKey) {
 }
 
 async function main() {
-    const client = await GlideClient.createClient({
+    const client = await GlideClusterClient.createClient({
         addresses: [{ host: 'localhost', port: 6379 }],
     });
     
@@ -405,7 +405,7 @@ async function main() {
 
 await main();`,
         'Queue': `// Queue Example using Valkey Glide in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function queueExample(client, queueKey) {
     // Add items to queue
@@ -425,7 +425,7 @@ async function queueExample(client, queueKey) {
 }
 
 async function main() {
-    const client = await GlideClient.createClient({
+    const client = await GlideClusterClient.createClient({
         addresses: [{ host: 'localhost', port: 6379 }],
     });
     

@@ -18,8 +18,8 @@ export default {
                 cursorBlink: true,
                 fontSize: 14,
                 theme: {
-                    background: '#0d0d0d', // Darker background
-                    foreground: '#dddddd', // Less bright text
+                    background: '#0d0d0d',
+                    foreground: '#dddddd',
                     cursor: '#ffffff',
                     selectionBackground: '#555555',
                 },

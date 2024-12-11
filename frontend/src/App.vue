@@ -7,17 +7,13 @@
         <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
       </div>
       <div v-else-if="currentTab === 'watchInAction'" class="content">
-        <!-- Overlay Modal -->
         <div v-if="!selectedGlide" class="overlay">
-          <!-- Close button -->
           <button class="close-button" @click="closeOverlay">×</button>
           <div class="selection-container">
-            <!-- First selection -->
             <div v-if="!selectedAction">
               <button class="selection-button" @click="selectAction('Leaderboard')">Leaderboard</button>
               <button class="selection-button" @click="selectAction('Task Manager')">Task Manager</button>
             </div>
-            <!-- Second selection -->
             <div v-else>
               <button class="selection-button" @click="selectGlide('valkey-glide (Node)')">Glide - Node.js</button>
               <button class="selection-button" @click="selectGlide('valkey-glide (Python)')">Glide - Python</button>
@@ -25,7 +21,6 @@
             </div>
           </div>
         </div>
-        <!-- Content after selections -->
         <div v-else class="watch-content">
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" :read-only="isReadOnly" />
@@ -360,7 +355,6 @@ export default {
 </script>
 
 <style>
-/* Global styles */
 body {
   background-color: #121212;
   color: #ffffff;
@@ -447,18 +441,20 @@ body {
 
 .editor-terminal>* {
   flex: 1;
-  min-height: 0;
+  overflow: hidden;
 }
 
 .visualization {
   flex: 1;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .sidebar {
   z-index: 10;
 }
 
-/* Media Queries for Responsiveness */
 @media (max-width: 768px) {
   .mainContent {
     flex-direction: column;
@@ -557,6 +553,5 @@ body {
 
 .double-height {
   min-height: 500px;
-  /* Adjust this value as needed */
 }
 </style>

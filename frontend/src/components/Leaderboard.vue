@@ -21,12 +21,10 @@
         </transition-group>
         <button class="start-game-btn" @click="startGame">Start Game</button>
 
-        <!-- Notifications Section -->
         <div class="notifications">
             <transition-group name="fade" tag="div">
                 <div v-for="(notification, index) in notifications" :key="index" class="notification"
                     :class="notification.type">
-                    <!-- Add arrow icons based on notification type -->
                     <span v-if="notification.type === 'earned'">⬆️</span>
                     <span v-if="notification.type === 'lost'">⬇️</span>
                     <span v-if="notification.type === 'rank-up'">🔼</span>
@@ -73,21 +71,18 @@ export default {
         };
 
         const notifications = ref([]);
-        const notificationQueue = ref([]); // Queue for pending notifications
-        const MAX_NOTIFICATIONS = 4; // Maximum visible notifications
+        const notificationQueue = ref([]);
+        const MAX_NOTIFICATIONS = 4;
         let debounceTimeout = null;
-        const DEBOUNCE_DELAY = 200; // milliseconds
+        const DEBOUNCE_DELAY = 200;
 
         let pendingNotifications = [];
 
-        let addNotification = (message, type) => { // Changed from const to let
-            // Push the new notification to the pendingNotifications array
+        let addNotification = (message, type) => {
             pendingNotifications.push({ message, type });
 
-            // Debouncing: Delay processing notifications to prevent rapid calls
             if (!debounceTimeout) {
                 debounceTimeout = setTimeout(() => {
-                    // Process all pending notifications
                     pendingNotifications.forEach(notification => {
                         if (notifications.value.length < MAX_NOTIFICATIONS) {
                             notifications.value.push(notification);
@@ -95,9 +90,7 @@ export default {
                             notificationQueue.value.push(notification);
                         }
                     });
-                    // Clear the pending notifications once processed
                     pendingNotifications = [];
-                    // Reset the debounce timeout
                     debounceTimeout = null;
                 }, DEBOUNCE_DELAY);
             }
@@ -112,13 +105,13 @@ export default {
 
         const updatedPlayers = ref({});
         const previousRanks = ref({});
-        const previousScores = ref({}); // Track previous scores
+        const previousScores = ref({});
 
         const updatePlayerHighlight = (playerId) => {
             updatedPlayers.value[playerId] = true;
             setTimeout(() => {
                 updatedPlayers.value[playerId] = false;
-            }, 2000); // Highlight lasts for 2 seconds
+            }, 2000);
         };
 
         const changeScore = (playerId, change) => {
@@ -144,11 +137,9 @@ export default {
             ws.value.onmessage = (event) => {
                 const message = JSON.parse(event.data);
                 if (message.action === 'updateLeaderboard') {
-                    // Store copies of previous ranks and scores before updating
                     const oldRanks = { ...previousRanks.value };
                     const oldScores = { ...previousScores.value };
 
-                    // Update player scores
                     message.data.players.forEach(updatedPlayer => {
                         const player = players.value.find(p => p.id === updatedPlayer.playerId);
                         if (player) {
@@ -156,7 +147,6 @@ export default {
                         }
                     });
 
-                    // Sort players to get new ranks
                     const newSorted = [...players.value].sort((a, b) => b.score - a.score);
 
                     newSorted.forEach((player, index) => {
@@ -185,11 +175,9 @@ export default {
                             }
 
                             if (!rankChanged && !scoreChanged) {
-                                // Do not notify if no changes
                                 return;
                             }
 
-                            // Determine notification type
                             let type = '';
                             if (scoreChanged && newScore > oldScore) {
                                 type = 'earned';
@@ -201,11 +189,10 @@ export default {
                                 type = 'rank-down';
                             }
 
-                            addNotification(notificationMessage, type); // Pass type
+                            addNotification(notificationMessage, type);
                         }
                     });
 
-                    // Update previousRanks and previousScores after processing all players
                     newSorted.forEach((player, index) => {
                         previousRanks.value[player.id] = index + 1;
                         previousScores.value[player.id] = player.score;
@@ -229,7 +216,6 @@ export default {
 
         const leaderboardRef = ref(null);
 
-        // Watch for changes in players to debug
         watch(players, (newPlayers) => {
             console.log('Players updated:', newPlayers);
         }, { deep: true });
@@ -250,13 +236,12 @@ export default {
             emit('terminal-write', message.trim() + '\n');
         };
 
-        // Modify the addNotification timeout to use removeNotification
         const originalAddNotification = addNotification;
-        addNotification = (message, type) => { // Reassignment is now allowed
+        addNotification = (message, type) => {
             originalAddNotification(message, type);
             setTimeout(() => {
                 removeNotification();
-            }, 4000); // Notification disappears after 4 seconds
+            }, 4000);
         };
 
         return {
@@ -274,12 +259,12 @@ export default {
     methods: {
         getPlayerStyle(player) {
             const borderColors = {
-                'Superman': '#1E90FF',       // DodgerBlue
-                'Batman': '#A9A9A9',         // DarkGray
-                'Wonder Woman': '#DAA520',   // Goldenrod
-                'Flash': '#B22222',          // Firebrick
-                'Green Lantern': '#228B22',  // ForestGreen
-                'Aquaman': '#8B008B',        // DarkMagenta
+                'Superman': '#1E90FF',
+                'Batman': '#A9A9A9',
+                'Wonder Woman': '#DAA520',
+                'Flash': '#B22222',
+                'Green Lantern': '#228B22',
+                'Aquaman': '#8B008B',
             };
             return {
                 borderColor: borderColors[player.name] || '#fff',
@@ -301,7 +286,6 @@ export default {
     padding: 20px;
     background-color: #121212;
     align-items: center;
-    /* Center the content */
 }
 
 .player-box {
@@ -314,11 +298,8 @@ export default {
     align-items: center;
     transition: transform 0.5s ease-in-out;
     max-width: 90%;
-    /* Adjust to fit within page */
     width: 90%;
-    /* Further increased width */
     max-width: 900px;
-    /* Further increased max-width */
 }
 
 .player-rank {
@@ -334,7 +315,6 @@ export default {
     border-radius: 50px;
     margin: 0 20px;
     object-fit: cover;
-    /* Ensure image covers the container */
 }
 
 .player-info {
@@ -368,37 +348,29 @@ export default {
     font-weight: bold;
 }
 
-/* Adjust score button colors to create gradient from green to red */
 .score-buttons button:nth-child(1) {
     background-color: #4caf50;
 }
 
-/* +7, green */
 .score-buttons button:nth-child(2) {
     background-color: #8bc34a;
 }
 
-/* +3 */
 .score-buttons button:nth-child(3) {
     background-color: #cddc39;
 }
 
-/* +1 */
 .score-buttons button:nth-child(4) {
     background-color: #ffeb3b;
 }
 
-/* -1 */
 .score-buttons button:nth-child(5) {
     background-color: #ff9800;
 }
 
-/* -3 */
 .score-buttons button:nth-child(6) {
     background-color: #f44336;
 }
-
-/* -7, red */
 
 .score-buttons button:hover {
     opacity: 0.8;
@@ -436,7 +408,6 @@ export default {
     }
 }
 
-/* Add transition styles for smooth reordering */
 .player-enter-active,
 .player-leave-active {
     transition: all 0.5s ease;
@@ -452,15 +423,12 @@ export default {
     position: fixed;
     top: 20px;
     left: 20px;
-    /* Changed from right to left */
     z-index: 1000;
 }
 
 .notification {
     background-color: #f0f0f0;
-    /* Bright background */
     color: #333333;
-    /* Dark text */
     padding: 10px 20px;
     margin-bottom: 10px;
     border-radius: 5px;
@@ -479,55 +447,37 @@ export default {
 }
 
 .player-box {
-    /* ...existing styles... */
     background-color: #1e1e1e;
-    /* Highlighted background */
 }
 
 .player-box.updated {
     background-color: #333333;
-}
-
-/* Optional: Add a subtle box-shadow when updated */
-.player-box.updated {
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
-/* Notification Type Styles */
 .notification.earned {
     background-color: #d4edda;
-    /* Light green */
     color: #155724;
-    /* Dark green text */
 }
 
 .notification.lost {
     background-color: #f8d7da;
-    /* Light red */
     color: #721c24;
-    /* Dark red text */
 }
 
 .notification.rank-up {
     background-color: #d1ecf1;
-    /* Light blue */
     color: #0c5460;
-    /* Dark blue text */
 }
 
 .notification.rank-down {
     background-color: #f1d1ec;
-    /* Light pink */
     color: #a71d5d;
-    /* Dark pink text */
 }
 
 .notification.warning {
-    /* Added for warning messages */
     background-color: #fff3cd;
-    /* Light yellow */
     color: #856404;
-    /* Dark yellow text */
 }
 
 .notification .icon {

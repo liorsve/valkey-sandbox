@@ -7,7 +7,8 @@
 
 <script>
 import { defineComponent, watch, shallowRef, onBeforeUnmount } from 'vue';
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor'
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+
 export default defineComponent({
   components: {
     VueMonacoEditor,
@@ -25,7 +26,6 @@ export default defineComponent({
   },
   emits: ['update:content'],
   setup(props, { emit }) {
-
     const MONACO_EDITOR_OPTIONS = {
       automaticLayout: true,
       formatOnType: true,
@@ -38,8 +38,9 @@ export default defineComponent({
       },
       fontSize: 14,
     };
-    const editorRef = shallowRef()
+    const editorRef = shallowRef();
     const code = shallowRef(props.content);
+
     const handlePaste = () => {
       editorRef.value?.getAction('editor.action.formatDocument').run();
     };
@@ -55,7 +56,7 @@ export default defineComponent({
       if (editorContainer) {
         editorContainer.style.paddingTop = '10px';
       }
-    }
+    };
 
     const onChange = (value) => {
       emit('update:content', value);
@@ -82,7 +83,7 @@ export default defineComponent({
       handleMount,
       editorRef,
       code,
-      onChange
+      onChange,
     };
   },
 });
@@ -108,7 +109,6 @@ export default defineComponent({
 
 :deep(.xterm .xterm-viewport),
 :deep(.xterm .xterm-screen) {
-  /* padding: 10px; */
   box-sizing: border-box;
 }
 

@@ -1,7 +1,6 @@
 <template>
   <div v-if="!hideSidebar" class="sidebar">
     <div class="top-section">
-      <!-- Client Dropdown -->
       <div class="dropdown-container">
         <select id="clientDropdown" :value="selectedClient" @change="onClientChange">
           <option v-for="client in availableClients" :key="client" :value="client">
@@ -9,14 +8,12 @@
           </option>
         </select>
       </div>
-      <!-- Mode Dropdown -->
       <div v-if="currentTab !== 'commonUseCases'" class="dropdown-container">
         <select id="modeDropdown" :value="executionMode" @change="onModeChange">
           <option value="Standalone">Standalone</option>
           <option value="Cluster">Cluster</option>
         </select>
       </div>
-      <!-- Buttons -->
       <button v-if="currentTab === 'playground' || currentTab === 'commonUseCases'" @click="$emit('run-code')">
         Run
       </button>
@@ -99,7 +96,6 @@ export default {
 };
 </script>
 
-
 <style scoped>
 .sidebar {
   color-scheme: dark;
@@ -123,47 +119,31 @@ export default {
 
 .sidebar button {
   padding: 12px 24px;
-  /* Better spacing */
   font-size: 16px;
-  /* Clean font size */
   font-weight: bold;
-  /* Clear and defined text */
   color: #ffffff;
-  /* Text color */
   background: linear-gradient(135deg, #3b82f6, #9333ea);
-  /* Modern gradient */
   border: none;
-  /* Remove border */
   border-radius: 12px;
-  /* Smoother corners */
   transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   cursor: pointer;
-  /* Indicate clickable */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  /* Subtle shadow */
 }
 
 .sidebar button:hover {
   transform: scale(1.05);
-  /* Slightly enlarge */
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-  /* More pronounced shadow */
   background: linear-gradient(135deg, #2563eb, #7e22ce);
-  /* Slightly darker gradient */
 }
 
 .sidebar button:active {
   transform: scale(0.97);
-  /* Simulate button press */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  /* Softer shadow */
 }
 
 .sidebar button:focus {
   outline: 2px solid #9333ea;
-  /* Accessibility focus */
   outline-offset: 3px;
-  /* Better visibility */
 }
 
 .sidebar .dropdown-container select {
@@ -172,61 +152,43 @@ export default {
   font-weight: bold;
   color: #ffffff;
   background: linear-gradient(135deg, #3b82f6, #9333ea);
-  /* Clearer gradient */
   border: 2px solid #9333ea;
-  /* Make border clear and bold */
   border-radius: 12px;
-  /* Rounded corners */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  /* Subtle shadow */
   cursor: pointer;
-  /* Indicate clickable */
   appearance: none;
-  /* Hide default arrow */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-  /* Custom arrow */
   background-repeat: no-repeat;
   background-position: right 10px center;
-  /* Move arrow further right */
   background-size: 16px;
   transition: box-shadow 0.2s ease;
-  /* Remove background transition */
   width: 100%;
-  /* Make the width 100% to ensure equal size */
 }
 
 .sidebar .dropdown-container {
   width: 100%;
-  /* Ensure both dropdowns take equal space */
 }
 
 .sidebar .dropdown-container select:hover {
   background-color: #444;
-  /* Darker background when hovering */
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-  /* Enhanced shadow */
   background: linear-gradient(135deg, #2563eb, #7e22ce);
-  /* Slightly darker gradient */
 }
 
 .sidebar .dropdown-container select:focus {
   outline: 2px solid #9333ea;
-  /* Accessibility outline */
   outline-offset: 2px;
   border: 2px solid #9333ea;
-  /* Strong border when focused */
 }
 
 .sidebar .dropdown-container select option {
   background-color: #555;
-  /* Consistent option background */
   color: #ffffff;
   padding: 10px;
 }
 
 .sidebar .dropdown-container select option:hover {
   background-color: #666;
-  /* Option hover effect */
 }
 
 .sidebar select {
@@ -251,54 +213,38 @@ export default {
   font-weight: bold;
   color: #ffffff;
   background: linear-gradient(135deg, #3b82f6, #9333ea);
-  /* Clearer gradient */
   border: 2px solid #9333ea;
-  /* Make border clear and bold */
   border-radius: 12px;
-  /* Rounded corners */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  /* Subtle shadow */
   cursor: pointer;
-  /* Indicate clickable */
   appearance: none;
-  /* Hide default arrow */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-  /* Custom arrow */
   background-repeat: no-repeat;
   background-position: right 10px center;
-  /* Move arrow further right */
   background-size: 16px;
   transition: box-shadow 0.2s ease;
-  /* Remove background transition */
 }
 
 .sidebar .dropdown-container select:hover {
   background-color: #444;
-  /* Darker background when hovering */
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-  /* Enhanced shadow */
   background: linear-gradient(135deg, #2563eb, #7e22ce);
-  /* Slightly darker gradient */
 }
 
 .sidebar .dropdown-container select:focus {
   outline: 2px solid #9333ea;
-  /* Accessibility outline */
   outline-offset: 2px;
   border: 2px solid #9333ea;
-  /* Strong border when focused */
 }
 
 .sidebar .dropdown-container select option {
   background-color: #555;
-  /* Consistent option background */
   color: #ffffff;
   padding: 10px;
 }
 
 .sidebar .dropdown-container select option:hover {
   background-color: #666;
-  /* Option hover effect */
 }
 
 .logo {

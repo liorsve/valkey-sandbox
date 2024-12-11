@@ -81,7 +81,7 @@ async def main():
         
         # Get player rankings
         print("\\nPlayer Rankings:")
-        leaderboard = await client.zrevrange("leaderboard", 0, -1, withscores=True)
+        leaderboard = await client.custom_command(['ZREVRANGE', 'leaderboard', '0', '-1', 'WITHSCORES'])
         for rank, (player_id, score) in enumerate(leaderboard, 1):
             player_data = json.loads(await client.get(f"player:{player_id.decode()}"))
             print(f"{rank}. {player_data['name']}: {int(score)} points (Level {player_data['level']})")
@@ -89,19 +89,21 @@ async def main():
     except Exception as e:
         print(f"Error: {e}")
     finally:
-        if client:
+        if (client) {
             await client.close()
             print("\\nConnection closed")
+        }
+    }
 
 asyncio.run(main())`,
     },
     
     'valkey-glide (Node)': {
         'Task Manager': `// Task Manager with Queue and Lock using Valkey Glide in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function main() {
-    const client = await GlideClient.createClient({
+    const client = await GlideClusterClient.createClient({
         addresses: [{ host: 'localhost', port: 6379 }]
     });
 
@@ -144,14 +146,14 @@ async function main() {
 
 await main();`,
         'Leaderboard': `// Leaderboard Use Case in Node.js
-import { GlideClient } from '@valkey/valkey-glide';
+import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function main() {
     let client = null;
     try {
         const host = process.env.VALKEY_HOST || 'localhost';
         const port = process.env.VALKEY_PORT || 6379;
-        client = await GlideClient.createClient({
+        client = await GlideClusterClient.createClient({
             addresses: [{ host, port: parseInt(port) }],
             clientName: 'leaderboard_client'
         });
@@ -182,7 +184,7 @@ async function main() {
 
         // Get player rankings
         console.log('\\nPlayer Rankings:');
-        const leaderboard = await client.zrevrange('Leaderboard', 0, -1, 'WITHSCORES');
+        const leaderboard = await client.customCommand(['ZREVRANGE', 'leaderboard', '0', '-1', 'WITHSCORES']);
         for (let i = 0; i < leaderboard.length; i += 2) {
             const playerId = leaderboard[i];
             const score = parseInt(leaderboard[i + 1]);
@@ -303,7 +305,7 @@ public class LeaderboardExample {
 
             // Get player rankings
             System.out.println("\\nPlayer Rankings:");
-            List<String> leaderboard = client.zrevrangeWithScores("leaderboard", 0, -1).get();
+            List<String> leaderboard = client.customCommand(Arrays.asList("ZREVRANGE", "leaderboard", "0", "-1", "WITHSCORES")).get();
             
             for (int i = 0; i < leaderboard.size(); i += 2) {
                 String playerId = leaderboard.get(i);

@@ -24,7 +24,6 @@
             <div ref="lockIcon" class="lock-icon">🔒</div>
             <div ref="unlockIcon" class="unlock-icon">🔓</div>
         </div>
-        <!-- Add Modal -->
         <div v-if="showEmptyQueuePopup" class="modal-overlay">
             <div class="modal-content">
                 <p>Please add tasks to the queue before setting it.</p>
@@ -135,7 +134,6 @@ export default {
             el.style.borderBottomColor = '#6a11cb';
 
             const sequence = async () => {
-                // 1. Show and animate lock icon
                 lockIcon.classList.add('show', 'grow');
                 await new Promise(r => setTimeout(r, 1000));
                 lockIcon.classList.add('fade-out');
@@ -144,11 +142,9 @@ export default {
 
                 await new Promise(r => setTimeout(r, 300));
 
-                // 2. Move triangle to center
                 el.classList.add('move-to-center');
                 await new Promise(r => setTimeout(r, 600));
 
-                // 3. Perform action
                 const baseTransform = 'translateX(-50%) translateY(-50%)';
                 switch (action.action || action) {
                     case 'Flip Right':
@@ -297,7 +293,6 @@ export default {
     flex-direction: column;
     gap: 10px;
     width: 150px;
-    /* reduced from 200px */
 }
 
 .add-task-btn {

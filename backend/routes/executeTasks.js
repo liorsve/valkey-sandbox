@@ -15,17 +15,17 @@ router.post('/', async (req, res) => {
 });
 
 async function executeTask(task) {
-  // Example task execution logic
   try {
     const { language, code, mode } = task;
     await executeCode(language, code, mode, (output) => {
       console.log(`Task Output: ${output}`);
-      // You can broadcast task-specific updates here if needed
     });
-    // Add any additional task handling logic here
   } catch (error) {
     console.error(`Error executing task: ${error.message}`);
-    broadcast({ action: 'taskUpdate', data: { status: 'error', task, error: error.message } });
+    broadcast({
+      action: 'taskUpdate',
+      data: { status: 'error', task, error: error.message },
+    });
   }
 }
 
