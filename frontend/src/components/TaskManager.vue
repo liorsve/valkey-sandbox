@@ -1,24 +1,28 @@
 <template>
     <div class="task-manager">
-        <div class="task-creation">
-            <select v-model="selectedTask">
-                <option v-for="task in tasks" :key="task.id" :value="task">
+        <div class="task-panel">
+            <div class="control-section">
+                <button @click="addTask" class="add-task-btn">Add Task</button>
+                <select v-model="selectedTask" class="task-select">
+                    <option v-for="task in tasks" :key="task.id" :value="task">
+                        {{ task.action }}
+                    </option>
+                </select>
+            </div>
+            <div class="tasks-grid">
+                <div v-for="(task, index) in taskQueue" :key="index" class="task-item">
                     {{ task.action }}
-                </option>
-            </select>
-            <button @click="addTask">Add Task</button>
+                </div>
+            </div>
         </div>
-        <ul class="task-queue">
-            <li v-for="(task, index) in taskQueue" :key="index">
-                {{ task.action }}
-            </li>
-        </ul>
         <button v-if="buttonState === 'set'" @click="setTasks">Set Tasks Queue</button>
         <button v-else-if="buttonState === 'invoke'" @click="invokeTaskManager">Invoke Task Manager</button>
         <button v-else-if="buttonState === 'cancel'" @click="cancelTaskManager">Cancel</button>
         <button v-else-if="buttonState === 'tryAgain'" @click="resetTaskManager">Try Again</button>
         <div class="visualization">
             <div ref="triangle" class="triangle"></div>
+            <div ref="lockIcon" class="lock-icon">🔒</div>
+            <div ref="unlockIcon" class="unlock-icon">🔓</div>
         </div>
         <!-- Add Modal -->
         <div v-if="showEmptyQueuePopup" class="modal-overlay">
@@ -43,27 +47,25 @@ export default {
             { id: 4, action: 'Flip Down' },
             { id: 5, action: 'Grow' },
             { id: 6, action: 'Shrink' },
-            { id: 7, action: 'Confetti' },
-            { id: 8, action: 'Change Random Color' },
+            { id: 7, action: 'Change Random Color' },
         ]);
 
         const selectedTask = ref(tasks.value[0]);
         const taskQueue = ref([]);
         const triangle = ref(null);
+        const lockIconRef = ref(null);
+        const unlockIconRef = ref(null);
         let ws;
         const buttonState = ref('set');
         const showEmptyQueuePopup = ref(false);
 
         const addTask = () => {
-            if (taskQueue.value.length < 8) {
-                taskQueue.value.push(selectedTask.value);
+            if (taskQueue.value.length < 6) {
+                taskQueue.value.push({
+                    ...selectedTask.value,
+                    uniqueId: Date.now() + Math.random().toString(36).substr(2, 9)
+                });
             }
-        };
-
-        const executeTasks = () => {
-            if (taskQueue.value.length === 0) return;
-            const task = taskQueue.value.shift();
-            performTask(task.action);
         };
 
         const setTasks = () => {
@@ -73,8 +75,9 @@ export default {
             }
             ws.send(JSON.stringify({
                 action: 'setTasks',
-                data: taskQueue.value.map(task => task.action)
+                data: taskQueue.value
             }));
+            emit('terminal-write', '\x1Bc');
             terminalWrite('📝 Task Queue has been set!\n');
             buttonState.value = 'invoke';
         };
@@ -104,17 +107,17 @@ export default {
         const handleWebSocketMessage = (event) => {
             const message = JSON.parse(event.data);
             if (message.action === 'taskUpdate') {
-                terminalWrite(`🔔 ${message.data.status}`);
+                terminalWrite(`🔔 ${message.data.status}\n`);
                 if (message.data.action) {
                     performTask(message.data.action);
                 }
             } else if (message.action === 'queueStatus') {
-                const queueData = typeof message.data === 'string' ? message.data : message.data.join('\n');
-                terminalWrite(`📋 Current Queue:\n${queueData}`);
+                const queueData = Array.isArray(message.data) ? message.data.join(', ') : message.data;
+                terminalWrite(`📋 Current Queue: ${queueData}\n`);
             } else if (message.action === 'lockStatus') {
                 animateLocking(message.data.locked);
             } else if (message.action === 'processCompleted') {
-                terminalWrite('✅ All tasks completed!');
+                terminalWrite('✅ All tasks completed!\n');
                 buttonState.value = 'tryAgain';
             }
         };
@@ -125,64 +128,81 @@ export default {
 
         const performTask = (action) => {
             const el = triangle.value;
-            if (!el) return;
-            switch (action) {
-                case 'Flip Right':
-                    el.classList.add('flip-right');
-                    break;
-                case 'Flip Left':
-                    el.classList.add('flip-left');
-                    break;
-                case 'Flip Up':
-                    el.classList.add('flip-up');
-                    break;
-                case 'Flip Down':
-                    el.classList.add('flip-down');
-                    break;
-                case 'Grow':
-                    el.classList.add('grow');
-                    break;
-                case 'Shrink':
-                    el.classList.add('shrink');
-                    break;
-                case 'Confetti':
-                    createConfetti(el);
-                    break;
-                case 'Change Random Color':
-                    el.style.backgroundColor = getRandomColor();
-                    break;
-                default:
-                    break;
-            }
-            setTimeout(() => {
-                el.classList.remove(
-                    'flip-right',
-                    'flip-left',
-                    'flip-up',
-                    'flip-down',
-                    'grow',
-                    'shrink'
-                );
-                if (taskQueue.value.length > 0) {
-                    executeTasks();
-                }
-            }, 1000);
-        };
+            const lockIcon = lockIconRef.value;
+            const unlockIcon = unlockIconRef.value;
+            if (!el || !lockIcon || !unlockIcon) return;
 
-        function createConfetti(parent) {
-            const colors = ['#FFD700', '#FF69B4', '#00CED1', '#FF4500', '#9370DB'];
-            for (let i = 0; i < 50; i++) {
-                const confetti = document.createElement('div');
-                confetti.classList.add('confetti');
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                confetti.style.animationDelay = Math.random() * 1000 + 'ms';
-                confetti.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.8)';
-                confetti.style.filter = 'brightness(1.5) contrast(1.2)';
-                parent.appendChild(confetti);
-                setTimeout(() => parent.removeChild(confetti), 2000);
-            }
-        }
+            el.style.borderBottomColor = '#6a11cb';
+
+            const sequence = async () => {
+                // 1. Show and animate lock icon
+                lockIcon.classList.add('show', 'grow');
+                await new Promise(r => setTimeout(r, 1000));
+                lockIcon.classList.add('fade-out');
+                await new Promise(r => setTimeout(r, 800));
+                lockIcon.classList.remove('show', 'grow', 'fade-out');
+
+                await new Promise(r => setTimeout(r, 300));
+
+                // 2. Move triangle to center
+                el.classList.add('move-to-center');
+                await new Promise(r => setTimeout(r, 600));
+
+                // 3. Perform action
+                const baseTransform = 'translateX(-50%) translateY(-50%)';
+                switch (action.action || action) {
+                    case 'Flip Right':
+                        el.style.transform = `${baseTransform} rotateY(180deg)`;
+                        break;
+                    case 'Flip Left':
+                        el.style.transform = `${baseTransform} rotateY(-180deg)`;
+                        break;
+                    case 'Flip Up':
+                        el.style.transform = `${baseTransform} rotateX(-180deg)`;
+                        break;
+                    case 'Flip Down':
+                        el.style.transform = `${baseTransform} rotateX(180deg)`;
+                        break;
+                    case 'Grow':
+                        el.style.transform = `${baseTransform} scale(1.5)`;
+                        break;
+                    case 'Shrink':
+                        el.style.transform = `${baseTransform} scale(0.5)`;
+                        break;
+                    case 'Change Random Color':
+                        el.style.borderBottomColor = getRandomColor();
+                        break;
+                }
+
+                await new Promise(r => setTimeout(r, 1000));
+
+                if ((action.action || action) !== 'Change Random Color') {
+                    el.style.transform = baseTransform;
+                } else {
+                    el.style.borderBottomColor = '#6a11cb';
+                }
+
+                el.classList.remove(
+                    'flip-right', 'flip-left', 'flip-up', 'flip-down',
+                    'grow', 'shrink', 'move-to-center'
+                );
+                await new Promise(r => setTimeout(r, 600));
+
+                await new Promise(r => setTimeout(r, 300));
+
+                unlockIcon.classList.add('show', 'shrink');
+                await new Promise(r => setTimeout(r, 1000));
+                unlockIcon.classList.add('fade-out');
+                await new Promise(r => setTimeout(r, 800));
+                unlockIcon.classList.remove('show', 'shrink', 'fade-out');
+
+                await new Promise(r => setTimeout(r, 300));
+
+                ws.send(JSON.stringify({ action: 'taskCompleted' }));
+            };
+
+            sequence();
+        };
 
         const getRandomColor = () => {
             const letters = '0123456789ABCDEF';
@@ -216,8 +236,9 @@ export default {
 
         onMounted(() => {
             triangle.value = document.querySelector('.triangle');
+            lockIconRef.value = document.querySelector('.lock-icon');
+            unlockIconRef.value = document.querySelector('.unlock-icon');
             connectWebSocket();
-            ws.addEventListener('message', handleWebSocketMessage);
             window.addEventListener('beforeunload', () => {
                 ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
             });
@@ -239,6 +260,8 @@ export default {
             cancelTaskManager,
             resetTaskManager,
             triangle,
+            lockIcon: lockIconRef,
+            unlockIcon: unlockIconRef,
             buttonState,
             showEmptyQueuePopup,
             closePopup,
@@ -255,22 +278,97 @@ export default {
     height: 100%;
     background-color: #121212;
     overflow: hidden;
+    gap: 15px;
+}
+
+.task-panel {
+    display: flex;
+    gap: 15px;
+    height: 100px;
+    background-color: #1e1e1e;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.control-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 150px;
+    /* reduced from 200px */
+}
+
+.add-task-btn {
+    background-color: #4a148c;
+    padding: 12px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    border: 1px solid #6a1b9a;
+}
+
+.add-task-btn:hover {
+    background-color: #6a1b9a;
+    transform: translateY(-1px);
+}
+
+.task-select {
+    background-color: #2a2a2a;
+    padding: 10px;
+    border-radius: 6px;
+    width: 100%;
+    color: #fff;
+    border: 1px solid #4a148c;
+}
+
+.tasks-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 5px;
+    align-content: center;
+}
+
+.task-item {
+    background-color: #2a2a2a;
+    padding: 12px;
+    border-radius: 6px;
+    color: #fff;
+    border: 1px solid #7b1fa2;
+    transition: all 0.3s ease;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.task-item:hover {
+    background-color: #333;
+    transform: translateY(-1px);
+    border-color: #9c27b0;
 }
 
 .task-creation {
     display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 15px;
+    margin-bottom: 15px;
 }
 
 .task-creation select,
 .task-creation button {
-    padding: 10px;
+    padding: 12px 20px;
     font-size: 16px;
     background-color: #1e1e1e;
     color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
+}
+
+.task-creation select {
+    flex: 1;
+    min-width: 200px;
 }
 
 .task-creation button {
@@ -280,97 +378,123 @@ export default {
 
 .task-creation button:hover {
     background-color: #2575fc;
+    transform: translateY(-1px);
 }
 
 .task-queue {
     list-style: none;
     padding: 0;
     margin-bottom: 10px;
-    flex: 1;
+    max-height: 300px;
+    overflow-y: auto;
+    flex: 5 !important;
+    min-height: 400px !important;
+    background-color: #1e1e1e;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 0;
 }
 
 .task-queue li {
-    background-color: #333;
-    padding: 10px;
-    margin-bottom: 5px;
-    border-radius: 5px;
+    background-color: #2a2a2a;
+    padding: 12px 20px;
+    margin-bottom: 8px;
+    border-radius: 6px;
     color: #fff;
+    transition: background-color 0.3s ease;
+}
+
+.task-queue li:hover {
+    background-color: #333;
 }
 
 button {
-    background-color: #444;
+    background-color: #6a11cb;
     color: #fff;
     border: none;
-    padding: 10px;
-    border-radius: 5px;
+    padding: 12px 20px;
+    border-radius: 6px;
     cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 button:hover {
-    background-color: #555;
+    background-color: #2575fc;
+    transform: translateY(-1px);
 }
 
 .visualization {
-    flex: 2;
-    background-color: #1e1e1e;
-    margin-top: 20px;
+    position: relative;
+    flex: 6 !important;
+    min-height: 500px !important;
+    background-color: #0a0a0a;
+    margin-top: 0;
     border-radius: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
+    height: 100%;
 }
 
 .triangle {
-    width: 0;
-    height: 0;
-    border-left: 60px solid transparent;
-    border-right: 60px solid transparent;
-    border-bottom: 120px solid #6a11cb;
-    transition: transform 1s, background-color 1s;
+    position: absolute;
+    left: 50%;
+    top: 75%;
+    transform: translateX(-50%) translateY(-50%);
+    transition: all 0.6s ease-in-out;
+    border-left: 150px solid transparent;
+    border-right: 150px solid transparent;
+    border-bottom: 300px solid #6a11cb;
 }
 
-.flip-right {
-    transform: rotateY(180deg);
+.move-to-center {
+    top: 50% !important;
 }
 
-.flip-left {
-    transform: rotateY(-180deg);
+.lock-icon,
+.unlock-icon {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 96px;
+    opacity: 0;
+    transition: all 0.8s ease-in-out;
+    z-index: 2;
 }
 
-.flip-up {
-    transform: rotateX(-180deg);
-}
-
-.flip-down {
-    transform: rotateX(180deg);
+.show {
+    opacity: 1;
 }
 
 .grow {
-    transform: scale(1.5);
+    transform: translate(-50%, -50%) scale(6);
 }
 
 .shrink {
-    transform: scale(0.5);
+    transform: translate(-50%, -50%) scale(6);
+    animation: shrinkAnimation 1.2s ease-in-out forwards;
 }
 
-/* Add styles for lock animations */
-.locked {
-    animation: lockAnimation 2s;
+.fade-out {
+    opacity: 0;
 }
 
-@keyframes lockAnimation {
+@keyframes shrinkAnimation {
     0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.2);
-        background-color: red;
+        transform: translate(-50%, -50%) scale(6);
+        opacity: 1;
     }
 
     100% {
-        transform: scale(1);
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
     }
+}
+
+.locked {
+    opacity: 0.8;
 }
 
 .modal-overlay {
@@ -415,5 +539,22 @@ button:hover {
 
 .modal-content button:hover {
     background-color: #2575fc;
+}
+
+.tasks-grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tasks-grid::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.tasks-grid::-webkit-scrollbar-thumb {
+    background: #4a148c;
+    border-radius: 4px;
+}
+
+.tasks-grid::-webkit-scrollbar-thumb:hover {
+    background: #6a1b9a;
 }
 </style>

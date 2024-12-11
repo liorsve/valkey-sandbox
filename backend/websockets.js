@@ -78,11 +78,29 @@ export function setupWebSocket(server) {
           case 'setTasks':
             console.log('[WSS] Setting tasks:', data);
             await initializeClient();
-            await client.del(queueKey);
-            await client.rpush(queueKey, ...data);
-            console.log('[WSS] Tasks set successfully');
-            ws.send(JSON.stringify({ action: 'queueStatus', data: data.join(', ') }));
-            ws.send(JSON.stringify({ action: 'tasksSet', data: 'Tasks have been set in ValKey cluster.' }));
+            // Clear both queue and lock for fresh start
+            await client.del([queueKey, lockKey]);
+            const totalTasks = data.length;
+            for (let i = 0; i < data.length; i++) {
+                await client.rpush(queueKey, JSON.stringify({
+                    action: data[i].action,
+                    index: i,
+                    total: totalTasks
+                }));
+            }
+            console.log('[WSS] Tasks and lock cleared, new tasks set successfully');
+            ws.send(JSON.stringify({ 
+                action: 'queueStatus', 
+                data: data.map(t => t.action)
+            }));
+            break;
+          case 'taskCompleted':
+            console.log('[WSS] Task completed, releasing lock');
+            await client.del([lockKey]);
+            ws.send(JSON.stringify({ 
+                action: 'lockStatus', 
+                data: { locked: false } 
+            }));
             break;
           case 'startTasks':
             checkLock(ws);
@@ -132,29 +150,48 @@ export function setupWebSocket(server) {
 
 async function checkLock(ws) {
   try {
-    const lockExists = await client.exists(lockKey);
-    console.log('[WSS] Lock check:', { exists: lockExists });
+    const lockValue = await client.get(lockKey);
+    const lockExists = lockValue === 'locked';
+    console.log('[WSS] Lock check:', { exists: lockExists, value: lockValue });
 
     if (!lockExists) {
       const tasks = await client.lrange(queueKey, 0, -1);
       console.log('[WSS] Current tasks in queue:', tasks);
 
       if (tasks.length > 0) {
-        const task = await client.lpop(queueKey);
+        const taskJson = await client.lpop(queueKey);
+        const task = JSON.parse(taskJson);
         console.log('[WSS] Processing task:', task);
-        await client.set(lockKey, 'locked', { EX: 10 });
-        ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: true } }));
-        ws.send(JSON.stringify({ action: 'taskUpdate', data: { status: `Processing task: ${task}`, action: task } }));
+        
+        const lockSet = await client.set(lockKey, 'locked', { 
+            conditionalSet: 'onlyIfDoesNotExist', 
+            expiry: { type: "EX", count: 30 }
+        });
+
+        if (lockSet) {
+            ws.send(JSON.stringify({ 
+                action: 'lockStatus', 
+                data: { locked: true } 
+            }));
+            
+            ws.send(JSON.stringify({ 
+                action: 'taskUpdate', 
+                data: { 
+                    status: `Processing task: ${task.action} (${task.index + 1}/${task.total})`, 
+                    action: task.action 
+                } 
+            }));
+        } else {
+            await client.lpush(queueKey, taskJson);
+        }
       } else {
         console.log('[WSS] Queue empty, completing process');
         ws.send(JSON.stringify({ action: 'processCompleted', data: 'All tasks completed.' }));
         clearInterval(ws.taskManagerInterval);
-        await client.del(lockKey);
+        await client.del([lockKey]);
         client.close();
         client = null;
       }
-    } else {
-      ws.send(JSON.stringify({ action: 'lockStatus', data: { locked: false } }));
     }
   } catch (error) {
     console.error('[WSS] Lock check error:', {
