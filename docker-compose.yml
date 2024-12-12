@@ -80,6 +80,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.python
+    image: python-executor
     ports:
       - "3002:3002"
     networks:

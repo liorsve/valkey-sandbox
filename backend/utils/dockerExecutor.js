@@ -27,7 +27,7 @@ async function executeCode(language, code, mode = 'standalone', callback) {
 
         const dockerMappings = {
             'python': {
-                image: 'valkey-python:latest',
+                image: 'python-executor',
                 buildCommand: (codeFile) => `python3 /app/temp/${codeFile}`
             },
             'javascript': {
