@@ -1,6 +1,6 @@
-# ValKey Sandbox
+# Valkey Sandbox
 
-An interactive development environment for exploring [ValKey](https://valkey.io/) features and [ValKey-Glide](https://github.com/valkey-io/valkey-glide) client implementations along with various other main valkey clients.
+An interactive development environment for exploring [Valkey](https://valkey.io/) features and [Valkey-Glide](https://github.com/valkey-io/valkey-glide) client implementations along with various other main valkey clients.
 
 ## 🚀 Features
 
@@ -20,7 +20,7 @@ An interactive development environment for exploring [ValKey](https://valkey.io/
 
 ## 🎮 Gamified Watch-in-Action
 
-Experience ValKey's capabilities through interactive gamified features:
+Experience Valkey's capabilities through interactive gamified features:
 
 - **Leaderboard**: A dynamic leaderboard showcasing real-time data updates, player rankings, and score changes.
 - **Task Manager**: Visualize and manage task queues, learn about task scheduling, and observe task execution in real-time.
@@ -66,9 +66,9 @@ We welcome contributions! Here are some areas where you can help:
 
 3. Features
    - Additional code templates
-   - More ValKey-Glide examples
+   - More Valkey-Glide examples
    - Performance monitoring
-   - Support for multiple ValKey versions
+   - Support for multiple Valkey versions
 
 4. UI/UX Improvements
    - Theme customization
@@ -85,8 +85,8 @@ See [DEVELOPER.md](DEVELOPER.md) for technical details.
 
 ## 🔗 Related Projects
 
-- [ValKey](https://valkey.io/) - High-performance in-memory database
-- [ValKey-Glide](https://github.com/valkey-io/valkey-glide) - Official client library
+- [Valkey](https://valkey.io/) - High-performance in-memory database
+- [Valkey-Glide](https://github.com/valkey-io/valkey-glide) - Official client library
 
 ## 🔧 Configuration
 
@@ -106,16 +106,16 @@ For issues and feature requests, please use the GitHub issue tracker.
 
 This project is licensed under the Apache License 2.0.
 
-Both this project and ValKey-Glide are licensed under the Apache License 2.0. ValKey has its own licensing terms.
+Both this project and Valkey-Glide are licensed under the Apache License 2.0. Valkey has its own licensing terms.
 
 For more details, see the [LICENSE](LICENSE) file.
 
 ### Third-Party Licenses
 
-This project uses ValKey-Glide under the Apache License 2.0:
+This project uses Valkey-Glide under the Apache License 2.0:
 
 ```
-Copyright 2024 ValKey IO
+Copyright 2024 Valkey IO
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
