@@ -109,7 +109,7 @@ async def recommend(client, user_embeddings, top_n):
   return sorted(recs, key=lambda x: -x[1])[:top_n]
 async def main():
   # Create Glide client
-  config = GlideClusterClientConfiguration([NodeAddress("localhost", 6379)])
+  config = GlideClusterClientConfiguration([NodeAddress("localhost", 7000)])
   client = await GlideClusterClient.create(config)
   # Sample dataset
   products = [
@@ -151,7 +151,7 @@ async def lock_example(client, lock_key, resource_key):
 
 async def main():
     host = os.getenv('VALKEY_HOST', 'localhost')
-    port = int(os.getenv('VALKEY_PORT', '6379'))
+    port = int(os.getenv('VALKEY_PORT', '7000'))
     config = GlideClusterClientConfiguration([NodeAddress(host, port)])
     client = await GlideClusterClient.create(config)
     
@@ -182,7 +182,7 @@ async def queue_example(client, queue_key):
 
 async def main():
     host = os.getenv('VALKEY_HOST', 'localhost')
-    port = int(os.getenv('VALKEY_PORT', '6379'))
+    port = int(os.getenv('VALKEY_PORT', '7000'))
     config = GlideClusterClientConfiguration([NodeAddress(host, port)])
     client = await GlideClusterClient.create(config)
     
@@ -259,7 +259,7 @@ async function sessionCacheExample(client, username) {
 
 async function main() {
     const host = process.env.VALKEY_HOST || 'localhost';
-    const port = process.env.VALKEY_PORT ? parseInt(process.env.VALKEY_PORT) : 6379;
+    const port = process.env.VALKEY_PORT ? parseInt(process.env.VALKEY_PORT) : 7000;
 
     // Create the Glide client
     const client = await GlideClusterClient.createClient({
@@ -341,7 +341,7 @@ async function recommend(client, userEmbeddings, topN) {
 // Main function
 async function main() {
     const client = await GlideClusterClient.createClient({
-        addresses: [{ host: 'localhost', port: 6379 }],
+        addresses: [{ host: 'localhost', port: 7000 }],
     });
 
     const products = [
@@ -395,7 +395,7 @@ async function lockExample(client, lockKey, resourceKey) {
 
 async function main() {
     const client = await GlideClusterClient.createClient({
-        addresses: [{ host: 'localhost', port: 6379 }],
+        addresses: [{ host: 'localhost', port: 7000 }],
     });
     
     await lockExample(client, 'mylock', 'counter');
@@ -426,7 +426,7 @@ async function queueExample(client, queueKey) {
 
 async function main() {
     const client = await GlideClusterClient.createClient({
-        addresses: [{ host: 'localhost', port: 6379 }],
+        addresses: [{ host: 'localhost', port: 7000 }],
     });
     
     await queueExample(client, 'myqueue');
