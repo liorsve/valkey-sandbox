@@ -193,6 +193,7 @@ export default {
         const selectedTemplate = codeTemplates[this.selectedClient];
         let template;
         if (this.currentTab === 'commonUseCases') {
+          this.executionMode = 'Cluster';
           if (this.selectedUseCase) {
             if (['Task Manager', 'Leaderboard'].includes(this.selectedUseCase)) {
               template = watchInActionTemplates[this.selectedClient]?.[this.selectedUseCase] ||
