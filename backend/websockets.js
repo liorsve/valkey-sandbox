@@ -16,6 +16,7 @@ let client;
 let glideClient;
 const lockKey = 'task-lock';
 const queueKey = 'task-queue';
+const LOGGING_ENABLED = process.env.LOGGING_ENABLED === 'true';
 
 /**
  * Initialize the Glide client for websocket connections.
@@ -289,6 +290,9 @@ export function setupWebSocket(server) {
     ws.on('message', async (message) => {
       try {
         const { action, data } = JSON.parse(message);
+        if (LOGGING_ENABLED) {
+          console.log(`Received action: ${action}`);
+        }
         console.log(`[WSS] Received action: ${action}`, data);
 
         switch (action) {

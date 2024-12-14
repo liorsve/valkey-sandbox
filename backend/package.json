@@ -16,7 +16,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "start:prod": "npm start",
-    "start:dev": "npm run dev"
+    "start:dev": "nodemon --ignore temp/ index.js"
   },
   "devDependencies": {
     "nodemon": "3.1.9"

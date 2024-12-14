@@ -22,11 +22,12 @@
 
 ### Using Setup Script
 
-The `setup.sh` script provides two modes:
+The `setup.sh` script provides additional options:
 ```bash
 ./setup.sh --dev   # Development mode with hot-reloading
 ./setup.sh         # Production mode
 ./setup.sh --cleanup  # Clean up all running processes
+./setup.sh --log  # Enable logging
 ```
 
 Features:

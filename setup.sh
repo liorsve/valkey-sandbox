@@ -15,6 +15,8 @@ BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 VALKEY_NETWORK="valkey-net"
 
+LOGGING_ENABLED=false
+
 cleanup_processes() {
     echo -e "${YELLOW}Cleaning up processes...${NC}"
     pkill -f "vue-cli-service" 2>/dev/null || true
@@ -29,12 +31,18 @@ cleanup_processes() {
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --dev) DEV_MODE=true ;;
+        --dev)
+            DEV_MODE=true
+            LOGGING_ENABLED=true  # Enable logging in dev mode
+            ;;
         --cleanup) cleanup_processes ;;
+        --log) LOGGING_ENABLED=true ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
+
+export LOGGING_ENABLED
 
 # Default mode and environment variables
 if [ "$DEV_MODE" = true ]; then

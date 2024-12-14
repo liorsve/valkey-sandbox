@@ -81,6 +81,15 @@ async function executeCode(language, code, mode = 'standalone', callback) {
             callback(stdout);
             // Clean up container
             exec(`docker rm ${containerName}`);
+
+            // Delete the temporary code file after sending the response
+            fs.unlink(tempFile, (err) => {
+                if (err) {
+                    console.error(`Error deleting temporary file ${tempFile}:`, err);
+                } else {
+                    console.log(`Temporary file ${tempFile} deleted.`);
+                }
+            });
         });
     } catch (error) {
         callback(`Error executing code: ${error.message}`);

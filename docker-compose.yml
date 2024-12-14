@@ -25,6 +25,7 @@ services:
       - VUE_APP_WS_URL=ws://localhost:8080/appws
       - WDS_SOCKET_PORT=443
       - START_SCRIPT=${START_SCRIPT}
+      - LOGGING_ENABLED=${LOGGING_ENABLED}
 
   frontend:
     build:
