@@ -1,0 +1,11 @@
+{
+    "ignore": [
+        "temp/*",
+        "temp/**/*"
+    ],
+    "watch": [
+        "*.js",
+        "routes/*",
+        "utils/*"
+    ]
+}

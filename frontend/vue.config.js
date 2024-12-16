@@ -24,13 +24,7 @@ module.exports = defineConfig({
       '/appws': {
         target: 'ws://localhost:3000',
         ws: true,
-        changeOrigin: true,
-        secure: false,
-        logLevel: 'debug',
-        headers: {
-          'Upgrade': 'websocket',
-          'Connection': 'Upgrade'
-        }
+        changeOrigin: true
       }
     }
   },

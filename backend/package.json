@@ -10,13 +10,14 @@
     "express": "5.0.1",
     "iovalkey": "0.2.1",
     "socket.io": "^4.0.1",
-    "ws": "8.18.0"
+    "ws": "8.18.0",
+    "express-ws": "^5.0.2"
   },
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon --ignore 'temp/*' server.js",
     "start": "node server.js",
     "start:prod": "npm start",
-    "start:dev": "nodemon --ignore temp/ index.js"
+    "start:dev": "nodemon --ignore 'temp/*' server.js"
   },
   "devDependencies": {
     "nodemon": "3.1.9"

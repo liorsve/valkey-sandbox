@@ -41,6 +41,7 @@
 </template>
 
 <script>
+import { defineComponent, onMounted } from 'vue';
 import Editor from './components/Editor.vue';
 import AppTerminal from './components/AppTerminal.vue';
 import AppSidebar from './components/Sidebar.vue';
@@ -50,7 +51,7 @@ import TopTabs from './components/TopTabs.vue';
 import { codeTemplates } from './assets/codeTemplates';
 import { watchInActionTemplates } from './assets/watchInActionTemplates.js';
 
-export default {
+export default defineComponent({
   name: 'App',
 
   components: {
@@ -64,9 +65,9 @@ export default {
 
   data() {
     return {
-      currentTab: 'playground',
-      selectedClient: 'valkey-glide (Python)',
-      executionMode: 'Standalone',
+      currentTab: localStorage.getItem('currentTab') || 'playground',
+      selectedClient: localStorage.getItem('selectedClient') || 'valkey-glide (Python)',
+      executionMode: localStorage.getItem('executionMode') || 'Standalone',
       clients: [
         'valkey-glide (Java)',
         'valkey-glide (Python)',
@@ -99,6 +100,7 @@ export default {
 
   beforeUnmount() {
     if (this.ws) {
+      clearInterval(this.wsPingInterval);
       this.ws.close();
       this.ws = null;
     }
@@ -134,6 +136,17 @@ export default {
     },
   },
 
+  setup() {
+    onMounted(() => {
+      setTimeout(() => {
+        const preloader = document.getElementById('preloader');
+        if (preloader) {
+          preloader.style.display = 'none';
+        }
+      }, 300);
+    });
+  },
+
   methods: {
     getWebSocketUrl() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -155,12 +168,28 @@ export default {
           console.log('[WS] Connected');
           this.wsConnected = true;
           this.wsRetryCount = 0;
+
+          // Setup ping interval
+          this.wsPingInterval = setInterval(() => {
+            if (this.ws?.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({ action: 'ping' }));
+            }
+          }, 25000);
         };
 
         this.ws.onclose = (event) => {
           console.log('[WS] Closed:', event.code, event.reason);
           this.wsConnected = false;
           this.ws = null;
+          clearInterval(this.wsPingInterval);
+
+          // Attempt reconnection after a delay
+          setTimeout(() => {
+            if (this.wsRetryCount < 3) {
+              this.wsRetryCount++;
+              this.setupWebSocket();
+            }
+          }, 3000);
         };
 
         this.ws.onerror = (error) => {
@@ -172,6 +201,8 @@ export default {
             const response = JSON.parse(event.data);
             if (response.action === 'output') {
               this.$refs.terminal?.write(response.data);
+            } else if (response.action === 'systemMessage') {
+              console.log('[System]:', response.data.trim());
             }
           } catch (error) {
             console.error('[WS] Message parse error:', error);
@@ -275,13 +306,35 @@ export default {
       this.currentView = view;
     },
 
-    switchTab(tabName) {
-      if (this.currentTab === 'watchInAction' && tabName === 'watchInAction') {
-        this.resetWatchInAction();
+    async switchTab(tabName) {
+      if (this.currentTab === tabName) {
+        if (tabName === 'watchInAction') {
+          this.resetWatchInAction();
+        }
+        await this.flushServers();
+      } else {
+        this.currentTab = tabName;
+        localStorage.setItem('currentTab', tabName);
+        this.selectedUseCase = (tabName === 'commonUseCases') ? 'Recommendation System' : null; // Set default use case
+        await this.flushServers(); // Flush servers on tab switch
+        this.updateTemplate();
       }
-      this.currentTab = tabName;
-      this.selectedUseCase = null;
-      this.updateTemplate();
+    },
+
+    async flushServers() {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({
+            action: 'flushServers',
+            data: {
+              mode: this.executionMode.toLowerCase()
+            }
+          }));
+        } catch (error) {
+          console.error('Error flushing servers:', error);
+          this.$refs.terminal?.write('Error flushing servers\n');
+        }
+      }
     },
 
     selectUseCase(useCase) {
@@ -328,17 +381,34 @@ export default {
     },
     updateClient(newClient, newMode) {
       this.selectedClient = newClient;
+      localStorage.setItem('selectedClient', newClient);
       this.executionMode = newMode;
+      localStorage.setItem('executionMode', newMode);
       this.updateTemplate();
+
+      if (this.currentTab === 'commonUseCases') {
+        this.executionMode = 'Cluster';
+        localStorage.setItem('executionMode', 'Cluster');
+        this.flushServers();
+      }
     },
     updateMode(newClient, newMode) {
       this.selectedClient = newClient;
+      localStorage.setItem('selectedClient', newClient);
       this.executionMode = newMode;
+      localStorage.setItem('executionMode', newMode);
       this.updateTemplate();
+
+      if (this.currentTab === 'commonUseCases') {
+        this.flushServers();
+      }
     },
     closeOverlay() {
       this.resetWatchInAction();
       this.currentTab = 'playground';
+      this.selectedClient = localStorage.getItem('selectedClient') || 'valkey-glide (Python)';
+      this.executionMode = localStorage.getItem('executionMode') || 'Cluster';
+      this.updateTemplate();
     },
     resetWatchInAction() {
       this.selectedAction = null;
@@ -351,8 +421,17 @@ export default {
     handleTerminalResize(size) {
       this.terminalClass = size === 'double-height' ? 'double-height' : '';
     },
+    closeWatchInAction() {
+      this.currentTab = 'playground';
+      this.selectedGlide = null;
+      this.selectedAction = null;
+      this.selectedUseCase = null;
+      this.selectedClient = localStorage.getItem('selectedClient') || 'valkey-glide (Python)';
+      this.executionMode = localStorage.getItem('executionMode') || 'Cluster';
+      this.updateTemplate();
+    },
   },
-};
+});
 </script>
 
 <style>

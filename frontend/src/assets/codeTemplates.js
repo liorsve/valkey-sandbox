@@ -130,12 +130,17 @@ async def main():
 asyncio.run(main())`,
         'Lock': `# Lock Example using Valkey Glide in Python
 import asyncio
-from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration
+from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration, ConditionalChange, ExpirySet, ExpiryType
 import os
 
 async def lock_example(client, lock_key, resource_key):
     # Try to acquire lock with 10 second expiry
-    lock_acquired = await client.set(lock_key, 'locked', nx=True, ex=10)
+    lock_acquired = await client.set(
+        lock_key, 
+        'locked', 
+        conditional_set=ConditionalChange.ONLY_IF_DOES_NOT_EXIST, 
+        expiry=ExpirySet(ExpiryType.SEC, 10)
+    )
     if lock_acquired:
         try:
             # Critical section - modify resource

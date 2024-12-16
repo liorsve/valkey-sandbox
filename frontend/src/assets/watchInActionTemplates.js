@@ -49,6 +49,14 @@ import json
 from glide import NodeAddress, GlideClusterClient, GlideClusterClientConfiguration, RangeByScore, InfBound
 import os
 
+async def print_leaderboard(client: GlideClusterClient):
+    # Get player rankings
+    print("\\nPlayer Rankings:\\n")
+    leaderboard = await client.zrange_withscores("leaderboard", RangeByScore(InfBound.POS_INF, InfBound.NEG_INF), reverse=True)
+    for rank, (player_id, score) in enumerate(leaderboard.items(), 1):
+        print(f"{rank}. {player_id.decode()}: {int(score)} points")
+
+
 async def main():
     client = None
     try:
@@ -56,34 +64,34 @@ async def main():
         port = int(os.getenv('VALKEY_CLUSTER_PORT', '7000'))
         config = GlideClusterClientConfiguration([NodeAddress(host, port)])
         client = await GlideClusterClient.create(config)
-        print("Connected to Valkey server")
-        await client.flushall()
-        print("Cluster flushed")
+        print("Connected to Valkey server\\n")
         
         # Initialize test data
         players = [
-            {"id": "player1", "name": "Superman", "score": 1500},
-            {"id": "player2", "name": "Batman", "score": 1800},
-            {"id": "player3", "name": "Wonder Woman", "score": 1200},
-            {"id": "player4", "name": "Flash", "score": 300},
-            {"id": "player5", "name": "Green Lantern", "score": 150},
-            {"id": "player6", "name": "Aquaman", "score": 75}
+            {"id": "Superman", "score": 1500},
+            {"id": "Batman", "score": 1800},
+            {"id": "Wonder Woman", "score": 1200},
+            {"id": "Flash", "score": 300},
+            {"id": "Green Lantern", "score": 150},
+            {"id": "Aquaman", "score": 75}
         ]
         
         # Store player data
-        print("Initializing player data...")
+        print("Initializing player data...\\n")
         for player in players:
-            await client.set(player['id'], json.dumps(player))
             await client.zadd("leaderboard", {player['id']: player['score']})
-            print(f"Initialized {player['name']} with score {player['score']}")
+            print(f"Initialized {player['id']} with score {player['score']}")
         
-        # Get player rankings
-        print("Player Rankings:")
-        leaderboard = await client.zrange_withscores("leaderboard", RangeByScore(InfBound.POS_INF, InfBound.NEG_INF), reverse=True)
-        for rank, (player_id, score) in enumerate(leaderboard.items(), 1):
-            player_id = player_id.decode()
-            player_data = json.loads(await client.get(player_id))
-            print(f"{rank}. {player_data['name']}: {int(score)} points")
+        await print_leaderboard(client)
+
+        # Update scores
+        print("\\nUpdating scores...")
+        await client.zincrby("leaderboard", 300, "Superman")  # Superman wins a match
+        await client.zincrby("leaderboard", -100, "Batman")   # Batman loses a match
+        await client.zincrby("leaderboard", 500, "Flash")     # Flash makes a comeback
+
+        await print_leaderboard(client)
+
 
     except Exception as e:
         print(f"Error: {e}")
@@ -145,6 +153,18 @@ await main();`,
         'Leaderboard': `// Leaderboard Use Case in Node.js
 import { GlideClusterClient, InfBoundary } from '@valkey/valkey-glide';
 
+async function printLeaderboard(glideClient) {
+    // Get player rankings
+    const leaderboard = await glideClient.zrangeWithScores('leaderboard', {
+        start: InfBoundary.PositiveInfinity,
+        end:  InfBoundary.NegativeInfinity,
+        type: "byScore"
+    }, { reverse: true });
+    leaderboard.forEach((item, index) => {
+        console.log(\`\${index + 1}. \${item.element}: \${item.score} points\`);
+    });
+}
+
 async function main() {
     let glideClient = null;
     try {
@@ -154,48 +174,42 @@ async function main() {
             addresses: [{ host, port: parseInt(port) }],
             clientName: 'leaderboard-client',
         });
-        await glideClient.flushall();
-        console.log('[Valkey] Cluster flushed.');
 
         const players = [
-            { id: 'player1', name: 'Superman', score: 1500 },
-            { id: 'player2', name: 'Batman', score: 1800 },
-            { id: 'player3', name: 'Wonder Woman', score: 1200 },
-            { id: 'player4', name: 'Flash', score: 300 },
-            { id: 'player5', name: 'Green Lantern', score: 150 },
-            { id: 'player6', name: 'Aquaman', score: 75 }
+            { id: 'Superman', score: 1500 },
+            { id: 'Batman', score: 1800 },
+            { id: 'Wonder Woman', score: 1200 },
+            { id: 'Flash', score: 300 },
+            { id: 'Green Lantern', score: 150 },
+            { id: 'Aquaman', score: 75 }
         ];
         // Convert players to zadd format
         const leaderboardData = players.map(player => ({
-            element: \`player:\${player.id}\`,
+            element: player.id,
             score: player.score
         }));
         
         await glideClient.zadd('leaderboard', leaderboardData);
         
-        for (const player of players) {
-            await glideClient.set(\`player:\${player.id}\`, JSON.stringify(player));
-            console.log(\`[Valkey] Initialized player \${player.name} with score \${player.score}.\`);
-        }
-            
         // Get player rankings
-        const response = await glideClient.zrangeWithScores('leaderboard', {
-            start: InfBoundary.PositiveInfinity,
-            end:  InfBoundary.NegativeInfinity,
-            type: "byScore"
-        }, { reverse: true });
-        let rank = 1;
-        for (const { element: playerId, score } of response) {
-            const playerDataStr = await glideClient.get(playerId);
-            const data = JSON.parse(playerDataStr);
-            console.log(\`\${rank++}. \${data.name}: \${score} points\`);
-        }
+        await printLeaderboard(glideClient);
+
+        // Update scores
+        console.log("\\nUpdating scores...");
+        await glideClient.zadd("leaderboard", {
+            "Superman": 300,  // Superman wins a match
+            "Batman": -100,   // Batman loses a match
+            "Flash": 500      // Flash makes a comeback
+        });
+
+        await printLeaderboard(glideClient);
+
     } catch (error) {
         console.error('Error:', error);
     } finally {
         if (glideClient) {
             await glideClient.close();
-            console.log('\\nConnection closed');
+            console.log("\\nConnection closed");
         }
     }
 }
@@ -256,6 +270,18 @@ import java.util.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class LeaderboardExample {
+    public static void printLeaderboard(GlideClusterClient client) throws Exception {
+        // Get player rankings
+        System.out.println("\\nPlayer Rankings:\\n");
+        List<ZRangeWithScoresResult> leaderboard = client.zrangeWithscores("leaderboard", new RangeByScore(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY), true).get();
+        int rank = 1;
+        for (ZRangeWithScoresResult entry : leaderboard) {
+            String playerId = entry.getElement();
+            double score = entry.getScore();
+            System.out.printf("%d. %s: %.0f points%n", rank++, playerId, score);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         GlideClusterClientConfiguration config = new GlideClusterClientConfiguration(
             Arrays.asList(new NodeAddress("localhost", 7000))
@@ -270,61 +296,47 @@ public class LeaderboardExample {
             // Initialize test data
             List<Map<String, Object>> players = Arrays.asList(
                 new HashMap<String, Object>() {{ 
-                    put("id", "player1"); put("name", "Superman"); put("score", 1500);
+                    put("id", "Superman"); put("score", 1500);
                 }},
                 new HashMap<String, Object>() {{ 
-                    put("id", "player2"); put("name", "Batman"); put("score", 1800);
+                    put("id", "Batman"); put("score", 1800);
                 }},
                 new HashMap<String, Object>() {{ 
-                    put("id", "player3"); put("name", "Wonder Woman"); put("score", 1200);
+                    put("id", "Wonder Woman"); put("score", 1200);
                 }},
                 new HashMap<String, Object>() {{ 
-                    put("id", "player4"); put("name", "Flash"); put("score", 300);
+                    put("id", "Flash"); put("score", 300);
                 }},
                 new HashMap<String, Object>() {{ 
-                    put("id", "player5"); put("name", "Green Lantern"); put("score", 150);
+                    put("id", "Green Lantern"); put("score", 150);
                 }},
                 new HashMap<String, Object>() {{ 
-                    put("id", "player6"); put("name", "Aquaman"); put("score", 75);
+                    put("id", "Aquaman"); put("score", 75);
                 }}
             );
 
-            // Store player data and scores
+            // Store player scores
             System.out.println("Initializing player data...");
+            List<ZAddArgs> leaderboardData = new ArrayList<>();
             for (Map<String, Object> player : players) {
                 String playerId = (String) player.get("id");
                 int score = (Integer) player.get("score");
-                client.set("player:" + playerId, mapper.writeValueAsString(player)).get();
-                client.zadd("leaderboard", score, playerId).get();
-                System.out.printf("Initialized %s with score %d%n", player.get("name"), score);
+                leaderboardData.add(new ZAddArgs(score, playerId));
+            }
+            client.zadd("leaderboard", leaderboardData).get();
+            for (Map<String, Object> player : players) {
+                System.out.printf("Initialized %s with score %d%n", player.get("id"), player.get("score"));
             }
 
-            // Get player rankings
-            System.out.println("\\nPlayer Rankings:");
-            RangeByScore query = new RangeByScore(
-                InfScoreBound.NEGATIVE_INFINITY,
-                InfScoreBound.POSITIVE_INFINITY
-            );
-            Map<GlideString, Double> leaderboard = client.zrangeWithScores(
-                gs("leaderboard"),
-                query,
-                true  // reverse order to get highest scores first
-            ).get();
-            
-            int rank = 1;
-            for (Map.Entry<GlideString, Double> entry : leaderboard.entrySet()) {
-                String playerId = entry.getKey().toString();
-                double score = entry.getValue();
-                Map playerData = mapper.readValue(
-                    client.get("player:" + playerId).get(),
-                    Map.class
-                );
-                System.out.printf("%d. %s: %.0f points%n",
-                    rank++,
-                    playerData.get("name"),
-                    score
-                );
-            }
+            printLeaderboard(client);
+
+            // Update scores
+            System.out.println("\\nUpdating scores...");
+            client.zincrby("leaderboard", 300, "Superman").get();  // Superman wins a match
+            client.zincrby("leaderboard", -100, "Batman").get();   // Batman loses a match
+            client.zincrby("leaderboard", 500, "Flash").get();     // Flash makes a comeback
+
+            printLeaderboard(client);
 
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
