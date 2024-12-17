@@ -5,15 +5,15 @@
 ### Components
 - Frontend (Vue.js)
 - Backend (Node.js)
-- ValKey Standalone Instance
-- ValKey Cluster
+- Valkey Standalone Instance
+- Valkey Cluster
 - Python Executor Service
 - Node.js Executor Service
 
 ### Network Architecture
 ```
-[Frontend (8080)] → [Backend (3000)] → [ValKey Standalone (6379)]
-                                    → [ValKey Cluster (7000-7005)]
+[Frontend (8080)] → [Backend (3000)] → [Valkey Standalone (6379)]
+                                    → [Valkey Cluster (7000-7005)]
                                     → [Python Executor (3002)]
                                     → [Node.js Executor (3001)]
 ```
@@ -75,7 +75,7 @@ Modify `docker-compose.yml` for development:
    - Example collection
 
 3. Features
-   - ValKey cluster management UI
+   - Valkey cluster management UI
    - Performance benchmarking tools
    - Template marketplace
 
@@ -113,7 +113,7 @@ Modify `docker-compose.yml` for development:
 - `GET /templates` - Get code templates
 - `WS /appws` - WebSocket connection
 
-### ValKey Integration
+### Valkey Integration
 - Standalone mode: Direct connection
 - Cluster mode: Managed through proxy
 

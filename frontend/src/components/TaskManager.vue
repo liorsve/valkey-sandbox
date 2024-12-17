@@ -2,7 +2,7 @@
     <div class="task-manager">
         <div class="task-panel">
             <div class="control-section">
-                <button @click="addTask" class="add-task-btn">Add Task</button>
+                <button @click="addTask" :disabled="!isConnected" class="add-task-btn">Add Task</button>
                 <select v-model="selectedTask" class="task-select">
                     <option v-for="task in tasks" :key="task.id" :value="task">
                         {{ task.action }}
@@ -15,10 +15,22 @@
                 </div>
             </div>
         </div>
-        <button v-if="buttonState === 'set'" @click="setTasks">Set Tasks Queue</button>
-        <button v-else-if="buttonState === 'invoke'" @click="invokeTaskManager">Invoke Task Manager</button>
-        <button v-else-if="buttonState === 'cancel'" @click="cancelTaskManager">Cancel</button>
-        <button v-else-if="buttonState === 'tryAgain'" @click="resetTaskManager">Try Again</button>
+        <div class="control-buttons">
+            <button v-if="buttonState === 'set'" @click="setTasks" :disabled="!isConnected || taskQueue.length === 0"
+                class="control-btn">
+                Set Tasks Queue
+            </button>
+            <button v-else-if="buttonState === 'invoke'" @click="invokeTaskManager" :disabled="!isConnected"
+                class="control-btn">
+                Invoke Task Manager
+            </button>
+            <button v-else-if="buttonState === 'cancel'" @click="cancelTaskManager" class="control-btn cancel">
+                Cancel
+            </button>
+            <button v-else-if="buttonState === 'tryAgain'" @click="resetTaskManager" class="control-btn reset">
+                Try Again
+            </button>
+        </div>
         <div class="visualization">
             <div ref="triangle" class="triangle"></div>
             <div ref="lockIcon" class="lock-icon">🔒</div>
@@ -34,10 +46,15 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 
 export default {
     name: 'TaskManager',
+    props: {
+        ws: WebSocket,
+        isConnected: Boolean
+    },
+
     setup(props, { emit }) {
         const tasks = ref([
             { id: 1, action: 'Flip Right' },
@@ -54,9 +71,9 @@ export default {
         const triangle = ref(null);
         const lockIconRef = ref(null);
         const unlockIconRef = ref(null);
-        let ws;
         const buttonState = ref('set');
         const showEmptyQueuePopup = ref(false);
+        const taskStatus = ref('');
 
         const addTask = () => {
             if (taskQueue.value.length < 6) {
@@ -68,29 +85,45 @@ export default {
         };
 
         const setTasks = () => {
+            if (!props.isConnected) return;
+
             if (taskQueue.value.length === 0) {
                 showEmptyQueuePopup.value = true;
                 return;
             }
-            ws.send(JSON.stringify({
-                action: 'setTasks',
-                data: taskQueue.value
+
+            const taskData = taskQueue.value.map(task => ({
+                action: task.action,
+                uniqueId: task.uniqueId
             }));
-            emit('terminal-write', '\x1Bc');
-            terminalWrite('📝 Task Queue has been set!\n');
+
+            terminalWrite('🔧  Initializing distributed Task Queue in Valkey Cluster...');
+            terminalWrite('📝  \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism');
+
+            props.ws.send(JSON.stringify({
+                action: 'setTasks',
+                data: taskData
+            }));
+
             buttonState.value = 'invoke';
         };
 
         const invokeTaskManager = () => {
-            ws.send(JSON.stringify({
-                action: 'invokeTaskManager'
-            }));
-            terminalWrite('🚀 Invoking Task Manager...\n');
-            buttonState.value = 'cancel';
+            if (props.ws && props.ws.readyState === WebSocket.OPEN) {
+                console.log('Sending invokeTaskManager action');
+                props.ws.send(JSON.stringify({
+                    action: 'invokeTaskManager',
+                }));
+                terminalWrite('🚀 Invoking Task Manager...\n');
+                buttonState.value = 'cancel';
+            } else {
+                console.log('[WS] Cannot send message: WebSocket not connected.');
+                terminalWrite('Not connected to server. Retrying connection...\n');
+            }
         };
 
         const cancelTaskManager = () => {
-            ws.send(JSON.stringify({
+            props.ws.send(JSON.stringify({
                 action: 'cancelTaskManager'
             }));
             terminalWrite('⛔ Task Manager cancelled.\n');
@@ -104,20 +137,29 @@ export default {
         };
 
         const handleWebSocketMessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.action === 'taskUpdate') {
-                terminalWrite(`🔔 ${message.data.status}\n`);
-                if (message.data.action) {
-                    performTask(message.data.action);
+            try {
+                const message = JSON.parse(event.data);
+                if (message.action === 'taskUpdate') {
+                    if (message.data.clusterOperations) {
+                        message.data.clusterOperations.forEach(op => {
+                            terminalWrite(`📡 ${op}`);
+                        });
+                    }
+                    terminalWrite(`🔄 Task Manager Status: ${message.data.status}`);
+                    if (message.data.action) {
+                        terminalWrite(`⚡ Executing task: ${message.data.action}`);
+                        performTask(message.data.action);
+                    }
+                } else if (message.action === 'queueStatus') {
+                    const queueData = Array.isArray(message.data) ? message.data.join(', ') : message.data;
+                    terminalWrite(`📋 LRANGE task-queue 0 -1`);
+                    terminalWrite(`📊 Current Tasks: ${queueData}`);
+                } else if (message.action === 'gameCommand') {
+                    handleCommand(message.data);
                 }
-            } else if (message.action === 'queueStatus') {
-                const queueData = Array.isArray(message.data) ? message.data.join(', ') : message.data;
-                terminalWrite(`📋 Current Queue: ${queueData}\n`);
-            } else if (message.action === 'lockStatus') {
-                animateLocking(message.data.locked);
-            } else if (message.action === 'processCompleted') {
-                terminalWrite('✅ All tasks completed!\n');
-                buttonState.value = 'tryAgain';
+            } catch (error) {
+                console.error('[TaskManager] Error handling message:', error);
+                terminalWrite('❌ Error processing Valkey response');
             }
         };
 
@@ -194,7 +236,7 @@ export default {
 
                 await new Promise(r => setTimeout(r, 300));
 
-                ws.send(JSON.stringify({ action: 'taskCompleted' }));
+                props.ws.send(JSON.stringify({ action: 'taskCompleted' }));
             };
 
             sequence();
@@ -221,32 +263,92 @@ export default {
             }
         };
 
-        const connectWebSocket = () => {
-            ws = new WebSocket('ws://localhost:3000/appws');
-            ws.onmessage = handleWebSocketMessage;
-        };
-
         const closePopup = () => {
             showEmptyQueuePopup.value = false;
         };
+
+        const handleCommand = (command) => {
+            if (!command || typeof command !== 'object') return;
+            const { type, task, message, step } = command;
+
+            switch (type) {
+                case 'lockAcquired':
+                    terminalWrite('🔒  \x1b[1mSET task-lock\x1b[0m "locked" EX 30 NX');
+                    terminalWrite('✨  Lock acquired in Valkey Cluster - Ready to process tasks');
+                    animateLocking(true);
+                    break;
+
+                case 'performTask':
+                    terminalWrite(`⚡  \x1b[1mLPOP task-queue\x1b[0m // Processing task: ${task}`);
+                    terminalWrite(`📍  Task execution progress: ${step}/total`);
+                    performTask(task);
+                    break;
+
+                case 'lockReleased':
+                    terminalWrite('🔓  \x1b[1mDEL task-lock\x1b[0m // Released distributed lock');
+                    terminalWrite('🔄  Task Manager ready for next batch');
+                    animateLocking(false);
+                    break;
+
+                case 'complete':
+                    terminalWrite('✅  Queue processed successfully in Valkey Cluster!');
+                    terminalWrite('📊  All distributed tasks executed and synchronized');
+                    buttonState.value = 'tryAgain';
+                    break;
+            }
+
+            if (props.ws && props.ws.readyState === WebSocket.OPEN) {
+                props.ws.send(JSON.stringify({ action: 'gameCommand', data: command }));
+            }
+        };
+
+        const handleTerminalWrite = (message) => {
+            emit('terminal-write', message);
+        };
+
+        const handleWebSocket = (newWs) => {
+            if (newWs) {
+                newWs.onmessage = handleWebSocketMessage;
+            }
+        };
+
+        const cleanup = () => {
+            if (props.ws?.readyState === WebSocket.OPEN) {
+                props.ws.send(JSON.stringify({
+                    action: 'cancelTaskManager'
+                }));
+            }
+            taskQueue.value = [];
+            buttonState.value = 'set';
+
+            // Reset visual state
+            if (triangle.value) {
+                triangle.value.style.transform = 'translateX(-50%) translateY(-50%)';
+                triangle.value.style.borderBottomColor = '#6a11cb';
+                triangle.value.classList.remove('locked');
+            }
+        };
+
+        onBeforeUnmount(() => {
+            cleanup();
+            window.removeEventListener('beforeunload', cleanup);
+            emit('terminal-resize', 'normal-height');
+        });
 
         onMounted(() => {
             triangle.value = document.querySelector('.triangle');
             lockIconRef.value = document.querySelector('.lock-icon');
             unlockIconRef.value = document.querySelector('.unlock-icon');
-            connectWebSocket();
-            window.addEventListener('beforeunload', () => {
-                ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
-            });
-            emit('terminal-resize', 'double-height');
+            window.addEventListener('beforeunload', cleanup);
+            emit('terminal-resize', 'full-height');
+            handleWebSocket(props.ws);
         });
 
-        onBeforeUnmount(() => {
-            window.removeEventListener('beforeunload', () => {
-                ws.send(JSON.stringify({ action: 'cancelTaskManager' }));
-            });
-            emit('terminal-resize', 'normal-height');
-        });
+        watch(
+            () => props.ws,
+            handleWebSocket,
+            { immediate: true }
+        );
 
         return {
             tasks,
@@ -263,8 +365,12 @@ export default {
             buttonState,
             showEmptyQueuePopup,
             closePopup,
+            handleCommand,
+            handleTerminalWrite,
+            taskStatus,
+            cleanup,
         };
-    },
+    }
 };
 </script>
 
@@ -272,20 +378,35 @@ export default {
 .task-manager {
     display: flex;
     flex-direction: column;
-    padding: 20px;
     height: 100%;
     background-color: #121212;
+    padding: 20px;
     overflow: hidden;
     gap: 15px;
+    justify-content: space-between;
+    min-height: auto;
+    /* Remove 100vh */
 }
 
+/* Add this to ensure terminal can grow */
+:deep(.terminal-container) {
+    flex: 1;
+    min-height: 350px;
+}
+
+/* Move terminal-related styles to shared.css */
 .task-panel {
     display: flex;
     gap: 15px;
-    height: 100px;
+    margin-bottom: 10px;
+    /* Add margin to separate from visualization */
     background-color: #1e1e1e;
     border-radius: 6px;
     padding: 15px;
+    height: auto;
+    /* Remove fixed height */
+    min-height: 80px;
+    /* Set minimum height */
 }
 
 .control-section {
@@ -423,7 +544,10 @@ button:hover {
 .visualization {
     position: relative;
     flex: 6 !important;
-    min-height: 500px !important;
+    min-height: 350px !important;
+    /* Reduce minimum height */
+    max-height: calc(100% - 150px);
+    /* Account for task panel height */
     background-color: #0a0a0a;
     margin-top: 0;
     border-radius: 10px;
@@ -553,5 +677,33 @@ button:hover {
 
 .tasks-grid::-webkit-scrollbar-thumb:hover {
     background: #6a1b9a;
+}
+
+.control-buttons {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.control-btn {
+    min-width: 200px;
+    padding: 15px 30px;
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.control-btn.cancel {
+    background-color: #f44336;
+}
+
+.control-btn.reset {
+    background-color: #2196f3;
 }
 </style>

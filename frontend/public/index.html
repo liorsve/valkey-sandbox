@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ValKey Sandbox</title>
+    <title>Valkey Sandbox</title>
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <!-- XTerm.js Styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css">
@@ -30,7 +30,7 @@
         }
 
         .preloader-text {
-            font-size: 48px;
+            font-size: 35px;
             font-weight: bold;
             color: #ffffff;
             font-family: 'Courier New', monospace;
@@ -40,13 +40,13 @@
         }
 
         .preloader-text::after {
-            content: '{ ValKey Sandbox }';
+            content: '{ Valkey Sandbox }';
             position: absolute;
             left: 0;
             top: 0;
             height: 100%;
             width: 0;
-            color: #2575fc;
+            color: #276ce2;
             overflow: hidden;
             white-space: nowrap;
             animation: fillText 1s forwards;
@@ -66,10 +66,10 @@
 </head>
 <body>
     <noscript>
-        <strong>We're sorry but ValKey Sandbox doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
+        <strong>We're sorry but Valkey Sandbox doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
     </noscript>
     <div id="preloader" class="preloader">
-        <div class="preloader-text">{ ValKey Sandbox }</div>
+        <div class="preloader-text">{ Valkey Sandbox }</div>
     </div>
     <div id="app"></div>
     <!-- Scripts will be injected by webpack automatically -->

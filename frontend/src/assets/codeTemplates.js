@@ -381,7 +381,10 @@ import { GlideClusterClient } from '@valkey/valkey-glide';
 
 async function lockExample(client, lockKey, resourceKey) {
     // Try to acquire lock with 10 second expiry
-    const lockAcquired = await client.set(lockKey, 'locked', { NX: true, EX: 10 });
+    const lockAcquired = await client.set(lockKey, 'locked', {
+          conditionalSet: 'onlyIfDoesNotExist',
+          expiry: { type: 'EX', count: 3 },
+        });
     if (lockAcquired) {
         try {
             // Critical section - modify resource

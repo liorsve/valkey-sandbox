@@ -27,15 +27,17 @@
             <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
           </div>
           <div class="visualization">
-            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" @terminal-write="handleTerminalWrite" />
-            <TaskManager v-else-if="selectedAction === 'Task Manager'" @terminal-write="handleTerminalWrite"
-              @terminal-resize="handleTerminalResize" />
+            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" :ws="ws" :isConnected="wsConnected"
+              @terminal-write="handleTerminalWrite" />
+            <TaskManager v-else-if="selectedAction === 'Task Manager'" :ws="ws" :isConnected="wsConnected"
+              @terminal-write="handleTerminalWrite" @terminal-resize="handleTerminalResize"
+              @send-message="handleTaskManagerMessage" />
           </div>
         </div>
       </div>
       <AppSidebar class="sidebar" :currentTab="currentTab" :selectedClient="selectedClient"
         :executionMode="executionMode" @run-code="runCode" @navigate="navigate" @select-usecase="selectUseCase"
-        @update-client="updateClient" @update-mode="updateMode" />
+        @update-client="updateClient" @update-mode="updateMode" @start-task="startTask" />
     </div>
   </div>
 </template>
@@ -82,7 +84,7 @@ export default defineComponent({
       ws: null,
       wsConnected: false,
       wsBaseUrl: `/appws`,
-      language: 'javascript',
+      language: 'python',
       currentView: 'editor',
       selectedUseCase: null,
       selectedAction: null,
@@ -91,6 +93,10 @@ export default defineComponent({
       hideSidebar: false,
       isReadOnly: false,
       terminalClass: '',
+      wsRetryTimeout: null,
+      maxRetries: 5,
+      retryCount: 0,
+      retryDelay: 1000, // Start with 1 second delay
     };
   },
 
@@ -99,17 +105,7 @@ export default defineComponent({
   },
 
   beforeUnmount() {
-    if (this.ws) {
-      clearInterval(this.wsPingInterval);
-      this.ws.close();
-      this.ws = null;
-    }
-    try {
-      this.$refs.editor?.dispose();
-      this.$refs.terminal?.dispose();
-    } catch (error) {
-      console.error('Error during cleanup:', error);
-    }
+    this.cleanup();
   },
 
   mounted() {
@@ -118,7 +114,13 @@ export default defineComponent({
 
   watch: {
     currentTab(newTab, oldTab) {
-      if (newTab !== 'watchInAction') {
+      if (oldTab === 'watchInAction') {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({
+            action: 'cleanupTasks',
+            data: { previousTab: oldTab }
+          }));
+        }
         this.resetWatchInAction();
         this.hideSidebar = false;
       }
@@ -153,64 +155,154 @@ export default defineComponent({
       return `${protocol}//${window.location.host}/appws`;
     },
 
-    setupWebSocket() {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        return;
+    async setupWebSocket() {
+      // Clear any existing timeout
+      if (this.wsRetryTimeout) {
+        clearTimeout(this.wsRetryTimeout);
+        this.wsRetryTimeout = null;
       }
 
-      const wsUrl = this.getWebSocketUrl();
-      console.log('[WS] Connecting to', wsUrl);
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        return this.ws;
+      }
+
+      return new Promise((resolve, reject) => {
+        if (this.retryCount >= this.maxRetries) {
+          console.error('[WS] Max retry attempts reached');
+          reject(new Error('Max retry attempts reached'));
+          return;
+        }
+
+        try {
+          const wsUrl = this.getWebSocketUrl();
+          console.log(`[WS] Connecting to ${wsUrl} (Attempt ${this.retryCount + 1})`);
+
+          this.ws = new WebSocket(wsUrl);
+
+          const cleanupSocket = () => {
+            if (this.ws) {
+              this.ws.onclose = null;
+              this.ws.onerror = null;
+              this.ws.onmessage = null;
+              this.ws.onopen = null;
+              this.ws.close();
+              this.ws = null;
+            }
+          };
+
+          this.ws.onopen = () => {
+            console.log('[WS] Connection established');
+            this.wsConnected = true;
+            this.retryCount = 0;
+            this.retryDelay = 1000;
+            resolve(this.ws);
+          };
+
+          this.ws.onclose = (event) => {
+            console.log('[WS] Connection closed:', event.reason);
+            this.wsConnected = false;
+            cleanupSocket();
+
+            // Only retry if we haven't reached max attempts
+            if (this.retryCount < this.maxRetries) {
+              this.retryDelay *= 2; // Exponential backoff
+              this.retryCount++;
+              this.wsRetryTimeout = setTimeout(() => {
+                this.setupWebSocket().catch(console.error);
+              }, this.retryDelay);
+            }
+          };
+
+          this.ws.onerror = (error) => {
+            console.error('[WS] Error:', error);
+            cleanupSocket();
+            reject(error);
+          };
+
+          this.ws.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              this.handleWebSocketMessage(message);
+            } catch (error) {
+              console.error('[WS] Message parsing error:', error);
+            }
+          };
+
+        } catch (error) {
+          console.error('[WS] Setup error:', error);
+          this.wsConnected = false;
+          reject(error);
+        }
+      });
+    },
+
+    handleWebSocketMessage(message) {
+      if (!message || !message.action) return;
+
+      console.log('[WS] Processing message:', message);
 
       try {
-        this.ws = new WebSocket(wsUrl);
+        switch (message.action) {
+          case 'cleanupComplete':
+            console.log('Cleanup completed successfully');
+            break;
 
-        this.ws.onopen = () => {
-          console.log('[WS] Connected');
-          this.wsConnected = true;
-          this.wsRetryCount = 0;
+          case 'output':
+            this.$refs.terminal?.write(message.data);
+            break;
 
-          // Setup ping interval
-          this.wsPingInterval = setInterval(() => {
-            if (this.ws?.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({ action: 'ping' }));
-            }
-          }, 25000);
-        };
+          case 'gameCommand':
+            this.handleGameCommand(message.data);
+            break;
 
-        this.ws.onclose = (event) => {
-          console.log('[WS] Closed:', event.code, event.reason);
-          this.wsConnected = false;
-          this.ws = null;
-          clearInterval(this.wsPingInterval);
+          case 'error':
+            console.error('[WS] Server error:', message.data);
+            this.$refs.terminal?.write(`Error: ${message.data}\n`);
+            break;
 
-          // Attempt reconnection after a delay
-          setTimeout(() => {
-            if (this.wsRetryCount < 3) {
-              this.wsRetryCount++;
-              this.setupWebSocket();
-            }
-          }, 3000);
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('[WS] Error:', error);
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const response = JSON.parse(event.data);
-            if (response.action === 'output') {
-              this.$refs.terminal?.write(response.data);
-            } else if (response.action === 'systemMessage') {
-              console.log('[System]:', response.data.trim());
-            }
-          } catch (error) {
-            console.error('[WS] Message parse error:', error);
-          }
-        };
+          default:
+            console.log('[WS] Unhandled message action:', message.action);
+        }
       } catch (error) {
-        console.error('[WS] Setup error:', error);
+        console.error('[WS] Error handling message:', error);
       }
+    },
+
+    cleanup() {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({
+            action: 'cleanup',
+            data: {
+              tab: this.currentTab,
+              mode: this.executionMode.toLowerCase(),
+              useCase: this.selectedUseCase
+            }
+          }));
+        } catch (error) {
+          console.error('[WS] Error sending cleanup message:', error);
+        }
+      }
+
+      // Reset state
+      if (this.wsRetryTimeout) {
+        clearTimeout(this.wsRetryTimeout);
+        this.wsRetryTimeout = null;
+      }
+
+      // Reset WebSocket
+      if (this.ws) {
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.onmessage = null;
+        this.ws.onopen = null;
+        this.ws.close();
+        this.ws = null;
+      }
+
+      this.wsConnected = false;
+      this.retryCount = 0;
+      this.retryDelay = 1000;
     },
 
     updateTemplate() {
@@ -270,11 +362,8 @@ export default defineComponent({
 
       this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
 
-      if (!this.wsConnected) {
-        this.$refs.terminal?.write('Connecting to server...\n');
+      if (this.ws?.readyState !== WebSocket.OPEN) {
         this.setupWebSocket();
-        setTimeout(() => this.executeCode(language, code), 1000);
-        return;
       }
 
       this.executeCode(language, code);
@@ -282,23 +371,16 @@ export default defineComponent({
 
     executeCode(language, code) {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        try {
-          this.ws.send(
-            JSON.stringify({
-              action: 'runCode',
-              data: {
-                language,
-                code,
-                mode: this.executionMode.toLowerCase(),
-              },
-            })
-          );
-        } catch (error) {
-          console.error('Error sending code:', error);
-          this.$refs.terminal?.write('Error sending code to server\n');
-        }
+        this.ws.send(JSON.stringify({
+          action: 'runCode',
+          data: {
+            language,
+            code,
+            mode: this.executionMode.toLowerCase(),
+          },
+        }));
       } else {
-        this.$refs.terminal?.write('Not connected to server\n');
+        console.error('WebSocket is not open.');
       }
     },
 
@@ -307,34 +389,89 @@ export default defineComponent({
     },
 
     async switchTab(tabName) {
+      // Don't switch if it's the same tab
       if (this.currentTab === tabName) {
         if (tabName === 'watchInAction') {
           this.resetWatchInAction();
         }
-        await this.flushServers();
-      } else {
-        this.currentTab = tabName;
-        localStorage.setItem('currentTab', tabName);
-        this.selectedUseCase = (tabName === 'commonUseCases') ? 'Recommendation System' : null; // Set default use case
-        await this.flushServers(); // Flush servers on tab switch
-        this.updateTemplate();
+        return;
       }
-    },
 
-    async flushServers() {
+      // Cleanup current tab
+      this.cleanup();
+
+      // Close existing websockets
+      window.dispatchEvent(new Event('close-websockets'));
+
+      // Reset state based on target tab
+      switch (tabName) {
+        case 'playground':
+          this.selectedClient = localStorage.getItem('selectedClient') || 'valkey-glide (Python)';
+          this.executionMode = localStorage.getItem('executionMode') || 'Standalone';
+          this.selectedUseCase = null;
+          break;
+
+        case 'commonUseCases':
+          this.selectedClient = 'valkey-glide (Python)';
+          this.executionMode = 'Cluster';
+          this.selectedUseCase = 'Recommendation System';
+          localStorage.setItem('executionMode', 'Cluster');
+          break;
+
+        case 'watchInAction':
+          this.selectedAction = null;
+          this.selectedGlide = null;
+          break;
+      }
+
+      // Update current tab
+      this.currentTab = tabName;
+      localStorage.setItem('currentTab', tabName);
+
+      // Reinitialize WebSocket connection
+      await this.setupWebSocket();
+
+      // Send initialization after WebSocket is connected
       if (this.ws?.readyState === WebSocket.OPEN) {
-        try {
-          this.ws.send(JSON.stringify({
+        // Clear any existing state first
+        await this.ws.send(JSON.stringify({
+          action: 'cleanup',
+          data: {
+            previousTab: this.currentTab,
+            mode: this.executionMode.toLowerCase()
+          }
+        }));
+
+        // Initialize new state
+        await this.ws.send(JSON.stringify({
+          action: 'init',
+          data: {
+            client: this.selectedClient,
+            mode: this.executionMode,
+            tab: tabName,
+            useCase: this.selectedUseCase
+          }
+        }));
+
+        // Flush servers if needed
+        if (tabName === 'commonUseCases' || this.executionMode === 'Cluster') {
+          await this.ws.send(JSON.stringify({
             action: 'flushServers',
+            suppressOutput: true,
             data: {
               mode: this.executionMode.toLowerCase()
             }
           }));
-        } catch (error) {
-          console.error('Error flushing servers:', error);
-          this.$refs.terminal?.write('Error flushing servers\n');
         }
       }
+
+      // Clear terminal and show welcome message
+      this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
+      this.$refs.terminal?.writeWelcomeMessage(tabName);
+
+      // Update template for the new tab
+      this.updateTemplate();
+      this.updateLanguage();
     },
 
     selectUseCase(useCase) {
@@ -379,7 +516,23 @@ export default defineComponent({
     onContentChange(newContent) {
       this.content = newContent;
     },
-    updateClient(newClient, newMode) {
+    async flushServers() {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try {
+          await this.ws.send(JSON.stringify({
+            action: 'flushServers',
+            data: {
+              mode: this.executionMode.toLowerCase()
+            }
+          }));
+        } catch (error) {
+          console.error('Error flushing servers:', error);
+          this.$refs.terminal?.write('Error flushing servers\n');
+        }
+      }
+    },
+
+    async updateClient(newClient, newMode) {
       this.selectedClient = newClient;
       localStorage.setItem('selectedClient', newClient);
       this.executionMode = newMode;
@@ -389,10 +542,23 @@ export default defineComponent({
       if (this.currentTab === 'commonUseCases') {
         this.executionMode = 'Cluster';
         localStorage.setItem('executionMode', 'Cluster');
-        this.flushServers();
+        await this.flushServers();
+      }
+
+      // Send init message after client update
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          action: 'init',
+          data: {
+            client: this.selectedClient,
+            mode: this.executionMode,
+            tab: this.currentTab
+          }
+        }));
       }
     },
-    updateMode(newClient, newMode) {
+
+    async updateMode(newClient, newMode) {
       this.selectedClient = newClient;
       localStorage.setItem('selectedClient', newClient);
       this.executionMode = newMode;
@@ -400,9 +566,22 @@ export default defineComponent({
       this.updateTemplate();
 
       if (this.currentTab === 'commonUseCases') {
-        this.flushServers();
+        await this.flushServers();
+      }
+
+      // Send init message after mode update
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          action: 'init',
+          data: {
+            client: this.selectedClient,
+            mode: this.executionMode,
+            tab: this.currentTab
+          }
+        }));
       }
     },
+
     closeOverlay() {
       this.resetWatchInAction();
       this.currentTab = 'playground';
@@ -411,15 +590,33 @@ export default defineComponent({
       this.updateTemplate();
     },
     resetWatchInAction() {
+      // Enhanced cleanup
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          action: 'cancelTaskManager'
+        }));
+      }
       this.selectedAction = null;
       this.selectedGlide = null;
       this.hideSidebar = false;
     },
     handleTerminalWrite(message) {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          action: 'gameCommand',
+          data: message
+        }));
+      }
       this.$refs.terminal?.write(message);
     },
     handleTerminalResize(size) {
       this.terminalClass = size === 'double-height' ? 'double-height' : '';
+      const terminal = this.$refs.terminal;
+      if (terminal) {
+        setTimeout(() => {
+          terminal.handleResize();
+        }, 100);
+      }
     },
     closeWatchInAction() {
       this.currentTab = 'playground';
@@ -430,16 +627,71 @@ export default defineComponent({
       this.executionMode = localStorage.getItem('executionMode') || 'Cluster';
       this.updateTemplate();
     },
+
+    handleGameCommand(command) {
+      if (!command || typeof command !== 'object') return;
+
+      console.log('[Game] Received command:', command);
+
+      switch (command.type) {
+        case 'startGame':
+          if (this.selectedAction === 'Leaderboard') {
+            this.$refs.leaderboard?.startGame();
+          }
+          break;
+
+        case 'lockAcquired':
+          if (this.selectedAction === 'Task Manager') {
+            this.$refs.taskManager?.handleCommand(command);
+          }
+          break;
+
+        case 'performTask':
+          if (this.selectedAction === 'Task Manager') {
+            this.$refs.taskManager?.handleCommand(command);
+          }
+          break;
+
+        case 'lockReleased':
+          if (this.selectedAction === 'Task Manager') {
+            this.$refs.taskManager?.handleCommand(command);
+          }
+          break;
+
+        case 'complete':
+          if (this.selectedAction === 'Task Manager') {
+            this.$refs.taskManager?.handleCommand(command);
+          }
+          break;
+
+        default:
+          console.log('[Game] Unknown command type:', command.type);
+      }
+    },
+    startTask() {
+      this.$refs.taskManager.startTask();
+    },
+    handleTaskManagerMessage({ action, data }) {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ action, data }));
+      }
+    },
+    handleTabChange(tab) {
+      const terminal = this.$refs.terminal;
+      if (terminal) {
+        terminal.writeWelcomeMessage(tab);
+      }
+    },
   },
 });
 </script>
 
 <style>
 body {
-  background-color: #121212;
-  color: #ffffff;
+  background-color: #0a0b0e;
+  color: #e4e4e4;
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 #app {
@@ -450,23 +702,29 @@ body {
   bottom: 0;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, #0a0b0e 0%, #141618 100%);
 }
 
 .appContainer {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .mainContent {
   flex: 1;
   display: flex;
   flex-direction: row;
-  padding: 15px;
-  gap: 15px;
+  /* Change to row to restore side-by-side layout */
+  padding: 20px;
+  gap: 20px;
   overflow: hidden;
-  position: static;
+}
+
+.watch-in-action-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .mainContent.no-sidebar .sidebar {
@@ -481,29 +739,56 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 15px;
+  min-height: 0;
+  gap: 15px;
 }
 
 .codeEditor {
   flex: 2;
+  /* Give editor more space than terminal */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Terminal styles for normal mode */
+.content .terminal {
+  flex: 0 0 300px;
+  /* Fixed height in normal mode */
+  min-height: 0;
+  background-color: #0f1113;
+  border-top: 1px solid #2a2f35;
+  margin-top: auto;
+  /* Ensure it sticks to bottom */
+}
+
+.editor-terminal .codeEditor {
+  flex: 1;
   min-height: 0;
 }
 
-.terminal {
-  flex: 1;
-  background-color: #1e1e1e;
-  min-height: 0;
+.editor-terminal .terminal {
+  background-color: #0f1113;
+  border-top: 1px solid #2a2f35;
 }
 
 .sidebar {
-  width: 250px;
   flex-shrink: 0;
+  height: 100%;
   order: 2;
+  background: #1a1d21;
+  border-left: 1px solid #2a2f35;
+  padding: 20px;
 }
 
 .editor-terminal,
 .visualization {
   height: 100%;
+  background: #1a1d21;
+  border-radius: 8px;
+  border: 1px solid #2a2f35;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .action-selection,
@@ -517,6 +802,19 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
+  gap: 15px;
+}
+
+.editor-terminal .codeEditor {
+  flex: 2;
+  min-height: 0;
+}
+
+.editor-terminal .terminal {
+  flex: 0 0 200px;
+  min-height: 0;
+  position: relative;
 }
 
 .editor-terminal>* {
@@ -552,7 +850,8 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(10, 11, 14, 0.95);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -563,24 +862,54 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  background: #1a1d21;
+  padding: 30px;
+  border-radius: 8px;
+  border: 1px solid #2a2f35;
+  box-shadow: 0 0 30px rgba(0, 255, 157, 0.1);
 }
 
 .selection-button {
-  padding: 20px 40px;
-  font-size: 24px;
-  background: linear-gradient(45deg, #6a11cb, #2575fc);
-  color: #fff;
-  border: none;
-  border-radius: 15px;
+  padding: 15px 30px;
+  font-size: 16px;
+  background: #1a1d21;
+  color: #00ff9d;
+  border: 1px solid #00ff9d;
+  border-radius: 4px;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 255, 157, 0.2);
   margin-bottom: 20px;
   margin-right: 20px;
 }
 
 .selection-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  background: #00ff9d;
+  color: #0a0b0e;
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
+}
+
+.selection-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(120deg,
+      transparent,
+      rgba(0, 255, 157, 0.2),
+      transparent);
+  transition: 0.5s;
+}
+
+.selection-button:hover::before {
+  left: 100%;
 }
 
 .close-button {
@@ -589,39 +918,55 @@ body {
   right: 30px;
   font-size: 36px;
   background: none;
-  color: #fff;
+  color: #00ff9d;
   border: none;
   cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.3s ease;
 }
 
 .close-button:hover {
-  color: #ccc;
+  color: #00ff9d;
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
 }
 
 .watch-content {
   display: flex;
   flex: 1;
+  gap: 20px;
+  padding: 20px;
   overflow: hidden;
-  gap: 15px;
+  flex-direction: row;
+  height: 100%;
 }
 
 .editor-terminal {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-terminal>* {
   flex: 1;
-  overflow: hidden;
+  min-height: 0;
 }
 
+.editor-terminal .codeEditor {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-terminal .terminal {
+  flex: 1;
+  /* Allow terminal to grow */
+  min-height: 200px;
+  max-height: 50vh;
+}
+
+/* Ensure visualization takes available space */
 .visualization {
   flex: 1;
-  background-color: #1e1e1e;
-  border-radius: 10px;
+  min-height: 0;
   overflow: hidden;
+  max-height: 100%;
+  height: 100%;
 }
 
 .content,
@@ -632,6 +977,20 @@ body {
 }
 
 .double-height {
-  min-height: 500px;
+  min-height: 600px;
+}
+
+.appContainer::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    linear-gradient(rgba(0, 255, 157, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 157, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
 }
 </style>

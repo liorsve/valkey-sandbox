@@ -1,29 +1,44 @@
 <template>
-    <div class="leaderboard" ref="leaderboardRef">
-        <transition-group name="player" tag="div">
-            <div v-for="(player, index) in sortedPlayers" :key="player.id" class="player-box"
-                :style="getPlayerStyle(player)">
-                <div class="player-rank">{{ index + 1 }}</div>
-                <img :src="player.photo" alt="Player Image" class="player-image" />
-                <div class="player-info">
-                    <div class="player-name">{{ player.name }}</div>
-                    <div class="player-score">Score: {{ player.score }}</div>
+    <div class="leaderboard">
+        <transition name="fade" mode="out-in">
+            <div v-if="!gameStarted" key="pregame" class="pregame-container">
+                <div class="players-grid">
+                    <div v-for="player in initialPlayers" :key="`pre-${player.id}`" class="player-card">
+                        <img :src="player.photo" :alt="player.name" class="player-avatar" />
+                        <div class="player-name">{{ player.name }}</div>
+                    </div>
                 </div>
-                <div class="score-buttons">
-                    <button @click="changeScore(player.id, 7)">+7</button>
-                    <button @click="changeScore(player.id, 3)">+3</button>
-                    <button @click="changeScore(player.id, 1)">+1</button>
-                    <button @click="changeScore(player.id, -1)">-1</button>
-                    <button @click="changeScore(player.id, -3)">-3</button>
-                    <button @click="changeScore(player.id, -7)">-7</button>
-                </div>
+                <button class="start-game-btn" @click="startGame" :disabled="!isConnected">
+                    Start Game
+                </button>
             </div>
-        </transition-group>
-        <button class="start-game-btn" @click="startGame">Start Game</button>
-
+            <div v-else key="game" class="game-container">
+                <transition-group tag="div" name="list" class="player-list">
+                    <div v-for="(player, index) in sortedPlayers" :key="`player-${player.id}-${player.score}`"
+                        class="player-row" :class="{ 'score-changed': updatedPlayers[player.id] }">
+                        <div class="player-info">
+                            <div class="player-rank">#{{ index + 1 }}</div>
+                            <img :src="player.photo" :alt="player.name" class="player-avatar" />
+                            <div class="player-details">
+                                <div class="player-name">{{ player.name }}</div>
+                                <div class="player-score">Score: {{ player.score }}</div>
+                            </div>
+                        </div>
+                        <div class="score-buttons">
+                            <button @click="updatePlayerScore(player.id, 7)">+7</button>
+                            <button @click="updatePlayerScore(player.id, 3)">+3</button>
+                            <button @click="updatePlayerScore(player.id, 1)">+1</button>
+                            <button @click="updatePlayerScore(player.id, -1)">-1</button>
+                            <button @click="updatePlayerScore(player.id, -3)">-3</button>
+                            <button @click="updatePlayerScore(player.id, -7)">-7</button>
+                        </div>
+                    </div>
+                </transition-group>
+            </div>
+        </transition>
         <div class="notifications">
             <transition-group name="fade" tag="div">
-                <div v-for="(notification, index) in notifications" :key="index" class="notification"
+                <div v-for="(notification, index) in notifications" :key="`notification-${index}`" class="notification"
                     :class="notification.type">
                     <span v-if="notification.type === 'earned'">⬆️</span>
                     <span v-if="notification.type === 'lost'">⬇️</span>
@@ -46,54 +61,175 @@ import greenLanternImg from '@/assets/images/green_lantern.jpg';
 import aquamanImg from '@/assets/images/aquaman.jpg';
 
 export default {
-    name: 'LeaderboardComponent',
+    name: 'GameLeaderboard',
+    props: {
+        ws: WebSocket,
+        isConnected: Boolean
+    },
+
     setup(props, { emit }) {
-        const players = ref([
-            { id: 1, name: 'Superman', photo: supermanImg, score: 0 },
-            { id: 2, name: 'Batman', photo: batmanImg, score: 0 },
-            { id: 3, name: 'Wonder Woman', photo: wonderWomanImg, score: 0 },
-            { id: 4, name: 'Flash', photo: flashImg, score: 0 },
-            { id: 5, name: 'Green Lantern', photo: greenLanternImg, score: 0 },
-            { id: 6, name: 'Aquaman', photo: aquamanImg, score: 0 },
-        ]);
-
-        const sortedPlayers = computed(() => {
-            return [...players.value].sort((a, b) => b.score - a.score);
-        });
-
-        const ws = ref(null);
-
-        const startGame = () => {
-            if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-                ws.value.send(JSON.stringify({ action: 'startGame' }));
-                terminalWrite('Sent start game command to server.');
-            }
-        };
-
+        const gameStarted = ref(false);
+        const updatedPlayers = ref({});
+        const players = ref([]);
         const notifications = ref([]);
         const notificationQueue = ref([]);
         const MAX_NOTIFICATIONS = 4;
-        let debounceTimeout = null;
         const DEBOUNCE_DELAY = 200;
+        let debounceTimeout = null;
 
-        let pendingNotifications = [];
+        // Initial players for pre-game state
+        const initialPlayers = [
+            { id: 1, name: 'Superman', score: 0, photo: supermanImg },
+            { id: 2, name: 'Batman', score: 0, photo: batmanImg },
+            { id: 3, name: 'Wonder Woman', score: 0, photo: wonderWomanImg },
+            { id: 4, name: 'Flash', score: 0, photo: flashImg },
+            { id: 5, name: 'Green Lantern', score: 0, photo: greenLanternImg },
+            { id: 6, name: 'Aquaman', score: 0, photo: aquamanImg },
+        ];
 
-        let addNotification = (message, type) => {
-            pendingNotifications.push({ message, type });
+        // Initialize players with initial state
+        players.value = [...initialPlayers];
 
-            if (!debounceTimeout) {
-                debounceTimeout = setTimeout(() => {
-                    pendingNotifications.forEach(notification => {
-                        if (notifications.value.length < MAX_NOTIFICATIONS) {
-                            notifications.value.push(notification);
-                        } else {
-                            notificationQueue.value.push(notification);
-                        }
-                    });
-                    pendingNotifications = [];
-                    debounceTimeout = null;
-                }, DEBOUNCE_DELAY);
+        // Computed players with sorting
+        const sortedPlayers = computed(() =>
+            [...players.value].sort((a, b) => b.score - a.score)
+        );
+
+        const startGame = () => {
+            if (!props.isConnected) return;
+            gameStarted.value = true;
+            props.ws.send(JSON.stringify({ action: 'startGame' }));
+            terminalWrite('🎮  Initializing real-time leaderboard in Valkey Cluster...');
+            terminalWrite('📡  \x1b[1mSADD players\x1b[0m // Setting up player pool');
+            terminalWrite('🔄  \x1b[1mZADD leaderboard\x1b[0m // Initializing sorted set');
+        };
+
+        const updatePlayerScore = (playerId, change) => {
+            if (!props.isConnected || !playerId) return;
+
+            // Mark player as updating (for animation)
+            updatedPlayers.value[playerId] = true;
+            setTimeout(() => {
+                updatedPlayers.value[playerId] = false;
+            }, 1000);
+
+            // Send update request
+            props.ws.send(JSON.stringify({
+                action: 'updateScore',
+                data: { playerId, change }
+            }));
+        };
+
+        const handleLeaderboardUpdate = (data) => {
+            if (!Array.isArray(data)) {
+                console.error('Invalid leaderboard data:', data);
+                return;
             }
+
+            // Track old state for notifications
+            const oldState = players.value.reduce((acc, p) => ({
+                ...acc,
+                [p.id]: {
+                    score: p.score,
+                    rank: sortedPlayers.value.findIndex(sp => sp.id === p.id) + 1
+                }
+            }), {});
+
+            // Validate and merge with initial data
+            const validPlayers = data.map(player => {
+                if (!player || typeof player.id !== 'number') {
+                    console.error('Invalid player data:', player);
+                    return null;
+                }
+
+                // Find matching initial player for complete data
+                const initialPlayer = initialPlayers.find(p => p.id === player.id);
+                if (!initialPlayer) {
+                    console.error('No matching initial player for:', player);
+                    return null;
+                }
+
+                return {
+                    ...initialPlayer,
+                    score: parseInt(player.score || 0)
+                };
+            }).filter(Boolean);
+
+            console.log('Updated players:', validPlayers);
+
+            // Update players state
+            players.value = validPlayers;
+
+            // Update animations and notifications
+            validPlayers.forEach(player => {
+                const oldData = oldState[player.id];
+                if (!oldData) return;
+
+                const scoreDiff = player.score - oldData.score;
+                if (scoreDiff !== 0) {
+                    updatedPlayers.value[player.id] = true;
+                    setTimeout(() => {
+                        updatedPlayers.value[player.id] = false;
+                    }, 1000);
+
+                    // Enhanced terminal messages
+                    terminalWrite(`🔄  \x1b[1mZINCRBY leaderboard\x1b[0m ${scoreDiff} player:${player.id}`);
+                    terminalWrite(`📊  Updated score for ${player.name}: ${oldData.score} → ${player.score}`);
+
+                    addNotification({
+                        message: `${player.name} ${scoreDiff > 0 ? 'gained' : 'lost'} ${Math.abs(scoreDiff)} points`,
+                        type: scoreDiff > 0 ? 'earned' : 'lost'
+                    });
+                }
+            });
+        };
+
+        // WebSocket message handler
+        const handleWebSocketMessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+
+                switch (message.action) {
+                    case 'leaderboardUpdate':
+                        // Log operations before handling update
+                        if (message.operations) {
+                            message.operations.forEach(op => {
+                                terminalWrite(`🔷 ${op}`);
+                            });
+                        }
+                        handleLeaderboardUpdate(message.data);
+                        break;
+                    case 'gameCommand':
+                        if (message.data.type === 'startGame') {
+                            terminalWrite('🎮 Game started! Initializing players...');
+                        }
+                        break;
+                    case 'error':
+                        terminalWrite(`❌ Error: ${message.message}`);
+                        break;
+                }
+            } catch (error) {
+                console.error('[Leaderboard] Error handling message:', error);
+            }
+        };
+
+        const addNotification = (notification) => {
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+
+            debounceTimeout = setTimeout(() => {
+                if (notifications.value.length >= MAX_NOTIFICATIONS) {
+                    notificationQueue.value.push(notification);
+                } else {
+                    notifications.value.push(notification);
+                }
+
+                // Auto-remove after 4 seconds
+                setTimeout(() => removeNotification(), 4000);
+
+                debounceTimeout = null;
+            }, DEBOUNCE_DELAY);
         };
 
         const removeNotification = () => {
@@ -103,176 +239,42 @@ export default {
             }
         };
 
-        const updatedPlayers = ref({});
-        const previousRanks = ref({});
-        const previousScores = ref({});
-
-        const updatePlayerHighlight = (playerId) => {
-            updatedPlayers.value[playerId] = true;
-            setTimeout(() => {
-                updatedPlayers.value[playerId] = false;
-            }, 2000);
+        const terminalWrite = (message) => {
+            emit('terminal-write', `${message}\n`);
         };
 
-        const changeScore = (playerId, change) => {
-            try {
-                const player = players.value.find(p => p.id === playerId);
-                if (player && ws.value && ws.value.readyState === WebSocket.OPEN) {
-                    ws.value.send(JSON.stringify({ action: 'updateScore', data: { playerId, change } }));
-                    terminalWrite(`Sent score update for player ${player.name}: Change of ${change} points.`);
-                    updatePlayerHighlight(playerId);
-                } else {
-                    const warning = `Player with ID ${playerId} not found or WebSocket not open.`;
-                    console.warn(warning);
-                    addNotification(warning, 'warning');
-                }
-            } catch (error) {
-                console.error('Error sending score update:', error);
+        const handleWebSocket = (newWs) => {
+            if (newWs) {
+                newWs.onmessage = handleWebSocketMessage;
             }
         };
 
-        const connectWebSocket = () => {
-            const wsUrl = getWebSocketUrl();
-            ws.value = new WebSocket(wsUrl);
-            ws.value.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                if (message.action === 'updateLeaderboard') {
-                    const oldRanks = { ...previousRanks.value };
-                    const oldScores = { ...previousScores.value };
-
-                    message.data.players.forEach(updatedPlayer => {
-                        const player = players.value.find(p => p.id === updatedPlayer.playerId);
-                        if (player) {
-                            player.score = updatedPlayer.score;
-                        }
-                    });
-
-                    const newSorted = [...players.value].sort((a, b) => b.score - a.score);
-
-                    newSorted.forEach((player, index) => {
-                        const newRank = index + 1;
-                        const oldRank = oldRanks[player.id] || newRank;
-                        const newScore = player.score;
-                        const oldScore = oldScores[player.id] || newScore;
-
-                        let scoreChanged = oldScore !== newScore;
-                        let rankChanged = oldRank !== newRank;
-
-                        if (scoreChanged || rankChanged) {
-                            let notificationMessage = `${player.name} `;
-
-                            if (scoreChanged) {
-                                notificationMessage += newScore > oldScore
-                                    ? `earned ${newScore - oldScore} points`
-                                    : `lost ${oldScore - newScore} points`;
-                            }
-
-                            if (rankChanged) {
-                                notificationMessage += scoreChanged ? ', and ' : '';
-                                notificationMessage += `moved ${newRank < oldRank ? 'up' : 'down'} from position ${oldRank} to ${newRank}!`;
-                            } else if (scoreChanged) {
-                                notificationMessage += '.';
-                            }
-
-                            if (!rankChanged && !scoreChanged) {
-                                return;
-                            }
-
-                            let type = '';
-                            if (scoreChanged && newScore > oldScore) {
-                                type = 'earned';
-                            } else if (scoreChanged && newScore < oldScore) {
-                                type = 'lost';
-                            } else if (rankChanged && newRank < oldRank) {
-                                type = 'rank-up';
-                            } else if (rankChanged && newRank > oldRank) {
-                                type = 'rank-down';
-                            }
-
-                            addNotification(notificationMessage, type);
-                        }
-                    });
-
-                    newSorted.forEach((player, index) => {
-                        previousRanks.value[player.id] = index + 1;
-                        previousScores.value[player.id] = player.score;
-                    });
-
-                    terminalWrite('Received updated leaderboard from server.');
-                }
-            };
-            ws.value.onopen = () => {
-                terminalWrite('WebSocket connection established.');
-            };
-            ws.value.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-        };
-
-        const getWebSocketUrl = () => {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            return `${protocol}//${window.location.host}/appws`;
-        };
-
-        const leaderboardRef = ref(null);
-
-        watch(players, (newPlayers) => {
-            console.log('Players updated:', newPlayers);
-        }, { deep: true });
+        watch(
+            () => props.ws,
+            handleWebSocket,
+            { immediate: true }
+        );
 
         onMounted(() => {
-            connectWebSocket();
-            emit('terminal-resize', 'double-height');
+            emit('terminal-resize', 'full-height');
+            handleWebSocket(props.ws);
         });
 
         onBeforeUnmount(() => {
-            if (ws.value) {
-                ws.value.close();
-            }
             emit('terminal-resize', 'normal-height');
         });
 
-        const terminalWrite = (message) => {
-            emit('terminal-write', message.trim() + '\n');
-        };
-
-        const originalAddNotification = addNotification;
-        addNotification = (message, type) => {
-            originalAddNotification(message, type);
-            setTimeout(() => {
-                removeNotification();
-            }, 4000);
-        };
-
         return {
+            initialPlayers,
             players,
             sortedPlayers,
-            changeScore,
-            leaderboardRef,
-            startGame,
-            notifications,
+            gameStarted,
             updatedPlayers,
-            addNotification,
-            updatePlayerHighlight,
+            notifications,
+            startGame,
+            updatePlayerScore
         };
-    },
-    methods: {
-        getPlayerStyle(player) {
-            const borderColors = {
-                'Superman': '#1E90FF',
-                'Batman': '#A9A9A9',
-                'Wonder Woman': '#DAA520',
-                'Flash': '#B22222',
-                'Green Lantern': '#228B22',
-                'Aquaman': '#8B008B',
-            };
-            return {
-                borderColor: borderColors[player.name] || '#fff',
-                transition: 'background-color 0.5s ease',
-                backgroundColor: this.updatedPlayers[player.id] ? '#333333' : '#1e1e1e',
-            };
-        },
-    },
+    }
 };
 </script>
 
@@ -280,26 +282,176 @@ export default {
 .leaderboard {
     display: flex;
     flex-direction: column;
-    width: 100%;
     height: 100%;
-    overflow-y: auto;
-    padding: 20px;
     background-color: #121212;
-    align-items: center;
+    padding: 20px;
+    overflow: hidden;
+    gap: 15px;
+    justify-content: space-between;
 }
 
-.player-box {
-    margin-bottom: 20px;
-    padding: 15px;
+.pregame-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 30px;
+}
+
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 30px;
+    max-width: 900px;
+    width: 100%;
+    padding: 40px;
+}
+
+.player-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+    border-radius: 15px;
+    transition: transform 0.3s ease;
+}
+
+.player-card:hover {
+    transform: translateY(-5px);
+}
+
+.player-avatar {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #333;
+}
+
+.game-container {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+.player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
     background-color: #1e1e1e;
-    border: 3px solid;
     border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.player-info {
     display: flex;
     align-items: center;
-    transition: transform 0.5s ease-in-out;
-    max-width: 90%;
-    width: 90%;
-    max-width: 900px;
+    gap: 20px;
+}
+
+.player-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.player-rank {
+    font-size: 24px;
+    font-weight: bold;
+    min-width: 40px;
+    text-align: center;
+}
+
+.score-changed {
+    animation: highlight 1s ease-in-out;
+}
+
+@keyframes highlight {
+
+    0%,
+    100% {
+        background-color: #1e1e1e;
+    }
+
+    50% {
+        background-color: #333;
+    }
+}
+
+.button-container {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    background: linear-gradient(to top, #121212 50%, transparent);
+    z-index: 10;
+}
+
+.players-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+}
+
+.player-box.pre-game {
+    width: 150px;
+    height: 200px;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+    border: 2px solid #333;
+    transform: none;
+    transition: all 0.3s ease;
+}
+
+.player-box.pre-game:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    border-color: #666;
+}
+
+.player-box.pre-game .player-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 60px;
+    margin: 0;
+}
+
+.player-preview-name {
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.player-box.in-game {
+    width: 100%;
+    max-width: 800px;
+    margin: 10px auto;
+    transform: none;
+    animation: slideIn 0.3s ease-out;
 }
 
 .player-rank {
@@ -477,10 +629,189 @@ export default {
 
 .notification.warning {
     background-color: #fff3cd;
-    color: #856404;
 }
 
 .notification .icon {
+    color: #856404;
     margin-right: 8px;
+}
+
+.players-container {
+    width: 100%;
+    position: relative;
+}
+
+.player-box {
+    transition: all 0.5s ease-in-out;
+    position: relative;
+    transform: translateY(calc(var(--rank) * 120px));
+}
+
+.score-changed {
+    animation: highlight 2s ease-in-out;
+}
+
+@keyframes highlight {
+
+    0%,
+    100% {
+        background-color: #1e1e1e;
+    }
+
+    50% {
+        background-color: #333333;
+        transform: translateY(calc(var(--rank) * 90px)) scale(1.02);
+    }
+}
+
+.notification {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.player-box.pre-game {
+    width: 120px;
+    height: 120px;
+    padding: 5px;
+    margin: 5px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(0.9);
+    will-change: transform, width, height;
+}
+
+.player-box.pre-game .player-image {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: width, height;
+}
+
+.player-box.in-game {
+    width: 90%;
+    max-width: 900px;
+    border-radius: 10px;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(calc(var(--rank) * 90px));
+    /* Adjust spacing between rows */
+    will-change: transform, width, height;
+}
+
+/* Add specific transition class for game state changes */
+.player-enter-active.in-game,
+.player-leave-active.in-game {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: absolute;
+    width: 90%;
+    max-width: 900px;
+}
+
+.player-enter-from.in-game,
+.player-leave-to.in-game {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+/* Fix container styles for game state */
+.players-container:has(.in-game) {
+    display: block;
+    position: relative;
+    height: 600px;
+    padding-top: 10px;
+}
+
+.players-container:has(.pre-game) {
+    display: flex;
+    height: auto;
+    min-height: 300px;
+}
+
+/* Ensure images stay visible during transitions */
+.player-image {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Update score-changed animation to preserve transforms */
+.score-changed {
+    animation: highlight 2s ease-in-out;
+    z-index: 1;
+}
+
+@keyframes highlight {
+
+    0%,
+    100% {
+        background-color: #1e1e1e;
+    }
+
+    50% {
+        background-color: #333333;
+        transform: translateY(calc(var(--rank) * 90px)) scale(1.02);
+    }
+}
+
+.start-game-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #666;
+}
+
+.list-move,
+.list-enter-active,
+.list-leave-active {
+    transition: all 0.5s ease;
+}
+
+.list-enter-from,
+.list-leave-to {
+    opacity: 0;
+    transform: translateX(30px);
+}
+
+.list-leave-active {
+    position: absolute;
+}
+
+.player-row {
+    background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+    border: 1px solid #333;
+    margin: 10px 0;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.player-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    object-fit: cover;
+}
+
+.player-name {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.player-score {
+    font-size: 16px;
+    color: #888;
 }
 </style>

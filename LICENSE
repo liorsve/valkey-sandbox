@@ -18,8 +18,8 @@ Apache License
 
 -------------------------------------------------------------------------------
 
-Note: This project uses ValKey-Glide which is also licensed under the Apache 
-License 2.0. For the complete ValKey-Glide license text, please visit:
+Note: This project uses Valkey-Glide which is also licensed under the Apache 
+License 2.0. For the complete Valkey-Glide license text, please visit:
 https://github.com/valkey-io/valkey-glide/blob/main/LICENSE
 
 For all other third-party components, please see their respective license files

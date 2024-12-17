@@ -49,7 +49,7 @@ module.exports = defineConfig({
       entry: 'src/main.js',
       template: 'public/index.html',
       filename: 'index.html',
-      title: 'ValKey SandBox IDE'
+      title: 'Valkey SandBox IDE'
     }
   }
 })

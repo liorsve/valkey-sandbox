@@ -89,32 +89,6 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.editor-container {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.terminal-container {
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  padding: 10px 10px;
-  background-color: #0d0d0d;
-  display: flex;
-  flex-direction: column;
-}
-
-:deep(.xterm .xterm-viewport),
-:deep(.xterm .xterm-screen) {
-  box-sizing: border-box;
-}
-
-.terminal {
-  flex: 1;
-  max-height: 250px;
-  overflow-y: auto;
-}
+<style>
+@import '../assets/styles/shared.css';
 </style>
