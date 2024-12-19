@@ -174,7 +174,7 @@ async def queue_example(client, queue_key):
     # Add items to queue
     tasks = ['task1', 'task2', 'task3']
     for task in tasks:
-        await client.rpush(queue_key, task)
+        await client.rpush(queue_key, [task])
         print(f"Added to queue: {task}")
     
     # Process queue

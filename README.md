@@ -1,102 +1,112 @@
 # Valkey Sandbox
 
-An interactive development environment for exploring [Valkey](https://valkey.io/) features and [Valkey-Glide](https://github.com/valkey-io/valkey-glide) client implementations along with various other main valkey clients.
+Valkey Sandbox is your gateway to effortlessly exploring Valkey's power with various Valkey clients.  
+No setup, no orchestration—just sit, start, and experience a fully functional app in seconds.  
+With an easy-to-use IDE, customizable infrastructure, and support for multiple clients like GLIDE across various programming languages, it delivers a practical, hands-on Valkey experience.  
+All the common use cases, simple or complex, are at your fingertips.  
+Dive in, choose what to build, and discover how GLIDE simplifies Valkey workflows. Modern, intuitive, and ready to go.
 
 ## 🚀 Features
 
-- Interactive code editor with syntax highlighting
-- Real-time terminal output
-- Multiple execution modes (Standalone/Cluster)
-- Built-in code templates
-- WebSocket-based real-time updates
-- Integrated Python and Node.js execution environments
-- Example implementations:
-  - Session Cache Management
-  - Recommendation Engine
-  - Real-time Leaderboard
-  - **Gamified Watch-in-Action Features**
-    - Leaderboard
-    - Task Manager
+- **Interactive Code Editor**: Syntax-highlighted code editor with real-time validation.
+- **Real-time Terminal Output**: View output from your code executions instantly.
+- **Multiple Execution Modes**: Switch between Standalone and Cluster modes effortlessly.
+- **Built-in Code Templates**: Start quickly with ready example implementations such as:
+  - Search Engine
+  - Session Cache
+  - Recommendation System
+  - And more.
+- **WebSocket-based Real-time Updates**: Experience seamless data updates without page refreshes.
+- **Integrated Execution Environments**: Run Python and Node.js code directly in the browser, with Java and Go support coming soon.
+- **Gamified Watch-in-Action Features**:
+  - **Leaderboard**: Dynamic leaderboard showcasing real-time data updates, player rankings, and score changes.
+  - **Task Manager**: Visualize and manage task queues, learn about task scheduling, and observe task execution in real-time.
+- **Resources**: Access a wealth of valuable materials, including documentation, tutorials, blogs, FAQs, deployment guides, sessions, and more to deepen your understanding of Valkey and Glide.
+- **Community**: Engage with the Valkey team, Glide team and fellow developers. Join our community channels, participate in discussions, and stay connected through our social media platforms.
+- **Challenge Yourself**: Enhance your skills with daily challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
 
 ## 🎮 Gamified Watch-in-Action
 
-Experience Valkey's capabilities through interactive gamified features:
+Experience Valkey's capabilities through interactive gamified features that not only showcase but actually execute real Glide code, demonstrating Valkey's abilities in an engaging and enjoyable way:
 
-- **Leaderboard**: A dynamic leaderboard showcasing real-time data updates, player rankings, and score changes.
-- **Task Manager**: Visualize and manage task queues, learn about task scheduling, and observe task execution in real-time.
+- **Leaderboard**: Observe Valkey handling real-time data updates and ranking computations powered by live code execution.
+- **Task Manager**: Visualize and interact with task scheduling and execution using Valkey's queue management, seeing firsthand how the underlying code operates.
 
 ## 🛠️ Prerequisites
 
-- Docker and Docker Compose
-- Node.js (v14 or higher)
-- npm or yarn
+- **Docker and Docker Compose**
+- **Node.js** (v14 or higher)
+- **npm** or **yarn**
 
 ## 🏃‍♂️ Quick Start
 
-1. Clone and setup:
-```bash
-git clone https://github.com/yourusername/valkey-sandbox.git
-cd valkey-sandbox
-chmod +x setup.sh
-./setup.sh --dev  # For development mode
-# or
-./setup.sh        # For production mode
-```
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/avifenesh/valkey-sandbox.git
+   cd valkey-sandbox
+   ```
+2. **Set up the environment**:
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh --dev  # For development mode
+   # or
+   ./setup.sh        # For production mode
+   ```
+   - To clean up running processes:
+     ```bash
+     ./setup.sh --cleanup
+     ```
 
-2. Access the sandbox at `http://localhost:8080`
+3. **Access the sandbox**:
+   - Open your browser and navigate to `http://localhost:8080`.
 
-3. Run tests:
-WIP
+With just one click, you'll have a fully orchestrated, functioning application ready to use.
 
 ## 💡 Contributing
 
 We welcome contributions! Here are some areas where you can help:
 
 ### Priority Areas
-1. Test Coverage
-   - Implement unit tests for backend services
-   - Add frontend component tests
-   - Create integration tests
-   - Add E2E testing setup
 
-2. Documentation
-   - API documentation
-   - Usage examples
-   - Tutorial content
+1. **Test Coverage**
+   - Implement unit tests for backend services.
+   - Add frontend component tests.
+   - Create integration tests.
+   - Add E2E testing setup.
 
-3. Features
-   - Additional code templates
-   - More Valkey-Glide examples
-   - Performance monitoring
-   - Support for multiple Valkey versions
+2. **Documentation**
+   - API documentation.
+   - Usage examples.
+   - Tutorial content.
 
-4. UI/UX Improvements
-   - Theme customization
-   - Mobile responsiveness
-   - Accessibility enhancements
+3. **Features**
+   - Additional code templates.
+   - More Valkey-Glide examples.
+   - Performance monitoring.
+   - Support for multiple Valkey versions.
+
+4. **UI/UX Improvements**
+   - Theme customization.
+   - Mobile responsiveness.
+   - Accessibility enhancements.
 
 ### How to Contribute
-1. Check existing issues or create a new one
-2. Fork the repository
-3. Create a feature branch
-4. Submit a pull request
+
+1. **Check existing issues** or **create a new one**.
+2. **Fork the repository**.
+3. **Create a feature branch**.
+4. **Submit a pull request**.
 
 See [DEVELOPER.md](DEVELOPER.md) for technical details.
 
 ## 🔗 Related Projects
 
-- [Valkey](https://valkey.io/) - High-performance in-memory database
-- [Valkey-Glide](https://github.com/valkey-io/valkey-glide) - Official client library
-
-## 🔧 Configuration
-
-Environment variables can be configured in:
-- Frontend: `/frontend/.env`
-- Backend: Docker environment settings
+- [Valkey](https://valkey.io/) - High-performance in-memory database.
+- [Valkey-Glide](https://github.com/valkey-io/valkey-glide) - Official client library.
 
 ## 📚 Documentation
 
-For detailed documentation and contribution guidelines, see [DEVELOPER.md](DEVELOPER.md)
+For detailed documentation and contribution guidelines, see [DEVELOPER.md](DEVELOPER.md).
 
 ## 🤝 Support
 
@@ -104,30 +114,8 @@ For issues and feature requests, please use the GitHub issue tracker.
 
 ## 📜 License
 
-This project is licensed under the Apache License 2.0.
+This project is licensed under the Apache License 2.0. For more details, see the [LICENSE](LICENSE) file.
 
-Both this project and Valkey-Glide are licensed under the Apache License 2.0. Valkey has its own licensing terms.
+This project uses [Valkey-Glide](https://github.com/valkey-io/valkey-glide/blob/main/LICENSE) under the Apache License 2.0.
 
-For more details, see the [LICENSE](LICENSE) file.
-
-### Third-Party Licenses
-
-This project uses Valkey-Glide under the Apache License 2.0:
-
-```
-Copyright 2024 Valkey IO
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
-
-For all other dependencies, please see their respective license files in the node_modules directory.
+For all other dependencies, please see their respective license files in the `node_modules` directory.

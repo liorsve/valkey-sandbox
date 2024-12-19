@@ -79,8 +79,26 @@ async function executeCode(language, code, mode = 'standalone', callback) {
                 return;
             }
             callback(stdout);
-            // Clean up container
-            exec(`docker rm ${containerName}`);
+
+            // Check if the container exists before attempting to remove it
+            exec(`docker ps -a -q -f name=${containerName}`, (err, containerId) => {
+                if (err) {
+                    console.error(`Error checking container ${containerName}:`, err);
+                    return;
+                }
+                if (containerId.trim()) {
+                    // Clean up container
+                    exec(`docker rm ${containerName}`, (err) => {
+                        if (err) {
+                            console.error(`Error removing container ${containerName}:`, err);
+                        } else {
+                            console.log(`Container ${containerName} removed.`);
+                        }
+                    });
+                } else {
+                    console.log(`Container ${containerName} does not exist.`);
+                }
+            });
 
             // Delete the temporary code file after sending the response
             fs.unlink(tempFile, (err) => {
