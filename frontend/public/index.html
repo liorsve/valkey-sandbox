@@ -2,18 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1">
+    <meta name="description" content="Valkey Sandbox - Interactive Coding Environment">
     <title>Valkey Sandbox</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <!-- XTerm.js Styles -->
+    
+    <!-- Preload critical assets -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css" as="style">
+    <link rel="preload" as="font" href="/fonts/JetBrainsMono-Regular.woff2" type="font/woff2" crossorigin>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png">
+    
+    <!-- Styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css">
-    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/styles/main.css">
+    
     <style>
+        /* Critical CSS inlined for faster paint */
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'JetBrains Mono', 'Segoe UI', sans-serif;
             background-color: #1e1e1e;
+            overflow: hidden;
         }
 
         .preloader {
@@ -27,6 +39,11 @@
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            opacity: 1;
+            visibility: visible;
+            transform: translateZ(0);
+            will-change: opacity;
+            transition: opacity 0.3s ease-out;
         }
 
         .preloader-text {
@@ -35,44 +52,40 @@
             color: #ffffff;
             font-family: 'Courier New', monospace;
             position: relative;
-            overflow: hidden;
-            white-space: nowrap;
-        }
-
-        .preloader-text::after {
-            content: '{ Valkey Sandbox }';
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 0;
-            color: #276ce2;
-            overflow: hidden;
-            white-space: nowrap;
-            animation: fillText 1s forwards;
+            background: linear-gradient(to right, #276ce2 50%, #ffffff 50%);
+            background-size: 200% 100%;
+            background-position: right bottom;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: fillText 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            will-change: background-position;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
 
         @keyframes fillText {
-            from {
-                width: 0;
-            }
             to {
-                width: 100%;
+                background-position: left bottom;
             }
         }
+
+        @-webkit-keyframes typing {
+            to { transform: scaleX(1); }
+        }
+
+        @keyframes typing {
+            to { transform: scaleX(1); }
+        }
     </style>
-    <!-- Add favicon link -->
-    <link rel="icon" href="<%= BASE_URL %>favicon.ico" type="image/x-icon">
 </head>
 <body>
-    <noscript>
-        <strong>We're sorry but Valkey Sandbox doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
-    </noscript>
     <div id="preloader" class="preloader">
         <div class="preloader-text">{ Valkey Sandbox }</div>
     </div>
     <div id="app"></div>
-    <!-- Scripts will be injected by webpack automatically -->
-    <!-- Ensure no scripts are loading require.js or similar -->
+    
+    <!-- Defer non-critical scripts -->
+    <script defer src="/js/app.js"></script>
 </body>
 </html>
