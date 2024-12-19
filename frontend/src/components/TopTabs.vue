@@ -22,9 +22,9 @@ export default {
                 { name: 'playground', label: 'Playground' },
                 { name: 'commonUseCases', label: 'Common UseCases' },
                 { name: 'watchInAction', label: 'Watch in Action' },
-                { name: 'tryElasticache', label: 'Try Elasticache' },
+                { name: 'challengeYourself', label: 'Challenge Yourself' },
                 { name: 'community', label: 'Community' },
-                { name: 'aboutUs', label: 'About Us' },
+                { name: 'helpfulResources', label: 'Helpful Resources' },
             ],
         };
     },
