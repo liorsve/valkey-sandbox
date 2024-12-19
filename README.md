@@ -23,7 +23,7 @@ Dive in, choose what to build, and discover how GLIDE simplifies Valkey workflow
   - **Task Manager**: Visualize and manage task queues, learn about task scheduling, and observe task execution in real-time.
 - **Resources**: Access a wealth of valuable materials, including documentation, tutorials, blogs, FAQs, deployment guides, sessions, and more to deepen your understanding of Valkey and Glide.
 - **Community**: Engage with the Valkey team, Glide team and fellow developers. Join our community channels, participate in discussions, and stay connected through our social media platforms.
-- **Challenge Yourself**: Enhance your skills with daily challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
+- **Challenge Yourself**: Enhance your skills with weekly challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
 
 ## 🎮 Gamified Watch-in-Action
 
