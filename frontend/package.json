@@ -11,7 +11,8 @@
         "mitt": "^3.0.1",
         "resize-observer-polyfill": "^1.5.1",
         "serve": "^14.2.1",
-        "vue": "^3.3.0"
+        "vue": "^3.3.0",
+        "vue-router": "^4.5.0"
     },
     "devDependencies": {
         "@babel/eslint-parser": "^7.22.15",

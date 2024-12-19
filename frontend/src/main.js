@@ -1,5 +1,5 @@
-import { createApp } from "vue";
-import App from "./App.vue";
+import { createApp } from 'vue';
+import App from './App.vue';
 import { install as VueMonacoEditorPlugin } from "@guolao/vue-monaco-editor";
 
 const app = createApp(App);

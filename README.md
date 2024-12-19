@@ -32,6 +32,28 @@ Experience Valkey's capabilities through interactive gamified features that not 
 - **Leaderboard**: Observe Valkey handling real-time data updates and ranking computations powered by live code execution.
 - **Task Manager**: Visualize and interact with task scheduling and execution using Valkey's queue management, seeing firsthand how the underlying code operates.
 
+## 🎯 Challenge Yourself
+
+Enhance your skills with weekly challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
+
+- **Coding Challenges**: Solve practical programming problems using Glide with Valkey. Challenges range from easy to hard, and you can write and test your code directly in the browser using Python, JavaScript, or Java.
+- **Quizzes**: Test your knowledge with multiple-choice questions. Get instant feedback and links to relevant resources.
+- **Weekly Special Challenge**: Tackle a new, complex challenge every week. Submit your solution in your preferred language and receive feedback at the end of the week, along with the correct answer.
+
+This feature allows you to:
+
+- **Run Tests**: Instantly test your code submissions and see the results.
+- **Select Programming Language**: Choose between Python, JavaScript, and Java for coding challenges.
+- **Accumulate Scores**:
+  - **Quizzes**: 1 point per correct answer.
+  - **Easy Coding Challenges**: 3 points.
+  - **Medium Coding Challenges**: 5 points.
+  - **Hard Coding Challenges**: 8 points.
+  - **Weekly Challenges**: 30 points.
+- **Weekly Streaks**: Earn a 10% bonus on weekly challenges for each consecutive week you participate.
+
+With a competitive scoring system and engaging challenges, you can improve your Valkey and Glide skills while having fun.
+
 ## 🛠️ Prerequisites
 
 - **Docker and Docker Compose**
