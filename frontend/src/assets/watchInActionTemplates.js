@@ -350,4 +350,26 @@ public class LeaderboardExample {
 }
 `,
     },
+    // Add more clients if necessary
 };
+
+export const getTemplateForClient = (client, action) => {
+    const templates = watchInActionTemplates[client];
+    if (!templates) {
+        return '// No templates available for this client';
+    }
+    return templates[action] || '// No template available for this action';
+};
+
+export const defaultTemplate = '// Select a client and action to get started';
+
+export const supportedClients = [
+    'valkey-glide (Python)',
+    'valkey-glide (Node)',
+    'valkey-glide (Java)'
+];
+
+export const supportedActions = [
+    'Task Manager',
+    'Leaderboard'
+];

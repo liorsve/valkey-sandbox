@@ -26,6 +26,15 @@ module.exports = defineConfig({
         ws: true,
         changeOrigin: true
       }
+    },
+    static: {
+      directory: path.join(__dirname, 'public'),
+      serveIndex: true,
+      watch: true,
+      staticOptions: {
+        extensions: ['html', 'css', 'js', 'woff2'],
+        index: false,
+      },
     }
   },
   configureWebpack: {
@@ -43,6 +52,16 @@ module.exports = defineConfig({
         __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: true,
       })
     ]
+  },
+  chainWebpack: (config) => {
+    config.module
+      .rule('fonts')
+      .test(/\.(woff2?|ttf|eot|svg)(\?v=\d+\.\d+\.\d+)?$/)
+      .use('file-loader')
+      .loader('file-loader')
+      .options({
+        name: 'fonts/[name].[ext]'
+      });
   },
   pages: {
     index: {

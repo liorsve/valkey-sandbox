@@ -1,6 +1,6 @@
 <template>
     <div class="terminal-container" :class="height">
-        <div class="terminal" ref="terminalContainer"></div>
+        <div ref="terminalOutput" class="terminal"></div>
     </div>
 </template>
 
@@ -19,20 +19,11 @@ export default {
     },
     setup(props, { expose }) {
         const terminal = ref(null);
-        const terminalContainer = ref(null);
-        let resizeObserver = null;
+        const terminalOutput = ref(null);
+        let isInitialized = false;
 
-        const handleResize = () => {
-            if (terminal.value && terminalContainer.value) {
-                const { width, height } = terminalContainer.value.getBoundingClientRect();
-                const cols = Math.floor((width - 20) / 9);
-                const rows = Math.floor((height - 10) / 21);
-                terminal.value.resize(cols, rows);
-            }
-        };
-
-        onMounted(() => {
-            if (!terminalContainer.value) return;
+        const initializeTerminal = () => {
+            if (isInitialized || !terminalOutput.value) return;
 
             terminal.value = new Terminal({
                 cursorBlink: true,
@@ -55,19 +46,14 @@ export default {
                 rightClickSelectsWord: true,
             });
 
-            terminal.value.open(terminalContainer.value);
-
-            resizeObserver = new ResizeObserver(handleResize);
-            resizeObserver.observe(terminalContainer.value);
-
-            writeWelcomeMessage('playground');
-        });
-
-        const scrollToBottom = () => {
-            if (terminal.value) {
-                terminal.value.scrollToBottom();
-            }
+            terminal.value.open(terminalOutput.value);
+            terminal.value.focus();
+            isInitialized = true;
         };
+
+        onMounted(() => {
+            initializeTerminal();
+        });
 
         const clear = () => {
             if (terminal.value) {
@@ -83,38 +69,38 @@ export default {
 
             const messages = {
                 playground: [
-                    '👨‍💻 Welcome to Valkey Playground!',
-                    '🔧 Experiment with different Valkey clients',
-                    '💡 Try out commands and explore features freely'
+                    '👨‍💻  Welcome to Valkey Playground!',
+                    'Experiment with different Valkey clients',
+                    'Try out commands and explore features freely'
                 ],
-                commonUseCases: [
-                    '📚 Welcome to Valkey Common Use Cases!',
-                    '🎯 Explore pre-built examples using Valkey-Glide',
-                    '✨ Learn, modify, and enhance these patterns'
-                ],
-                watchInAction: [
-                    '🎮 Welcome to Valkey Watch in Action!',
-                    '🔍 See Valkey-Glide in real-world scenarios',
-                    '🚀 Interactive demos of distributed features'
+                commonusecases: [
+                    '📋  Welcome to Valkey Common Use Cases!',
+                    'Explore pre-built examples using Valkey-Glide',
+                    'Learn, modify, and enhance these patterns'
                 ],
                 leaderboard: [
-                    '🏆 Leaderboard Demo with Valkey-Glide',
-                    '📊 Watch real-time sorted sets in action',
-                    '🔄 See live Valkey commands as they happen'
+                    '🏆  Leaderboard Live with Valkey-Glide',
+                    'Watch real-time sorted sets in action',
+                    '⚡ See how Valkey handles concurrent updates'
                 ],
                 taskmanager: [
-                    '🔄 Task Manager Demo with Valkey-Glide',
-                    '🔒 Watch distributed locks in action',
-                    '📋 See how task queues are managed in real-time'
+                    'Task Manager with Valkey-Glide',
+                    'Watch distributed locks in action',
+                    'See how tasks are managed across instances'
+                ],
+                challenges: [
+                    '💻  Welcome to Challenges!',
+                    'Test your Valkey skills',
+                    '✨ Complete tasks and earn points'
                 ]
             };
 
-            (messages[tab] || messages.playground).forEach(msg => {
+            (messages[tab.toLowerCase()] || messages.playground).forEach(msg => {
                 terminal.value.writeln(`\x1b[90m${msg}\x1b[0m`);
             });
 
             terminal.value.writeln('\x1b[90m═══════════════════════════════════════\x1b[0m\n');
-            scrollToBottom();
+            terminal.value.scrollToBottom();
         };
 
         const write = (data) => {
@@ -133,61 +119,42 @@ export default {
         };
 
         onBeforeUnmount(() => {
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-            }
             if (terminal.value) {
                 terminal.value.dispose();
             }
+            terminal.value = null;
+            isInitialized = false;
         });
 
         expose({
             write,
             clear,
             writeWelcomeMessage,
-            handleResize
         });
 
         return {
-            terminalContainer,
+            terminalOutput
         };
-    },
+    }
 };
 </script>
 
 <style scoped>
-@import '../assets/styles/shared.css';
-
 .terminal-container {
     background-color: #0f1113;
     padding: 8px;
-    border-radius: 0 0 6px 6px;
-    /* Round only bottom corners */
-    transition: height 0.3s ease;
+    border-radius: 6px;
+    border: 1px solid #2a2f35;
     display: flex;
     flex-direction: column;
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    height: auto !important;
+    overflow: hidden;
+    height: 100%;
 }
 
 .terminal {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
-    position: sticky;
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    bottom: 3px;
-}
-
-.terminal-container.normal-height,
-.terminal-container.double-height,
-.terminal-container.full-height {
-    height: auto !important;
-    min-height: var(--terminal-height, 150px);
+    background-color: #0f1113;
 }
 
 :deep(.xterm) {
@@ -197,24 +164,6 @@ export default {
 
 :deep(.xterm-viewport) {
     overflow-y: auto !important;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: #666 #1a1a1a;
-    position: absolute !important;
-    right: 0;
-    width: calc(100% + 8px) !important;
-}
-
-:deep(.xterm-viewport),
-:deep(.xterm-screen),
-:deep(.xterm-scroll-area) {
-    height: 100% !important;
-    width: 100% !important;
-}
-
-:deep(.xterm-viewport) {
-    overflow-y: scroll !important;
-    overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: #666 #1a1a1a;
 }
@@ -230,9 +179,5 @@ export default {
 :deep(.xterm-viewport::-webkit-scrollbar-thumb) {
     background: #666;
     border-radius: 4px;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
-    background: #888;
 }
 </style>

@@ -61,12 +61,32 @@ import greenLanternImg from '@/assets/images/green_lantern.jpg';
 import aquamanImg from '@/assets/images/aquaman.jpg';
 
 export default {
-    name: 'GameLeaderboard',
+    name: 'AppLeaderboard',
     props: {
         ws: WebSocket,
-        isConnected: Boolean
+        isConnected: Boolean,
     },
-
+    methods: {
+        handleLeaderboardUpdate(data) {
+            const validPlayers = data.map(player => ({
+                id: player.id,
+                name: player.name,
+                score: parseInt(player.score || 0),
+            }));
+            this.players = validPlayers;
+            // Handle animations or notifications if needed
+        },
+    },
+    created() {
+        if (this.ws) {
+            this.ws.addEventListener('message', event => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'leaderboard_update') {
+                    this.handleLeaderboardUpdate(data.payload);
+                }
+            });
+        }
+    },
     setup(props, { emit }) {
         const gameStarted = ref(false);
         const updatedPlayers = ref({});
@@ -100,8 +120,8 @@ export default {
             gameStarted.value = true;
             props.ws.send(JSON.stringify({ action: 'startGame' }));
             terminalWrite('🎮  Initializing real-time leaderboard in Valkey Cluster...');
-            terminalWrite('📡  \x1b[1mSADD players\x1b[0m // Setting up player pool');
-            terminalWrite('🔄  \x1b[1mZADD leaderboard\x1b[0m // Initializing sorted set');
+            terminalWrite('\x1b[1mSADD players\x1b[0m // Setting up player pool');
+            terminalWrite('\x1b[1mZADD leaderboard\x1b[0m // Initializing sorted set');
         };
 
         const updatePlayerScore = (playerId, change) => {
@@ -173,7 +193,7 @@ export default {
                     }, 1000);
 
                     // Enhanced terminal messages
-                    terminalWrite(`🔄  \x1b[1mZINCRBY leaderboard\x1b[0m ${scoreDiff} player:${player.id}`);
+                    terminalWrite(`\x1b[1mZINCRBY leaderboard\x1b[0m ${scoreDiff} player:${player.id}`);
                     terminalWrite(`📊  Updated score for ${player.name}: ${oldData.score} → ${player.score}`);
 
                     addNotification({
@@ -258,6 +278,10 @@ export default {
         onMounted(() => {
             emit('terminal-resize', 'full-height');
             handleWebSocket(props.ws);
+            terminalWrite('\n🏆  Leaderboard Demo with Valkey-Glide');
+            terminalWrite('📊  Real-time sorted sets in action');
+            terminalWrite('⚡ See how Valkey handles concurrent updates\n');
+            terminalWrite('\x1b[1;32mℹ️  Press Start Game to begin!\x1b[0m\n');
         });
 
         onBeforeUnmount(() => {

@@ -7,7 +7,7 @@
         <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
       </div>
       <div v-else-if="currentTab === 'watchInAction'" class="content">
-        <div v-if="!selectedGlide" class="overlay">
+        <div v-if="!selectedGlide && !restoring" class="overlay">
           <button class="close-button" @click="closeOverlay">×</button>
           <div class="selection-container">
             <div v-if="!selectedAction">
@@ -22,6 +22,11 @@
           </div>
         </div>
         <div v-else class="watch-content">
+          <div class="replace-action-btn" :style="{ left: buttonPosition.x + 'px', top: buttonPosition.y + 'px' }"
+            @mousedown="startDrag" :class="{ 'dragging': isDragging }" title="Click to replace or drag to move">
+            <span class="icon">⟳</span>
+            <span class="text" data-full="Action">Replace</span>
+          </div>
           <div class="editor-terminal">
             <Editor ref="editor" v-model:content="content" :language="language" :read-only="isReadOnly" />
             <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
@@ -30,14 +35,27 @@
             <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" :ws="ws" :isConnected="wsConnected"
               @terminal-write="handleTerminalWrite" />
             <TaskManager v-else-if="selectedAction === 'Task Manager'" :ws="ws" :isConnected="wsConnected"
-              @terminal-write="handleTerminalWrite" @terminal-resize="handleTerminalResize"
-              @send-message="handleTaskManagerMessage" />
+              @terminal-write="handleTerminalWrite" @send-message="handleTaskManagerMessage" />
           </div>
+        </div>
+      </div>
+      <div v-else-if="currentTab === 'challenges'" class="challenge-content">
+        <div class="challenge-navigation">
+          <button v-for="section in challengeSections" :key="section.id"
+            :class="['challenge-nav-btn', { active: currentChallengeSection === section.id }]">
+            {{ section.label }}
+          </button>
+        </div>
+        <div class="challenge-main">
+          <keep-alive>
+            <component :is="currentChallengeComponent" v-if="currentChallengeComponent" :ws="ws"
+              :is-connected="wsConnected" :key="currentChallengeSection" class="challenge-component" />
+          </keep-alive>
         </div>
       </div>
       <AppSidebar class="sidebar" :currentTab="currentTab" :selectedClient="selectedClient"
         :executionMode="executionMode" @run-code="runCode" @navigate="navigate" @select-usecase="selectUseCase"
-        @update-client="updateClient" @update-mode="updateMode" @start-task="startTask" />
+        @update-client="updateClient" @update-mode="updateMode" @start-task="startTask" :clients="clients" />
     </div>
   </div>
 </template>
@@ -52,6 +70,10 @@ import TaskManager from './components/TaskManager.vue';
 import TopTabs from './components/TopTabs.vue';
 import { codeTemplates } from './assets/codeTemplates';
 import { watchInActionTemplates } from './assets/watchInActionTemplates.js';
+import { defaultTemplate } from './assets/watchInActionTemplates';
+import CodingChallenges from './components/CodingChallenges.vue';
+import Quizzes from './components/Quizzes.vue';
+import WeeklyChallenge from './components/WeeklyChallenge.vue';
 
 export default defineComponent({
   name: 'App',
@@ -63,6 +85,9 @@ export default defineComponent({
     LeaderboardComponent,
     TaskManager,
     TopTabs,
+    CodingChallenges,
+    Quizzes,
+    WeeklyChallenge,
   },
 
   data() {
@@ -96,12 +121,25 @@ export default defineComponent({
       wsRetryTimeout: null,
       maxRetries: 5,
       retryCount: 0,
-      retryDelay: 1000, // Start with 1 second delay
+      retryDelay: 1000,
+      restoring: false,
+      buttonPosition: { x: 12, y: 65 },
+      isDragging: false,
+      dragOffset: { x: 0, y: 0 },
+      dragStartTime: 0,
+      dragStartPos: { x: 0, y: 0 },
+      currentChallengeSection: 'coding',
+      challengeSections: [
+        { id: 'coding', label: 'Coding Challenges' },
+        { id: 'quiz', label: 'Quizzes' },
+        { id: 'weekly', label: 'Weekly Challenge' }
+      ],
     };
   },
 
   created() {
     this.setupWebSocket();
+    this.restoreWatchInActionState();
   },
 
   beforeUnmount() {
@@ -110,6 +148,14 @@ export default defineComponent({
 
   mounted() {
     this.updateTemplate();
+    if (this.$refs.terminal) {
+      this.$refs.terminal.writeWelcomeMessage(this.currentTab);
+    }
+    if (this.currentTab === 'playground') {
+      const selectedTemplate = codeTemplates[this.selectedClient];
+      this.content = selectedTemplate?.[this.executionMode] || '// No template available';
+      this.updateLanguage();
+    }
   },
 
   watch: {
@@ -147,6 +193,21 @@ export default defineComponent({
         }
       }, 300);
     });
+  },
+
+  computed: {
+    currentChallengeComponent() {
+      switch (this.currentChallengeSection) {
+        case 'coding':
+          return CodingChallenges;
+        case 'quiz':
+          return Quizzes;
+        case 'weekly':
+          return WeeklyChallenge;
+        default:
+          return null;
+      }
+    }
   },
 
   methods: {
@@ -306,32 +367,42 @@ export default defineComponent({
     },
 
     updateTemplate() {
-      if (this.currentTab === 'watchInAction') {
-        const template = watchInActionTemplates[this.selectedGlide]?.[this.selectedAction] || '';
-        if (template) {
-          this.content = template;
-          this.language = this.getLanguageForGlide(this.selectedGlide);
-        }
-      } else {
-        const selectedTemplate = codeTemplates[this.selectedClient];
-        let template;
-        if (this.currentTab === 'commonUseCases') {
-          this.executionMode = 'Cluster';
-          if (this.selectedUseCase) {
-            if (['Task Manager', 'Leaderboard'].includes(this.selectedUseCase)) {
-              template = watchInActionTemplates[this.selectedClient]?.[this.selectedUseCase] ||
-                '// No template available for selected use case';
-            } else {
-              template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
-            }
+      try {
+        if (this.currentTab === 'watchInAction') {
+          if (!this.selectedGlide || !this.selectedAction) {
+            this.content = defaultTemplate;
+            return;
+          }
+          const template = watchInActionTemplates[this.selectedGlide]?.[this.selectedAction];
+          if (template) {
+            this.content = template;
+            this.language = this.getLanguageForGlide(this.selectedGlide);
           } else {
-            template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+            this.content = '// No template available for this combination';
           }
         } else {
-          template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
+          // Handle regular code templates
+          const selectedTemplate = codeTemplates[this.selectedClient];
+          if (this.currentTab === 'commonUseCases' && this.selectedUseCase) {
+            if (['Task Manager', 'Leaderboard'].includes(this.selectedUseCase)) {
+              // Try to get template from watchInActionTemplates first
+              const template = watchInActionTemplates[this.selectedClient]?.[this.selectedUseCase];
+              if (template) {
+                this.content = template;
+                return;
+              }
+            }
+            // Fall back to regular use case templates
+            this.content = selectedTemplate?.[this.selectedUseCase] || '// No template available for selected use case';
+          } else {
+            // Regular mode templates (Standalone/Cluster)
+            this.content = selectedTemplate?.[this.executionMode] || '// No template available for selected mode';
+          }
+          this.updateLanguage();
         }
-        this.content = template;
-        this.updateLanguage();
+      } catch (error) {
+        console.error('Error updating template:', error);
+        this.content = '// Error loading template';
       }
     },
 
@@ -405,11 +476,14 @@ export default defineComponent({
 
       // Reset state based on target tab
       switch (tabName) {
-        case 'playground':
+        case 'playground': {
           this.selectedClient = localStorage.getItem('selectedClient') || 'valkey-glide (Python)';
           this.executionMode = localStorage.getItem('executionMode') || 'Standalone';
           this.selectedUseCase = null;
+          const selectedTemplate = codeTemplates[this.selectedClient];
+          this.content = selectedTemplate?.[this.executionMode] || '// No template available';
           break;
+        }
 
         case 'commonUseCases':
           this.selectedClient = 'valkey-glide (Python)';
@@ -419,8 +493,14 @@ export default defineComponent({
           break;
 
         case 'watchInAction':
-          this.selectedAction = null;
-          this.selectedGlide = null;
+          // Only set defaults if not restoring from saved state
+          if (!this.restoring) {
+            localStorage.removeItem('watchInActionAction');
+            localStorage.removeItem('watchInActionGlide');
+            this.selectedAction = null;
+            this.selectedGlide = null;
+            this.hideSidebar = false;
+          }
           break;
       }
 
@@ -482,22 +562,36 @@ export default defineComponent({
     selectAction(action) {
       this.selectedAction = action;
       this.selectedGlide = null;
+      localStorage.setItem('watchInActionAction', action);
     },
 
     selectGlide(glide) {
       this.selectedGlide = glide;
       this.hideSidebar = true;
+      localStorage.setItem('watchInActionGlide', glide);
       this.updateTemplateForAction();
     },
 
     updateTemplateForAction() {
-      const selectedTemplate = codeTemplates[this.selectedGlide];
-      const templateKey =
-        this.selectedAction.charAt(0).toUpperCase() + this.selectedAction.slice(1);
-      const template =
-        selectedTemplate[templateKey] || '// No template available for selected action';
-      this.content = template;
-      this.updateLanguage();
+      try {
+        if (this.currentTab === 'watchInAction') {
+          const template = watchInActionTemplates[this.selectedGlide]?.[this.selectedAction];
+          if (template) {
+            this.content = template;
+            this.language = this.getLanguageForGlide(this.selectedGlide);
+          } else {
+            this.content = '// No template available for this action';
+          }
+        } else {
+          const selectedTemplate = codeTemplates[this.selectedClient];
+          const template = selectedTemplate?.[this.executionMode] || '// No template available';
+          this.content = template;
+          this.updateLanguage();
+        }
+      } catch (error) {
+        console.error('Error updating template for action:', error);
+        this.content = '// Error loading template';
+      }
     },
 
     getLanguageForGlide(glide) {
@@ -533,28 +627,30 @@ export default defineComponent({
     },
 
     async updateClient(newClient, newMode) {
-      this.selectedClient = newClient;
-      localStorage.setItem('selectedClient', newClient);
-      this.executionMode = newMode;
-      localStorage.setItem('executionMode', newMode);
-      this.updateTemplate();
+      try {
+        this.selectedClient = newClient;
+        this.executionMode = newMode;
+        localStorage.setItem('selectedClient', newClient);
+        localStorage.setItem('executionMode', newMode);
 
-      if (this.currentTab === 'commonUseCases') {
-        this.executionMode = 'Cluster';
-        localStorage.setItem('executionMode', 'Cluster');
-        await this.flushServers();
-      }
+        // Update template immediately after changing client
+        const selectedTemplate = codeTemplates[newClient];
+        if (selectedTemplate) {
+          this.content = selectedTemplate[this.executionMode] || '// No template available';
+        }
+        this.updateLanguage();
 
-      // Send init message after client update
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({
-          action: 'init',
-          data: {
-            client: this.selectedClient,
-            mode: this.executionMode,
-            tab: this.currentTab
-          }
-        }));
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          await this.ws.send(JSON.stringify({
+            action: 'updateClient',
+            data: {
+              client: this.selectedClient,
+              mode: this.executionMode,
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error updating client:', error);
       }
     },
 
@@ -590,7 +686,6 @@ export default defineComponent({
       this.updateTemplate();
     },
     resetWatchInAction() {
-      // Enhanced cleanup
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({
           action: 'cancelTaskManager'
@@ -599,6 +694,8 @@ export default defineComponent({
       this.selectedAction = null;
       this.selectedGlide = null;
       this.hideSidebar = false;
+      localStorage.removeItem('watchInActionAction');
+      localStorage.removeItem('watchInActionGlide');
     },
     handleTerminalWrite(message) {
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -608,15 +705,6 @@ export default defineComponent({
         }));
       }
       this.$refs.terminal?.write(message);
-    },
-    handleTerminalResize(size) {
-      this.terminalClass = size === 'double-height' ? 'double-height' : '';
-      const terminal = this.$refs.terminal;
-      if (terminal) {
-        setTimeout(() => {
-          terminal.handleResize();
-        }, 100);
-      }
     },
     closeWatchInAction() {
       this.currentTab = 'playground';
@@ -676,13 +764,83 @@ export default defineComponent({
         this.ws.send(JSON.stringify({ action, data }));
       }
     },
-    handleTabChange(tab) {
-      const terminal = this.$refs.terminal;
-      if (terminal) {
-        terminal.writeWelcomeMessage(tab);
+    restoreWatchInActionState() {
+      if (this.currentTab === 'watchInAction') {
+        const savedAction = localStorage.getItem('watchInActionAction');
+        const savedGlide = localStorage.getItem('watchInActionGlide');
+        if (savedAction && savedGlide) {
+          this.restoring = true;
+          this.selectedAction = savedAction;
+          this.selectedGlide = savedGlide;
+          this.hideSidebar = true;
+          this.updateTemplateForAction();
+          this.restoring = false;
+        }
       }
     },
-  },
+    startDrag(e) {
+      if (!e.target.closest('.replace-action-btn')) return;
+
+      this.dragStartTime = Date.now();
+      this.dragStartPos = { x: e.clientX, y: e.clientY };
+      this.isDragging = true;
+
+      const buttonRect = e.target.closest('.replace-action-btn').getBoundingClientRect();
+      this.dragOffset = {
+        x: e.clientX - buttonRect.left,
+        y: e.clientY - buttonRect.top
+      };
+
+      const onMouseMove = (e) => {
+        if (!this.isDragging) return;
+
+        const newX = e.clientX - this.dragOffset.x;
+        const newY = e.clientY - this.dragOffset.y;
+
+        // Get button dimensions
+        const buttonWidth = 120;
+        const buttonHeight = 32;
+
+        // Add bounds with padding
+        const padding = 10;
+        const maxX = window.innerWidth - buttonWidth - padding;
+        const maxY = window.innerHeight - buttonHeight - padding;
+        const minX = padding;
+        const minY = 60;
+
+        requestAnimationFrame(() => {
+          this.buttonPosition = {
+            x: Math.max(minX, Math.min(maxX, newX)),
+            y: Math.max(minY, Math.min(maxY, newY))
+          };
+        });
+      };
+
+      const onMouseUp = (e) => {
+        const dragDistance = Math.hypot(
+          e.clientX - this.dragStartPos.x,
+          e.clientY - this.dragStartPos.y
+        );
+        const dragDuration = Date.now() - this.dragStartTime;
+
+        if (dragDuration < 200 && dragDistance < 5) {
+          this.resetWatchInAction();
+        }
+
+        this.isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+
+    handleReplaceClick(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  }
 });
 </script>
 
@@ -751,17 +909,6 @@ body {
   flex-direction: column;
 }
 
-/* Terminal styles for normal mode */
-.content .terminal {
-  flex: 0 0 300px;
-  /* Fixed height in normal mode */
-  min-height: 0;
-  background-color: #0f1113;
-  border-top: 1px solid #2a2f35;
-  margin-top: auto;
-  /* Ensure it sticks to bottom */
-}
-
 .editor-terminal .codeEditor {
   flex: 1;
   min-height: 0;
@@ -803,7 +950,6 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  gap: 15px;
 }
 
 .editor-terminal .codeEditor {
@@ -814,7 +960,6 @@ body {
 .editor-terminal .terminal {
   flex: 0 0 200px;
   min-height: 0;
-  position: relative;
 }
 
 .editor-terminal>* {
@@ -992,5 +1137,138 @@ body {
     linear-gradient(90deg, rgba(0, 255, 157, 0.03) 1px, transparent 1px);
   background-size: 20px 20px;
   pointer-events: none;
+}
+
+.replace-action-btn {
+  position: absolute;
+  cursor: grab;
+  background: linear-gradient(135deg, #3b82f6, #9333ea);
+  border: none;
+  border-radius: 30px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 100;
+  user-select: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  min-width: 80px;
+  /* Width for "Replace" */
+  height: 32px;
+  overflow: hidden;
+}
+
+.replace-action-btn .icon {
+  font-size: 14px;
+  animation: spin 2s linear infinite;
+}
+
+.replace-action-btn .text {
+  color: white;
+  font-weight: 500;
+  position: relative;
+  white-space: nowrap;
+}
+
+.replace-action-btn .text::after {
+  content: attr(data-full);
+  position: absolute;
+  left: 100%;
+  margin-left: 4px;
+  opacity: 0;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.replace-action-btn:hover {
+  min-width: 120px;
+  /* Width for "Replace Action" */
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #2563eb, #7e22ce);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.replace-action-btn:hover .text::after {
+  opacity: 1;
+}
+
+.replace-action-btn.dragging {
+  cursor: grabbing;
+  min-width: 120px;
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.replace-action-btn.dragging .text::after {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .replace-action-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 50% !important;
+    top: auto !important;
+    transform: translateX(-50%);
+  }
+}
+
+.challenge-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.challenge-main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.challenge-component {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.challenge-navigation {
+  display: flex;
+  gap: 1px;
+  background: #2d2d2d;
+  padding: 10px 20px;
+  border-bottom: 1px solid #333;
+}
+
+.challenge-nav-btn {
+  padding: 10px 20px;
+  color: #e4e4e4;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.challenge-nav-btn:hover {
+  background: #3d3d3d;
+}
+
+.challenge-nav-btn.active {
+  background: #4a148c;
+  color: white;
+}
+
+.challenge-main {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
 }
 </style>

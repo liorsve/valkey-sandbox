@@ -319,7 +319,7 @@ async function cancelProcess(ws) {
       console.error('[WSS] Error during cleanup:', error);
     } finally {
       if (client && !client.closed) {
-        await client.close();
+        client.close();
       }
       client = null;
     }

@@ -342,6 +342,10 @@ export default {
             window.addEventListener('beforeunload', cleanup);
             emit('terminal-resize', 'full-height');
             handleWebSocket(props.ws);
+            // Add welcome message after mount
+            terminalWrite('\n🔄  Task Manager Demo with Valkey-Glide');
+            terminalWrite('🔒  Watch distributed locks in action');
+            terminalWrite('📋  See how task queues are');
         });
 
         watch(
@@ -394,7 +398,6 @@ export default {
     min-height: 350px;
 }
 
-/* Move terminal-related styles to shared.css */
 .task-panel {
     display: flex;
     gap: 15px;

@@ -13,16 +13,17 @@ export default {
     props: {
         activeTab: {
             type: String,
-            required: true,
+            default: 'playground',
         },
     },
+    emits: ['change-tab'],
     data() {
         return {
             tabs: [
                 { name: 'playground', label: 'Playground' },
                 { name: 'commonUseCases', label: 'Common UseCases' },
                 { name: 'watchInAction', label: 'Watch in Action' },
-                { name: 'challengeYourself', label: 'Challenge Yourself' },
+                { name: 'challenges', label: 'Challenge Yourself' },
                 { name: 'community', label: 'Community' },
                 { name: 'helpfulResources', label: 'Helpful Resources' },
             ],

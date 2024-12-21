@@ -2,27 +2,31 @@
   <div v-if="!hideSidebar" class="sidebar">
     <div class="top-section">
       <div class="dropdown-container">
-        <select id="clientDropdown" :value="selectedClient" @change="onClientChange">
+        <label>Client:</label>
+        <select v-model="localSelectedClient" @change="handleClientChange">
           <option v-for="client in availableClients" :key="client" :value="client">
-            {{ client }}
+            {{ formatClientName(client) }}
           </option>
         </select>
-      </div>
-      <div v-if="currentTab !== 'commonUseCases'" class="dropdown-container">
-        <select id="modeDropdown" :value="executionMode" @change="onModeChange">
+
+        <label v-if="currentTab !== 'commonUseCases'">Mode:</label>
+        <select v-if="currentTab !== 'commonUseCases'" v-model="localExecutionMode" @change="handleModeChange">
           <option value="Standalone">Standalone</option>
           <option value="Cluster">Cluster</option>
         </select>
       </div>
+
       <button v-if="currentTab === 'playground' || currentTab === 'commonUseCases'" @click="$emit('run-code')">
         Run
       </button>
+
       <div v-if="currentTab === 'commonUseCases'" class="usecase-buttons">
         <button v-for="useCase in commonUseCases" :key="useCase" @click="$emit('select-usecase', useCase)">
           {{ useCase }}
         </button>
       </div>
     </div>
+
     <div class="logo">
       <img src="@/assets/images/logo.png" alt="Logo" />
     </div>
@@ -33,18 +37,13 @@
 export default {
   name: 'AppSidebar',
   props: {
-    currentTab: {
-      type: String,
-      required: true,
-    },
-    selectedClient: {
-      type: String,
-      required: true,
-    },
-    executionMode: {
-      type: String,
-      required: true,
-    },
+    currentTab: String,
+    selectedClient: String,
+    executionMode: String,
+    clients: {
+      type: Array,
+      required: true
+    }
   },
   data() {
     return {
@@ -59,6 +58,8 @@ export default {
         'Task Manager',
       ],
       defaultClient: 'valkey-glide (Python)',
+      localSelectedClient: this.selectedClient || 'valkey-glide (Python)',
+      localExecutionMode: this.executionMode,
     };
   },
   computed: {
@@ -85,6 +86,21 @@ export default {
         this.$emit('update-client', this.defaultClient, this.executionMode);
       }
     },
+    handleClientChange() {
+      const mode = this.currentTab === 'commonUseCases' ? 'Cluster' : this.localExecutionMode;
+      this.$emit('update-client', this.localSelectedClient, mode);
+    },
+    formatClientName(client) {
+      // Convert 'valkey-glide (Python)' to 'Valkey Glide (Python)'
+      return client
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+        .replace(/\((.*)\)/, '($1)');
+    },
+    handleModeChange(event) {
+      this.$emit('update-mode', this.selectedClient, event.target.value);
+    }
   },
   watch: {
     currentTab(newTab) {
@@ -92,6 +108,9 @@ export default {
         this.setDefaultClient();
       }
     },
+    selectedClient(newVal) {
+      this.localSelectedClient = newVal;
+    }
   },
 };
 </script>
@@ -308,5 +327,18 @@ export default {
 
 .some-class {
   text-decoration: none;
+}
+
+.dropdown-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dropdown-container label {
+  color: #e4e4e4;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
 </style>

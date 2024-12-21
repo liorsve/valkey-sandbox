@@ -1,26 +1,47 @@
-.terminal-container {
-    background: #1a1a1a;
-    padding: 8px;
-    border-radius: 6px;
-    transition: height 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    margin-top: auto;
-    flex: 1; /* Allow terminal container to grow */
-    min-height: 0;
-    height: auto; /* Remove fixed height */
-}
-
-/* Remove or comment out fixed height classes */
-.terminal-container.normal-height,
-.terminal-container.double-height,
-.terminal-container.full-height {
-    height: auto; /* Ensure height is auto */
-}
-
 .editor-container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+  height: 100%;
+  overflow: hidden;
+  background: #1e1e1e;
+  border-radius: 6px;
+}
+
+.button-primary {
+  background: #4a148c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button-primary:hover {
+  background: #6a1b9a;
+  transform: translateY(-1px);
+}
+
+.button-primary:disabled {
+  background: #333;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.select-primary {
+  background: #2d2d2d;
+  color: white;
+  border: 1px solid #333;
+  padding: 8px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+/* Animation classes */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
