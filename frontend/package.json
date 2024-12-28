@@ -4,11 +4,13 @@
     "dependencies": {
         "@guolao/vue-monaco-editor": "^1.5.4",
         "@vue/compat": "^3.3.0",
+        "@xterm/addon-fit": "0.10.0",
+        "@xterm/addon-web-links": "0.11.0",
         "@xterm/xterm": "5.5.0",
         "axios": "1.7.9",
         "backend": "file:../backend",
         "dompurify": "^3.2.3",
-        "highlight.js": "^11.7.0",
+        "highlight.js": "11.11.1",
         "http-server": "^14.1.1",
         "marked": "^15.0.4",
         "mitt": "^3.0.1",
@@ -18,22 +20,23 @@
     },
     "devDependencies": {
         "@babel/eslint-parser": "^7.22.15",
-        "@vue/cli-plugin-babel": "^5.0.8",
-        "@vue/cli-plugin-eslint": "^5.0.8",
-        "@vue/cli-service": "^5.0.8",
+        "@vitejs/plugin-vue": "^5.2.1",
         "@vue/compiler-sfc": "^3.3.0",
         "consolidate": "^1.0.4",
-        "eslint": "^8.0.0",
+        "eslint": "^8.40.0",
         "eslint-plugin-vue": "^9.0.0",
+        "file-loader": "^6.2.0",
         "html-webpack-plugin": "^5.6.3",
         "path-browserify": "^1.0.1",
+        "vite": "6.0.5",
         "vue-loader": "^17.4.2",
         "worker-loader": "^3.0.8"
     },
     "scripts": {
-        "serve": "vue-cli-service serve",
-        "build": "vue-cli-service build",
-        "lint": "vue-cli-service lint",
-        "serve:prod": "http-server dist -p 8080"
+        "dev": "vite --host",
+        "build": "vite build",
+        "preview": "vite preview --host --port 8080",
+        "serve": "vite preview --host --port 8080",
+        "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
     }
 }

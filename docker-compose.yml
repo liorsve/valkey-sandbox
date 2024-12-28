@@ -1,49 +1,74 @@
 services:
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - ./backend:/home/node/backend
-      - /home/node/backend/node_modules
+      - ./backend:/usr/src/app
+      - shared-temp:/app/temp
     depends_on:
-      valkey-standalone:
-        condition: service_healthy
       valkey-cluster:
         condition: service_healthy
+      valkey-standalone:
+        condition: service_healthy
+      docker-executor:
+        condition: service_healthy
     networks:
-      - valkey-net
+      valkey-net:
+        aliases:
+          - backend-service
+    env_file:
+      - ./backend/.env
     environment:
-      - EXECUTION_MODE=standalone
-      - VALKEY_HOST_STANDALONE=valkey-standalone
-      - VALKEY_PORT_STANDALONE=6379
-      - VALKEY_HOST_CLUSTER=valkey-cluster
-      - VALKEY_PORT_CLUSTER_START=7000
-      - VALKEY_PORT_CLUSTER_END=7005
-      - VUE_APP_WS_URL=ws://localhost:8080/appws
+      - VALKEY_STANDALONE_HOST=valkey-standalone
+      - VALKEY_STANDALONE_PORT=6379
+      - VALKEY_CLUSTER_HOST=valkey-cluster
+      - VALKEY_CLUSTER_PORT=7000
       - WDS_SOCKET_PORT=443
       - START_SCRIPT=${START_SCRIPT}
       - LOGGING_ENABLED=${LOGGING_ENABLED}
+      - EXECUTOR_SERVICE_URL=http://docker-executor:3001
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: ${NODE_ENV:-development}
     ports:
       - "8080:8080"
+    volumes:
+      - ./frontend:/usr/src/app:delegated
+      - /usr/src/app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - valkey-net
     environment:
-      - VUE_APP_BACKEND_URL=http://backend:3000
-      - VUE_APP_WS_URL=ws://localhost:8080/appws
-      - WDS_SOCKET_PORT=443
+      - VITE_WS_URL=ws://localhost:3000/appws
+      - NODE_ENV=${NODE_ENV:-development}
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run ${START_SCRIPT:-serve}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   valkey-standalone:
     image: valkey/valkey:8.0.1
+    container_name: valkey-standalone
     ports:
       - "6379:6379"
     networks:
@@ -64,47 +89,67 @@ services:
     ports:
       - "7000-7005:7000-7005"
     networks:
-      - valkey-net
+      valkey-net:
+        aliases:
+          - valkey-cluster
     volumes:
       - ./backend/cluster-setup.sh:/usr/local/bin/cluster-setup.sh:ro
       - valkey-cluster-data:/data
     command: ["sh", "/usr/local/bin/cluster-setup.sh"]
     healthcheck:
-      test: ["CMD", "valkey-cli", "-p", "7000", "cluster", "info"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      test: |
+        /bin/sh -c '[ "$$(valkey-cli -h valkey-cluster -p 7000 cluster info 2>/dev/null | grep -c "cluster_state:ok")" = "1" ]'
+      interval: 5s
+      timeout: 3s
+      retries: 30
       start_period: 30s
     privileged: true
+    cap_add:
+      - IPC_LOCK
+    ulimits:
+      memlock: -1
+    environment:
+      - VALKEY_CLUSTER_ANNOUNCE_IP=valkey-cluster
+      - CLUSTER_ANNOUNCE_IP=valkey-cluster
+      - INITIAL_PORT=7000
+      - SKIP_SYSCTL=1
+    restart: unless-stopped
+    stop_grace_period: 30s
 
-  python-executor:
+  docker-executor:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.python
-    image: python-executor
-    ports:
-      - "3002:3002"
-    networks:
-      - valkey-net
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "3002"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-
-  valkey-node:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.node
+      context: ./backend/executor
+      dockerfile: Dockerfile
+    container_name: docker-executor
+    volumes:
+      - shared-temp:/app/temp:rw
+      - ./backend/executor/src:/usr/src/app/src:ro
+      - executor-modules:/app/temp/node_modules
     ports:
       - "3001:3001"
-    networks:
-      - valkey-net
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NODE_ENV=development
+      - VALKEY_CLUSTER_HOST=valkey-cluster
+      - VALKEY_CLUSTER_PORT=7000
+      - VALKEY_STANDALONE_HOST=valkey-standalone
+      - VALKEY_STANDALONE_PORT=6379
+    depends_on:
+      valkey-cluster:
+        condition: service_healthy
+      valkey-standalone:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "3001"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 3
+    restart: unless-stopped
+    init: true
+    networks:
+      valkey-net:
+        aliases:
+          - docker-executor
 
 networks:
   valkey-net:
@@ -113,3 +158,7 @@ networks:
 volumes:
   valkey-standalone-data:
   valkey-cluster-data:
+  shared-temp:
+    driver: local
+  executor-modules:
+    driver: local

@@ -79,19 +79,21 @@ With a competitive scoring system and engaging challenges, you can improve your 
    cd valkey-sandbox
    ```
 2. **Set up the environment**:
+
    ```bash
    chmod +x setup.sh
    ./setup.sh --dev  # For development mode
    # or
    ./setup.sh        # For production mode
    ```
+
    - To clean up running processes:
      ```bash
      ./setup.sh --cleanup
      ```
 
 3. **Access the sandbox**:
-   - Open your browser and navigate to `http://localhost:8080`.
+   - Open your browser and navigate to `http://localhost:3000`.
 
 With just one click, you'll have a fully orchestrated, functioning application ready to use.
 
@@ -102,17 +104,20 @@ We welcome contributions! Here are some areas where you can help:
 ### Priority Areas
 
 1. **Test Coverage**
+
    - Implement unit tests for backend services.
    - Add frontend component tests.
    - Create integration tests.
    - Add E2E testing setup.
 
 2. **Documentation**
+
    - API documentation.
    - Usage examples.
    - Tutorial content.
 
 3. **Features**
+
    - Additional code templates.
    - More Valkey-Glide examples.
    - Performance monitoring.

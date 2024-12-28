@@ -1,4 +1,0 @@
-valkey
-numpy
-valkey-glide
-

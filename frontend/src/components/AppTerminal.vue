@@ -1,183 +1,91 @@
 <template>
-    <div class="terminal-container" :class="height">
-        <div ref="terminalOutput" class="terminal"></div>
-    </div>
+    <BaseTerminal ref="terminal" :options="terminalOptions" @ready="handleReady" />
 </template>
 
 <script>
-import { onMounted, onBeforeUnmount, ref } from 'vue';
-import { Terminal } from '@xterm/xterm';
-import '@xterm/xterm/css/xterm.css';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import BaseTerminal from './base/BaseTerminal.vue';
+import { useEventBus, EventTypes } from '../composables/useEventBus';
 
 export default {
     name: 'AppTerminal',
+    components: { BaseTerminal },
     props: {
-        height: {
-            type: String,
-            default: 'normal-height'
-        }
+        height: String
     },
-    setup(props, { expose }) {
-        const terminal = ref(null);
-        const terminalOutput = ref(null);
-        let isInitialized = false;
+    emits: [ 'ready' ],
+    setup( props, { emit } ) {
+        const terminal = ref( null );
+        const terminalInstance = ref( null );
+        const { on, off } = useEventBus();
 
-        const initializeTerminal = () => {
-            if (isInitialized || !terminalOutput.value) return;
-
-            terminal.value = new Terminal({
-                cursorBlink: true,
-                fontSize: 16,
-                fontFamily: 'Consolas, "Courier New", monospace',
-                theme: {
-                    background: '#0d0d0d',
-                    foreground: '#dddddd',
-                    cursor: '#ffffff',
-                    selectionBackground: '#555555',
-                },
-                scrollback: 1000,
-                convertEol: true,
-                rows: 16,
-                allowTransparency: true,
-                screenReaderMode: true,
-                tabStopWidth: 4,
-                scrollOnUserInput: true,
-                smoothScrollDuration: 150,
-                rightClickSelectsWord: true,
-            });
-
-            terminal.value.open(terminalOutput.value);
-            terminal.value.focus();
-            isInitialized = true;
-        };
-
-        onMounted(() => {
-            initializeTerminal();
-        });
-
-        const clear = () => {
-            if (terminal.value) {
-                terminal.value.clear();
+        const terminalOptions = {
+            cursorBlink: true,
+            fontSize: 14,
+            fontWeight: 500,
+            scrollback: 5000,
+            theme: {
+                background: '#1a1b26',
+                foreground: '#a9b1d6',
+                cursor: '#f7768e',
+                selection: '#28324a'
             }
         };
 
-        const writeWelcomeMessage = (tab) => {
-            if (!terminal.value) return;
-
-            clear();
-            terminal.value.writeln('\x1b[1;34m=== Valkey SandBox Terminal ===\x1b[0m');
-
-            const messages = {
-                playground: [
-                    '👨‍💻  Welcome to Valkey Playground!',
-                    'Experiment with different Valkey clients',
-                    'Try out commands and explore features freely'
-                ],
-                commonusecases: [
-                    '📋  Welcome to Valkey Common Use Cases!',
-                    'Explore pre-built examples using Valkey-Glide',
-                    'Learn, modify, and enhance these patterns'
-                ],
-                leaderboard: [
-                    '🏆  Leaderboard Live with Valkey-Glide',
-                    'Watch real-time sorted sets in action',
-                    '⚡ See how Valkey handles concurrent updates'
-                ],
-                taskmanager: [
-                    'Task Manager with Valkey-Glide',
-                    'Watch distributed locks in action',
-                    'See how tasks are managed across instances'
-                ],
-                challenges: [
-                    '💻  Welcome to Challenges!',
-                    'Test your Valkey skills',
-                    '✨ Complete tasks and earn points'
-                ]
-            };
-
-            (messages[tab.toLowerCase()] || messages.playground).forEach(msg => {
-                terminal.value.writeln(`\x1b[90m${msg}\x1b[0m`);
-            });
-
-            terminal.value.writeln('\x1b[90m═══════════════════════════════════════\x1b[0m\n');
-            terminal.value.scrollToBottom();
+        const handleReady = ( term ) => {
+            terminalInstance.value = term;
+            term.writeln( '\x1b[1;34m=== Valkey SandBox Terminal ===\x1b[0m' );
+            emit( 'ready', term );
         };
 
-        const write = (data) => {
-            if (terminal.value) {
-                const lines = data.replace(/\r/g, '').split('\n');
-                lines.forEach(line => {
-                    if (line.trim()) {
-                        terminal.value.writeln(line.trim());
-                        const viewport = terminal.value._core.viewport;
-                        if (viewport.scrollBarHeight - viewport.scrollTop < 50) {
-                            terminal.value.scrollToBottom();
-                        }
-                    }
-                });
+        const writeToTerminal = ( output ) => {
+            console.log( `[Terminal] Writing output:`, output );
+            if ( !output ) return;
+
+            let text;
+            if ( typeof output === 'string' ) {
+                text = output;
+            } else {
+                // Remove quotes around string values and format nicely
+                text = JSON.stringify( output, null, 2 )
+                    .replace( /"([^"]+)":/g, '$1:' )
+                    .replace( /["{}[\]]/g, '' )
+                    .trim();
+            }
+
+            // Split by newlines and filter out empty lines
+            const lines = text.split( '\n' ).filter( line => line.trim() );
+            lines.forEach( line => {
+                terminalInstance.value?.writeln( ` ${ line.trim() }` );
+            } );
+        };
+
+        const clearTerminal = () => {
+            if ( terminalInstance.value ) {
+                terminalInstance.value.clear();
+                handleReady( terminalInstance.value );
             }
         };
 
-        onBeforeUnmount(() => {
-            if (terminal.value) {
-                terminal.value.dispose();
-            }
-            terminal.value = null;
-            isInitialized = false;
-        });
+        onMounted( () => {
+            on( EventTypes.TERMINAL_OUTPUT, writeToTerminal );
+            on( EventTypes.TERMINAL_CLEAR, clearTerminal );
+        } );
 
-        expose({
-            write,
-            clear,
-            writeWelcomeMessage,
-        });
+        onBeforeUnmount( () => {
+            off( EventTypes.TERMINAL_OUTPUT, writeToTerminal );
+            off( EventTypes.TERMINAL_CLEAR, clearTerminal );
+        } );
 
         return {
-            terminalOutput
+            terminal,
+            terminalOptions,
+            handleReady
         };
     }
 };
 </script>
 
 <style scoped>
-.terminal-container {
-    background-color: #0f1113;
-    padding: 8px;
-    border-radius: 6px;
-    border: 1px solid #2a2f35;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    height: 100%;
-}
-
-.terminal {
-    flex: 1;
-    min-height: 0;
-    background-color: #0f1113;
-}
-
-:deep(.xterm) {
-    height: 100%;
-    padding: 4px;
-}
-
-:deep(.xterm-viewport) {
-    overflow-y: auto !important;
-    scrollbar-width: thin;
-    scrollbar-color: #666 #1a1a1a;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar) {
-    width: 8px;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar-track) {
-    background: #1a1a1a;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar-thumb) {
-    background: #666;
-    border-radius: 4px;
-}
+/* Remove all styles as they're now handled in BaseTerminal */
 </style>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1">
+    <meta name="description" content="Valkey Sandbox - Interactive Coding Environment">
+    <title>Valkey Sandbox</title>    
+    <!-- Favicon - Note the updated paths for Vite -->
+    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.css">
+    <link rel="stylesheet" href="/styles/main.css">
+    
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'JetBrains Mono', 'Segoe UI', sans-serif;
+            background-color: #1e1e1e;
+            overflow: hidden;
+        }
+
+        /* Prevent FOUC */
+        html {
+            background-color: #1e1e1e;
+        }
+
+        .preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1e1e1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 1;
+            visibility: visible;
+            transform: translateZ(0);
+            will-change: opacity;
+            transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+        }
+
+        .preloader.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .preloader-text {
+            font-size: 35px;
+            font-weight: bold;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            position: relative;
+            background: linear-gradient(to right, #276ce2 50%, #ffffff 50%);
+            background-size: 200% 100%;
+            background-position: right bottom;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: fillText 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            will-change: background-position;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        @keyframes fillText {
+            to {
+                background-position: left bottom;
+            }
+        }
+
+        @-webkit-keyframes typing {
+            to { transform: scaleX(1); }
+        }
+
+        @keyframes typing {
+            to { transform: scaleX(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="preloader" class="preloader">
+        <div class="preloader-text">{ Valkey Sandbox }</div>
+    </div>
+    <div id="app"></div>
+    
+    <!-- Note: Changed to type="module" for Vite -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

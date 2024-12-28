@@ -1,45 +1,134 @@
-import express from 'express';
-import http from 'http';
-import cors from 'cors';
-import { setupWebSocket } from './websockets.js';
+import express from "express";
+import cors from "cors";
+import { createServer } from "http";
+import { WebSocketServer } from "ws";
+import { GlideClusterClient } from "@valkey/valkey-glide";
+import { MessageHandlers } from "./handlers/MessageHandlers.js";
+
+// Prevent memory leaks
+process.setMaxListeners(5);
 
 const app = express();
-const server = http.createServer(app);
+const port = process.env.PORT || 3000;
 
-// CORS configuration
-const corsOptions = {
-  origin: ['http://localhost:8080', 'ws://localhost:8080', 'http://localhost:8081', 'ws://localhost:8081'],
-  methods: ['GET', 'POST'],
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Content-Type-Options', 'X-Requested-With', 'X-XSRF-TOKEN']
-};
+// WebSocket state
+const wsConnections = new Map();
+const outputCache = new Map();
+let glideClient = null;
 
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    origin: ["http://localhost:8080"],
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["*"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-// Initialize WebSocket server with our handlers
-const wss = setupWebSocket(server);
-
-const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0';
-
-server.listen(PORT, HOST, () => {
-  console.log(`Backend server running on ${HOST}:${PORT}`);
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
-// Error handling
-server.on('error', (error) => {
-  console.error('Server error:', error);
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use`);
-    process.exit(1);
+// Add Glide client initialization
+const initializeGlideClient = async () => {
+  if (!glideClient) {
+    const host = process.env.VALKEY_CLUSTER_HOST || "valkey-cluster";
+    const port = parseInt(process.env.VALKEY_CLUSTER_PORT || "7000");
+
+    console.log(
+      `[Server] Attempting to connect to Valkey cluster at ${host}:${port}`
+    );
+
+    const retryStrategy = (times) => {
+      const delay = Math.min(times * 1000, 5000);
+      console.log(`[Server] Retry attempt ${times}, waiting ${delay}ms`);
+      return delay;
+    };
+
+    glideClient = await GlideClusterClient.createClient({
+      addresses: [{ host, port }],
+      clientName: `ws-client-${Date.now()}`,
+      clusterMode: true,
+      connectionTimeout: 10000,
+      retryStrategy,
+      maxRetries: 20,
+    });
   }
+  return glideClient;
+};
+
+const startServer = async () => {
+  const server = createServer(app);
+
+  // Create WebSocket server
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Initialize Glide client
+  try {
+    await initializeGlideClient();
+    console.log("[Server] Glide client initialized");
+  } catch (error) {
+    console.error("[Server] Failed to initialize Glide client:", error);
+  }
+
+  // Create message handlers instance
+  const messageHandlers = new MessageHandlers(
+    {
+      connections: wsConnections,
+      outputCache,
+    },
+    null, // leaderboardService - pass if needed
+    null // taskManager - pass if needed
+  );
+
+  // Handle WebSocket connection
+  wss.on("connection", (ws) => {
+    const id = Date.now() + Math.random();
+    ws.id = id;
+    wsConnections.set(id, ws);
+
+    console.log(`[WSS] Client connected (ID: ${id})`);
+    ws.send(JSON.stringify({ action: "connected", data: { id } }));
+
+    ws.on("message", (msg) => messageHandlers.handleMessage(ws, msg));
+    ws.on("close", () => {
+      wsConnections.delete(id);
+      console.log(`[WSS] Client disconnected (ID: ${id})`);
+    });
+  });
+
+  // Handle upgrade requests
+  server.on("upgrade", (request, socket, head) => {
+    if (request.url === "/appws") {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
+  // Start HTTP server
+  await new Promise((resolve) => {
+    server.listen(port, "0.0.0.0", () => {
+      console.log(`[Server] HTTP Server running on port ${port}`);
+      resolve();
+    });
+  });
+
+  return { server, wss };
+};
+
+// Handle uncaught errors
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  process.exit(1);
 });
 
-process.on('SIGTERM', () => {
-  clearInterval(interval);
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+// Start the server
+const { server, wss } = await startServer();
+
+// Export for use in other modules if needed
+export { server, wss, wsConnections, outputCache, glideClient };
