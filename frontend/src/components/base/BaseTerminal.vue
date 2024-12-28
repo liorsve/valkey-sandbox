@@ -67,7 +67,6 @@ export default defineComponent({
         const handleResize = () => {
             if (!fitAddon || !terminalContainer.value) return;
 
-            // Use RAF for smooth resize
             cancelAnimationFrame(resizeRAF);
             resizeRAF = requestAnimationFrame(() => {
                 try {
@@ -107,7 +106,6 @@ export default defineComponent({
                 resizeObserver.observe(terminalContainer.value);
             }
 
-            // Initial fit
             setTimeout(() => {
                 handleResize();
                 emit('ready', terminal);

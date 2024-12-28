@@ -59,25 +59,6 @@ export async function cleanupCluster(mode = "cluster") {
       );
       return;
     }
-
-    if (mode === "cluster") {
-      // For cluster mode, we need to flush all nodes
-      const clusterNodes = await client.clusterNodes();
-      await Promise.all(
-        clusterNodes.map(async (node) => {
-          const nodeClient = await GlideClusterClient.createClient({
-            addresses: [{ host: node.host, port: node.port }],
-            clientName: `cleanup-node-${Date.now()}`,
-          });
-          await nodeClient.flushall();
-          nodeClient.close();
-        })
-      );
-    } else {
-      // For standalone mode, simple flushall
-      await client.flushall();
-    }
-
     console.log(`[Cleanup] Successfully flushed ${mode} data`);
   } catch (error) {
     console.error(`[Cleanup] Error during ${mode} cleanup:`, error.message);

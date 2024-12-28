@@ -98,7 +98,10 @@ export default {
         const startGame = () => {
             if ( !props.isConnected ) return;
             gameStarted.value = true;
-            props.ws.send( JSON.stringify( { action: 'startGame' } ) );
+            props.ws.send( JSON.stringify( {
+                action: 'startGame',
+                data: { initialize: true }
+            } ) );
             terminalWrite( '🎮  Initializing real-time leaderboard in Valkey Cluster...' );
             terminalWrite( '\x1b[1mSADD players\x1b[0m // Setting up player pool' );
             terminalWrite( '\x1b[1mZADD leaderboard\x1b[0m // Initializing sorted set' );
@@ -114,7 +117,10 @@ export default {
 
             props.ws.send( JSON.stringify( {
                 action: 'updateScore',
-                data: { playerId, change }
+                data: {
+                    playerId: parseInt( playerId ),
+                    change: parseInt( change )
+                }
             } ) );
         };
 
@@ -180,6 +186,13 @@ export default {
         const handleWebSocketMessage = ( event ) => {
             try {
                 const message = JSON.parse( event.data );
+                // Only process messages if the component is mounted and game is active
+                if ( !gameStarted.value && message.action !== 'startGame' ) {
+                    console.log( '[Leaderboard] Ignoring message, game not started:', message.action );
+                    return;
+                }
+
+                console.log( '[Leaderboard] Processing message:', message.action );
 
                 switch ( message.action ) {
                     case 'leaderboardUpdate':
@@ -241,8 +254,19 @@ export default {
             players.value = [ ...initialPlayers ];
             notifications.value = [];
             notificationQueue.value = [];
+
             if ( props.ws?.readyState === WebSocket.OPEN ) {
-                props.ws.send( JSON.stringify( { action: 'cleanup' } ) );
+                try {
+                    props.ws.send( JSON.stringify( {
+                        action: 'cleanup',
+                        data: {
+                            component: 'leaderboard',
+                            force: true
+                        }
+                    } ) );
+                } catch ( error ) {
+                    console.error( '[Leaderboard] Cleanup error:', error );
+                }
             }
         };
 
@@ -269,13 +293,13 @@ export default {
             } );
         } );
 
-        onBeforeUnmount( () => {
-            emit( 'terminal-resize', 'normal-height' );
-            off( EventTypes.GAME_ACTION );
+        onBeforeUnmount( async () => {
             cleanup();
             if ( props.ws ) {
                 props.ws.removeEventListener( 'message', handleWebSocketMessage );
             }
+            emit( 'terminal-resize', 'normal-height' );
+            off( EventTypes.GAME_ACTION );
         } );
 
         const terminalWrite = ( message ) => {

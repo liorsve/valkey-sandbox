@@ -5,26 +5,41 @@ import { cleanupCluster } from "../utils/cleanUpServer.js";
 export class LeaderboardService {
   constructor() {
     this.client = null;
+    this.initializing = false;
+    this.initialized = false;
   }
 
   async initialize() {
-    if (!this.client) {
+    if (this.initialized) return;
+    if (this.initializing) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return this.initialize();
+    }
+
+    try {
+      this.initializing = true;
       const host = process.env.VALKEY_CLUSTER_HOST || "localhost";
       const port = process.env.VALKEY_CLUSTER_PORT || 7000;
+
       this.client = await GlideClusterClient.createClient({
         addresses: [{ host, port: parseInt(port) }],
         clientName: "leaderboard-client",
       });
+
+      this.initialized = true;
+    } catch (error) {
+      console.error("[LeaderboardService] Initialization error:", error);
+      throw error;
+    } finally {
+      this.initializing = false;
     }
   }
 
   async initializeLeaderboard() {
     await this.initialize();
 
-    // Clean existing data before initialization
     await cleanupCluster();
 
-    // Initialize each player
     for (const player of DEFAULT_PLAYERS) {
       const playerKey = `${KEYS.PLAYER_PREFIX}${player.id}`;
       await this.client.hset(playerKey, player);

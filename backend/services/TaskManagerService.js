@@ -79,7 +79,7 @@ export class TaskManagerService {
         if (this.client) {
           const currentLock = await this.client.get(KEYS.LOCK);
           if (currentLock === "locked") {
-            await this.client.del(KEYS.LOCK);
+            await this.client.del([KEYS.LOCK]);
             console.log("[WSS] Auto-released lock due to no response");
           }
         }
@@ -113,10 +113,10 @@ export class TaskManagerService {
   }
 
   async clearExistingTasks(operations) {
-    await this.client.del(KEYS.QUEUE);
+    await this.client.del([KEYS.QUEUE]);
     operations.push('DEL task-queue "Clearing existing tasks"');
 
-    await this.client.del(KEYS.LOCK);
+    await this.client.del([KEYS.LOCK]);
     operations.push('DEL task-lock "Clearing existing locks"');
   }
 
@@ -178,8 +178,8 @@ export class TaskManagerService {
     if (this.client) {
       try {
         await Promise.all([
-          this.client.exists(KEYS.LOCK) && this.client.del(KEYS.LOCK),
-          this.client.exists(KEYS.QUEUE) && this.client.del(KEYS.QUEUE),
+          this.client.exists(KEYS.LOCK) && this.client.del([KEYS.LOCK]),
+          this.client.exists(KEYS.QUEUE) && this.client.del([KEYS.QUEUE]),
         ]);
 
         console.log("[TaskManager] Resources cleaned up successfully");

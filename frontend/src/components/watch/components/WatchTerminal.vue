@@ -31,7 +31,7 @@ export default defineComponent( {
         const onTerminalReady = ( term ) => {
             terminal.value = term;
             term.writeln( '\x1b[1;34m=== Valkey Watch Terminal ===\x1b[0m' );
-            term.writeln( 'Ready to watch your actions in real-time...' );
+            term.writeln( ' Ready to watch your actions in real-time...' );
             term.writeln( '' );
 
             emit( 'ready', term );

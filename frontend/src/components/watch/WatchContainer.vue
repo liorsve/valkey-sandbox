@@ -5,26 +5,25 @@
             <button v-if="hasError" @click="handleReload">Reload</button>
         </div>
         <template v-else>
+            <!-- Show action select when no action is selected -->
             <ActionSelect v-if="!hasSelection" @select="handleActionSelect" />
-            <template v-else-if="selectedTemplate && selectedClient">
-                <div class="visualization-layout">
-                    <div class="code-section">
-                        <WatchEditor :content="editorContent || ''" :language="currentLanguage"
-                            @ready="handleEditorReady" @update:content="handleCodeUpdate" />
-                        <WatchTerminal @ready="handleTerminalReady" />
-                    </div>
 
-                    <component v-if="currentVisualization && ws" :is="currentVisualization" :ws="ws"
-                        :isConnected="isConnected" :terminal="terminalInstance" @terminal-write="handleTerminalWrite"
-                        class="visualization-section" />
+            <div v-else class="visualization-layout">
+                <div class="code-section">
+                    <WatchEditor :content="editorContent" :language="currentLanguage" @ready="handleEditorReady"
+                        @update:content="handleCodeUpdate" />
+                    <WatchTerminal @ready="handleTerminalReady" />
                 </div>
-            </template>
+
+                <component v-if="currentVisualization" :is="currentVisualization" :ws="ws" :isConnected="isConnected"
+                    :terminal="terminalInstance" @terminal-write="handleTerminalWrite" class="visualization-section" />
+            </div>
         </template>
     </div>
 </template>
 
 <script>
-import { defineComponent, onMounted, computed, toRefs, onBeforeUnmount, nextTick } from 'vue';
+import { defineComponent, onMounted, computed, toRefs, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useWatchInAction } from '@/composables/useWatchInAction';
 import { store } from '@/store';
 import WatchEditor from './components/WatchEditor.vue';
@@ -65,23 +64,21 @@ export default defineComponent( {
         const selectedClient = computed( () => store.currentClient );
 
         const hasSelection = computed( () => {
-            return store.watchState.selectedAction && store.watchState.selectedClient;
+            return Boolean( store.watchState?.selectedAction );
         } );
 
         const handleActionSelect = ( { action, client, language } ) => {
             try {
                 store.setWatchState( client, action, language );
-                if ( editorContent.value ) {
-                    editorContent.value = store.getTemplateCode( client, action );
-                }
-
                 currentLanguage.value = language;
+                editorContent.value = store.getTemplateCode( client, action );
 
                 currentVisualization.value = action === 'Leaderboard'
                     ? LeaderboardVisualization
                     : TaskManagerVisualization;
             } catch ( error ) {
                 console.error( 'Error handling action select:', error );
+                hasError.value = true;
             }
         };
 
@@ -156,12 +153,34 @@ export default defineComponent( {
                 useEventBus().off( 'tab-changed', handleTabChange );
             } );
 
-            const cleanup = () => {
+            const cleanup = async () => {
                 if ( currentVisualization.value?.__vueParent$?.exposed?.cleanup ) {
                     currentVisualization.value.__vueParent$?.exposed?.cleanup();
                 }
                 store.clearWatchState();
+                try {
+                    if ( ws?.readyState === WebSocket.OPEN ) {
+                        ws.send( JSON.stringify( { action: 'cleanup', force: true } ) );
+                        await new Promise( resolve => setTimeout( resolve, 500 ) );
+                    }
+                } catch ( error ) {
+                    console.error( '[WatchContainer] Cleanup error:', error );
+                }
             };
+
+            watch(
+                () => store.currentTab,
+                async ( newTab, oldTab ) => {
+                    if ( oldTab === 'watchInAction' || newTab === 'watchInAction' ) {
+                        await cleanup();
+                    }
+                }
+            );
+
+            onBeforeUnmount( async () => {
+                await cleanup();
+            } );
+
 
             useEventBus().on( 'tab-changed', ( newTab ) => {
                 if ( newTab === 'watchInAction' && store.watchState?.selectedAction ) {

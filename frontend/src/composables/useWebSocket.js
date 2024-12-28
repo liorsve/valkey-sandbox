@@ -12,7 +12,6 @@ class WebSocketManager {
   }
 
   async connect(url) {
-    // Check if we already have a valid connection
     if (this.ws?.readyState === WebSocket.OPEN) {
       console.log("[WS] Reusing existing connection");
       return this.ws;
@@ -127,19 +126,19 @@ class WebSocketManager {
   }
 
   send(data) {
-    console.log("[WS] Attempting to send:", data);
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const formattedMessage = {
-        ...data,
-        client: store.currentClient,
-      };
-      this.ws.send(
-        typeof formattedMessage === "string"
-          ? formattedMessage
-          : JSON.stringify(formattedMessage)
-      );
-    } else {
+    if (!this.isConnectionValid()) {
       console.warn("[WS] Cannot send message - connection not ready");
+      return Promise.reject(new Error("WebSocket connection not ready"));
+    }
+
+    try {
+      const formattedMessage =
+        typeof data === "string" ? data : JSON.stringify(data);
+      this.ws.send(formattedMessage);
+      return Promise.resolve();
+    } catch (error) {
+      console.error("[WS] Send error:", error);
+      return Promise.reject(error);
     }
   }
 
@@ -153,7 +152,6 @@ class WebSocketManager {
 
 export const wsInstance = new WebSocketManager();
 
-// Expose a global connection checker
 export const ensureConnection = async () => {
   if (!wsInstance.isConnectionValid()) {
     const wsUrl =

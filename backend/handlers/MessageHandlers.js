@@ -4,6 +4,13 @@ import { ExecutorService } from "../services/ExecutorService.js";
 
 export class MessageHandlers {
   constructor(state, leaderboardService, taskManager) {
+    if (!leaderboardService) {
+      throw new Error("LeaderboardService is required");
+    }
+    if (!taskManager) {
+      throw new Error("TaskManager is required");
+    }
+
     this.state = state;
     this.leaderboardService = leaderboardService;
     this.taskManager = taskManager;
@@ -92,16 +99,28 @@ export class MessageHandlers {
   }
 
   async handleStartGame(ws) {
-    const players = await this.leaderboard.initializeLeaderboard();
-    this.sendToClient(ws, "updateLeaderboard", players);
+    try {
+      await this.leaderboardService.initialize();
+      const players = await this.leaderboardService.initializeLeaderboard();
+      this.sendToClient(ws, "leaderboardUpdate", players);
+    } catch (error) {
+      console.error("[LeaderboardService] Start game error:", error);
+      this.handleError(ws, error);
+    }
   }
 
   async handleUpdateScore(ws, data) {
-    const { players, operations } = await this.leaderboard.updateScore(
-      data.data.playerId,
-      data.data.change
-    );
-    this.sendToClient(ws, "leaderboardUpdate", players, operations);
+    try {
+      await this.leaderboardService.initialize();
+      const { players, operations } = await this.leaderboardService.updateScore(
+        data.data.playerId,
+        data.data.change
+      );
+      this.sendToClient(ws, "leaderboardUpdate", players, operations);
+    } catch (error) {
+      console.error("[LeaderboardService] Update score error:", error);
+      this.handleError(ws, error);
+    }
   }
 
   async handleStartTasks(ws) {
@@ -128,12 +147,10 @@ export class MessageHandlers {
 
   async handleCleanup(ws) {
     try {
-      // First try to cancel any running tasks
       if (this.taskManager) {
         await this.taskManager.cancelProcess(ws);
       }
 
-      // Then clean up the cluster
       await cleanupCluster("cluster");
       this.sendToClient(ws, "cleanup", { status: "success" });
     } catch (error) {

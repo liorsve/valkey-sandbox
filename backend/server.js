@@ -4,6 +4,8 @@ import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { GlideClusterClient } from "@valkey/valkey-glide";
 import { MessageHandlers } from "./handlers/MessageHandlers.js";
+import { LeaderboardService } from "./services/LeaderboardService.js";
+import { TaskManagerService } from "./services/TaskManagerService.js";
 
 // Prevent memory leaks
 process.setMaxListeners(5);
@@ -73,18 +75,23 @@ const startServer = async () => {
     console.error("[Server] Failed to initialize Glide client:", error);
   }
 
+  // Initialize services
+  const leaderboardService = new LeaderboardService();
+  const taskManager = new TaskManagerService();
+  const state = {
+    connections: wsConnections,
+    outputCache,
+  };
+
   // Create message handlers instance
   const messageHandlers = new MessageHandlers(
-    {
-      connections: wsConnections,
-      outputCache,
-    },
-    null, // leaderboardService - pass if needed
-    null // taskManager - pass if needed
+    state,
+    leaderboardService,
+    taskManager
   );
 
   // Handle WebSocket connection
-  wss.on("connection", (ws) => {
+  wss.on("connection", async (ws) => {
     const id = Date.now() + Math.random();
     ws.id = id;
     wsConnections.set(id, ws);
@@ -92,7 +99,27 @@ const startServer = async () => {
     console.log(`[WSS] Client connected (ID: ${id})`);
     ws.send(JSON.stringify({ action: "connected", data: { id } }));
 
-    ws.on("message", (msg) => messageHandlers.handleMessage(ws, msg));
+    // Initialize leaderboard service on connection
+    try {
+      await leaderboardService.initialize();
+    } catch (error) {
+      console.error("[WSS] Failed to initialize LeaderboardService:", error);
+    }
+
+    ws.on("message", async (msg) => {
+      try {
+        await messageHandlers.handleMessage(ws, msg);
+      } catch (error) {
+        console.error("[WSS] Message handling error:", error);
+        ws.send(
+          JSON.stringify({
+            action: "error",
+            message: "Internal server error",
+          })
+        );
+      }
+    });
+
     ws.on("close", () => {
       wsConnections.delete(id);
       console.log(`[WSS] Client disconnected (ID: ${id})`);

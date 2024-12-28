@@ -46,7 +46,6 @@ export default {
             if ( typeof output === 'string' ) {
                 text = output;
             } else {
-                // Remove quotes around string values and format nicely
                 text = JSON.stringify( output, null, 2 )
                     .replace( /"([^"]+)":/g, '$1:' )
                     .replace( /["{}[\]]/g, '' )
@@ -87,5 +86,4 @@ export default {
 </script>
 
 <style scoped>
-/* Remove all styles as they're now handled in BaseTerminal */
 </style>

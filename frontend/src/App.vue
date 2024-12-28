@@ -62,17 +62,25 @@ export default defineComponent( {
       return store.getLanguage( selectedClient.value );
     } );
 
-    const handleTabChange = ( tab ) => {
-      if ( tab === 'watchInAction' == store.currentTab ) {
-        store.clearWatchState();
-      }
-      const { emit: emitEvent } = useEventBus();
-      const prevTab = store.currentTab;
-      store.setTab( tab );
+    const handleTabChange = async ( tab ) => {
+      try {
+        const { emit: emitEvent } = useEventBus();
+        const prevTab = store.currentTab;
 
-      emitEvent( EventTypes.TERMINAL_CLEAR );
-      if ( prevTab !== tab ) {
-        if ( tab === 'commonUseCases' ) {
+        // Clear terminal before tab switch
+        emitEvent( EventTypes.TERMINAL_CLEAR );
+
+        // Only cleanup if we're leaving watch-in-action
+        if ( prevTab === 'watchInAction' && tab !== 'watchInAction' ) {
+          await cleanupWatchComponents();
+        }
+
+        store.setTab( tab );
+
+        // Reset watch state when entering watch-in-action
+        if ( tab === 'watchInAction' ) {
+          store.clearWatchState();
+        } else if ( tab === 'commonUseCases' ) {
           if ( !store.currentClient.includes( 'glide' ) ) {
             store.setClient( 'glide-node' );
           }
@@ -87,6 +95,24 @@ export default defineComponent( {
             store.executionMode
           ) || "// Template not available.";
         }
+
+      } catch ( error ) {
+        console.error( '[App] Tab change error:', error );
+        store.addNotification( 'Error switching tabs', 'error' );
+      }
+    };
+
+    const cleanupWatchComponents = async () => {
+      try {
+        if ( wsInstance.isConnectionValid() ) {
+          await wsInstance.send( {
+            action: 'cleanup',
+            data: { force: true }
+          } );
+        }
+        store.clearWatchState();
+      } catch ( error ) {
+        console.error( '[App] Cleanup error:', error );
       }
     };
 

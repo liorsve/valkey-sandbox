@@ -94,27 +94,37 @@ export default {
         };
 
         const setTasks = () => {
-            if ( !props.isConnected ) return;
+            if ( !props.isConnected || !props.ws || props.ws.readyState !== WebSocket.OPEN ) {
+                console.warn( '[TaskManager] WebSocket not ready. Current state:', props.ws?.readyState );
+                terminalWrite( '⚠️ Connection not ready. Please wait...' );
+                return;
+            }
 
             if ( taskQueue.value.length === 0 ) {
                 showEmptyQueuePopup.value = true;
                 return;
             }
 
-            const taskData = taskQueue.value.map( task => ( {
-                action: task.action,
-                uniqueId: task.uniqueId
-            } ) );
+            try {
+                const taskData = taskQueue.value.map( task => ( {
+                    action: task.action,
+                    uniqueId: task.uniqueId
+                } ) );
 
-            terminalWrite( '🔧  Initializing distributed Task Queue in Valkey Cluster...' );
-            terminalWrite( '📝  \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism' );
+                terminalWrite( '🔧  Initializing distributed Task Queue in Valkey Cluster...' );
+                terminalWrite( '📝  \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism' );
 
-            props.ws.send( JSON.stringify( {
-                action: 'setTasks',
-                data: taskData
-            } ) );
+                props.ws.send( JSON.stringify( {
+                    action: 'setTasks',
+                    data: taskData
+                } ) );
 
-            buttonState.value = 'invoke';
+                buttonState.value = 'invoke';
+            } catch ( error ) {
+                console.error( '[TaskManager] Error sending tasks:', error );
+                terminalWrite( `❌ Error: ${ error.message }` );
+                emitEvent( EventTypes.ERROR, error.message );
+            }
         };
 
         const invokeTaskManager = () => {
@@ -342,21 +352,40 @@ export default {
             taskQueue.value = [];
             buttonState.value = 'set';
             if ( props.ws?.readyState === WebSocket.OPEN ) {
-                props.ws.send( JSON.stringify( { action: 'cleanup' } ) );
+                try {
+                    props.ws.send( JSON.stringify( {
+                        action: 'cleanup',
+                        data: { force: true }
+                    } ) );
+                } catch ( error ) {
+                    console.error( '[TaskManager] Cleanup error:', error );
+                }
             }
+        };
+
+        const handleWebSocketError = ( error ) => {
+            console.error( '[TaskManager] WebSocket error:', error );
+            terminalWrite( '❌ Connection error. Attempting to reconnect...' );
+            buttonState.value = 'set';
         };
 
         onBeforeUnmount( () => {
             cleanup();
             if ( props.ws ) {
                 props.ws.removeEventListener( 'message', handleWebSocketMessage );
+                props.ws.removeEventListener( 'error', handleWebSocketError );
             }
         } );
 
         onMounted( () => {
             window.addEventListener( 'beforeunload', cleanup );
             emit( 'terminal-resize', 'full-height' );
-            handleWebSocket( props.ws );
+
+            if ( props.ws ) {
+                props.ws.addEventListener( 'error', handleWebSocketError );
+                handleWebSocket( props.ws );
+            }
+
             terminalWrite( '\n🔄  Task Manager Demo with Valkey-Glide' );
             terminalWrite( '🔒  Watch distributed locks in action' );
             terminalWrite( '📋  See how task queues are' );
@@ -367,6 +396,25 @@ export default {
             handleWebSocket,
             { immediate: true }
         );
+
+        watch( () => props.isConnected, ( newState ) => {
+            if ( newState ) {
+                terminalWrite( '🔗 Connection established' );
+            } else {
+                terminalWrite( '⚠️ Connection lost' );
+                buttonState.value = 'set';
+            }
+        } );
+
+        watch( () => props.ws, ( newWs, oldWs ) => {
+            if ( oldWs ) {
+                oldWs.removeEventListener( 'message', handleWebSocketMessage );
+            }
+            if ( newWs ) {
+                newWs.addEventListener( 'message', handleWebSocketMessage );
+                console.log( '[TaskManager] WebSocket connection updated' );
+            }
+        }, { immediate: true } );
 
         return {
             tasks,
@@ -400,7 +448,6 @@ export default {
     flex-direction: column;
     height: 100%;
     background-color: var(--surface-dark);
-
     padding: 20px;
     overflow: hidden;
     gap: 15px;
@@ -582,7 +629,6 @@ button:hover {
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    margin-bottom: 30px;
 }
 
 .logo-container {
