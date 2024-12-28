@@ -13,7 +13,7 @@ export class LeaderboardService {
     if (this.initialized) return;
     if (this.initializing) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      return this.initialize();
+      return await this.initialize();
     }
 
     try {
@@ -37,18 +37,32 @@ export class LeaderboardService {
 
   async initializeLeaderboard() {
     await this.initialize();
+    const operations = [];
 
     await cleanupCluster();
+    operations.push(
+      "\x1b[1mDEL leaderboard\x1b[0m // Cleaning up previous game"
+    );
 
+    operations.push("\x1b[1mSADD players\x1b[0m // Setting up player pool");
     for (const player of DEFAULT_PLAYERS) {
       const playerKey = `${KEYS.PLAYER_PREFIX}${player.id}`;
       await this.client.hset(playerKey, player);
+      operations.push(
+        `\x1b[1mHSET ${playerKey}\x1b[0m // Adding player ${player.name}`
+      );
+
       await this.client.zadd(KEYS.LEADERBOARD, [
         { element: playerKey, score: player.score },
       ]);
+      operations.push(
+        `\x1b[1mZADD leaderboard\x1b[0m // Setting initial score for ${player.name}`
+      );
     }
 
-    return this.getLeaderboardState();
+    console.log("Successfully initialized leaderboard in Valkey cluster");
+    const currentState = await this.getLeaderboardState();
+    return { operations, state: currentState };
   }
 
   async getLeaderboardState() {
@@ -95,25 +109,34 @@ export class LeaderboardService {
       const playerData = await this.client.hgetall(playerKey);
       if (!playerData) throw new Error(`Player not found: ${playerKey}`);
 
-      operations.push(
-        `Updating ${playerData.name}'s score by ${
-          change > 0 ? "+" : ""
-        }${change}`
-      );
+      if (!playerData.name) {
+        playerData.name = `Player ${playerId}`;
+        await this.client.hset(playerKey, { name: playerData.name });
+        console.warn(
+          `[LeaderboardService] Assigned default name to player: ${playerKey}`
+        );
+      }
+
       const newScore = await this.client.zincrby(
         KEYS.LEADERBOARD,
         change,
         playerKey
       );
 
-      operations.push(`Setting new score: ${newScore}`);
+      operations.push(
+        `\x1b[1mZINCRBY\x1b[0m leaderboard ${change} for ${playerData.name}`
+      );
+      operations.push(
+        `\x1b[1mHSET\x1b[0m ${playerKey} score ${newScore} // Updated score`
+      );
+
       await this.client.hset(playerKey, {
         ...playerData,
         score: newScore.toString(),
       });
 
-      const players = await this.getLeaderboardState();
-      return { players, operations };
+      const state = await this.getLeaderboardState();
+      return { state, operations };
     } catch (error) {
       console.error("[LeaderboardService] Score update error:", error);
       throw error;

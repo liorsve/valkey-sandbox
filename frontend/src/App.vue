@@ -12,10 +12,10 @@
 </template>
 
 <script>
-import { defineComponent, computed, onMounted, ref, provide } from 'vue';
+import { defineComponent, computed, onMounted, ref, provide, inject, onBeforeUnmount } from 'vue';
 import { store } from './store';
-import { wsInstance, ensureConnection } from './composables/useWebSocket';
-import { useEventBus, EventTypes } from './composables/useEventBus';
+import { ensureConnection } from './composables/useWebSocket';
+import { EventTypes } from './composables/useEventBus';
 import TopTabs from './components/layout/TopTabs.vue';
 import Sidebar from './components/layout/Sidebar.vue';
 import PlaygroundContainer from './components/playground/PlaygroundContainer.vue';
@@ -39,6 +39,9 @@ export default defineComponent( {
 
     provide( 'getEditorContent', getEditorContent );
     provide( 'editorContent', editorContent );
+
+    const eventBus = inject( 'eventBus' );
+    const wsManager = inject( 'wsManager' );
 
     const currentView = computed( () => {
       const tab = store.currentTab;
@@ -64,7 +67,7 @@ export default defineComponent( {
 
     const handleTabChange = async ( tab ) => {
       try {
-        const { emit: emitEvent } = useEventBus();
+        const { emit: emitEvent } = eventBus;
         const prevTab = store.currentTab;
 
         // Clear terminal before tab switch
@@ -104,8 +107,8 @@ export default defineComponent( {
 
     const cleanupWatchComponents = async () => {
       try {
-        if ( wsInstance.isConnectionValid() ) {
-          await wsInstance.send( {
+        if ( wsManager?.isConnectionValid() ) {
+          await wsManager.send( {
             action: 'cleanup',
             data: { force: true }
           } );
@@ -120,68 +123,67 @@ export default defineComponent( {
       editorContent.value = content;
     };
 
-    onMounted( async () => {
-      console.log( '[App] onMounted - initializing global WebSocket...' );
-
+    const initializeWebSocket = () => {
+      console.log( '[App] Initializing global WebSocket...' );
       try {
-        const ws = await ensureConnection();
+        wsManager.connect();
 
-        if ( ws ) {
-          wsInstance.addMessageListener( ( event ) => {
-            try {
-              const data = JSON.parse( event.data );
-              if ( data.action === 'connected' ) {
-                store.setConnection( true );
-                console.log( '[App] Connected with ID:', data.data.id );
-              }
-            } catch ( error ) {
-              console.error( '[App] Message parse error:', error );
+        onMounted( () => {
+          const healthCheck = setInterval( () => {
+            if ( !wsManager.isConnectionValid() ) {
+              wsManager.connect().catch( err => {
+                console.warn( '[App] Reconnection attempt failed:', err );
+              } );
             }
-          } );
-        }
+          }, 30000 );
 
-        // Connection health check
-        const healthCheck = setInterval( async () => {
-          if ( !wsInstance.isConnectionValid() ) {
-            try {
-              await ensureConnection();
-            } catch ( err ) {
-              console.warn( '[App] Reconnection attempt failed:', err );
-            }
-          }
-        }, 30000 );
-
-        // Cleanup on unmount
-        return () => clearInterval( healthCheck );
+          onBeforeUnmount( () => clearInterval( healthCheck ) );
+        } );
 
       } catch ( error ) {
         console.error( '[App] WebSocket initialization error:', error );
         store.addNotification( 'WebSocket connection failed', 'error' );
       }
+    };
 
-      // Ensure defaults are set
+    const handleWSMessage = ( message ) => {
+      try {
+        if ( message.action === 'connected' ) {
+          store.setConnection( true );
+        } else if ( message.action === 'updateLeaderboard' ) {
+          store.updateLeaderboard( message.payload );
+        }
+      } catch ( error ) {
+        console.error( '[App] Message parse error:', error );
+      }
+    };
+
+    onMounted( () => {
+      initializeWebSocket();
+      wsManager.addMessageListener( handleWSMessage );
+
+      // Initialize defaults and content
       store.initializeDefaults();
-
-      // Then initialize with stored state or defaults
       const storedTab = localStorage.getItem( 'valkey-currentTab' ) || 'playground';
       store.setTab( storedTab );
 
-      // Initialize content on mount with guaranteed defaults
-      const initialCode = store.getTemplateCode(
-        store.currentClient || store.getDefaultClient(),
-        store.executionMode || store.currentUseCase || store.getDefaultMode()
-      ) || "// Initial code not available.";
-      editorContent.value = initialCode;
+      editorContent.value = store.getInitialCode() || "// Initial code not available.";
 
       console.log( 'App mounted, environment:', process.env.NODE_ENV );
 
-      const { on: onEventBus } = useEventBus();
-      onEventBus( EventTypes.CODE_EXECUTION, ( payload ) => {
+      eventBus.on( EventTypes.CODE_EXECUTION, ( payload ) => {
         console.log( '[App] CODE_EXECUTION event received:', payload );
       } );
-      onEventBus( EventTypes.CODE_RESULT, ( payload ) => {
+
+      eventBus.on( EventTypes.CODE_RESULT, ( payload ) => {
         console.log( '[App] CODE_RESULT event received:', payload );
       } );
+    } );
+
+    onBeforeUnmount( () => {
+      wsManager.removeMessageListener( handleWSMessage );
+      eventBus.off( EventTypes.CODE_EXECUTION );
+      eventBus.off( EventTypes.CODE_RESULT );
     } );
 
     return {

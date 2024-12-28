@@ -21,8 +21,8 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, provide } from 'vue';
-import { useWebSocket } from '@/composables/useWebSocket';
+import { defineComponent, ref, computed, provide } from 'vue';
+import { wsInstance } from '@/composables/useWebSocket';
 import { store } from '@/store';
 import Editor from '../Editor.vue';
 import AppTerminal from '../AppTerminal.vue';
@@ -40,11 +40,12 @@ export default defineComponent( {
         TaskManagerVisual
     },
     setup() {
-        const { ws, isConnected } = useWebSocket( 'ws://localhost:3000/appws' );
-
-        const selectedAction = ref( null );
         const terminalInstance = ref( null );
+        const selectedAction = ref( null );
         const editorContent = ref( '' );
+
+        // Provide WebSocket instance properly
+        provide( 'websocket', wsInstance );
 
         const activeVisualization = computed( () =>
             selectedAction.value?.action === 'Leaderboard' ? LeaderboardVisual : TaskManagerVisual
@@ -64,7 +65,7 @@ export default defineComponent( {
                 terminalInstance.value.writeln( `\x1b[1;32m>>> Selected ${ action.action } with ${ action.client }\x1b[0m` );
             }
 
-            ws.value?.send( JSON.stringify( {
+            wsInstance.ws?.send( JSON.stringify( {
                 action: 'init',
                 component: action.action,
                 client: action.internalClient
@@ -73,6 +74,8 @@ export default defineComponent( {
 
         const handleTerminalReady = ( terminal ) => {
             terminalInstance.value = terminal;
+            provide( 'terminal', terminalInstance );
+            terminal.clear();
             terminal.writeln( '\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m' );
         };
 
@@ -85,7 +88,7 @@ export default defineComponent( {
         };
 
         const handleReplace = () => {
-            ws.value?.send( JSON.stringify( { action: 'cleanup' } ) );
+            wsInstance.ws?.send( JSON.stringify( { action: 'cleanup' } ) );
             selectedAction.value = null;
         };
 
@@ -100,8 +103,8 @@ export default defineComponent( {
             selectedAction,
             activeVisualization,
             currentLanguage,
-            ws,
-            isConnected,
+            ws: wsInstance.ws,
+            isConnected: computed( () => wsInstance.isConnectionValid() ),
             terminalInstance,
             editorContent,
             handleActionSelect,

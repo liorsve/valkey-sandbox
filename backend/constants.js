@@ -41,12 +41,12 @@ export const DEFAULT_PLAYERS = [
 export const CLUSTER_CONFIG = {
   retryAttempts: 30,
   retryDelay: 1000,
-  connectionTimeout: 5000
+  connectionTimeout: 5000,
 };
 
 export const CLUSTER_ENDPOINTS = {
   development: {
-    host: process.env.VALKEY_CLUSTER_HOST || 'valkey-cluster',
-    port: parseInt(process.env.VALKEY_CLUSTER_PORT || '7000')
-  }
+    host: process.env.VALKEY_CLUSTER_HOST || "valkey-cluster",
+    port: parseInt(process.env.VALKEY_CLUSTER_PORT || "7000"),
+  },
 };

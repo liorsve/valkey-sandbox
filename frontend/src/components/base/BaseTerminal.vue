@@ -12,121 +12,123 @@
 </template>
 
 <script>
-import { defineComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { defineComponent, onMounted, onBeforeUnmount, ref } from 'vue';
 import '@xterm/xterm/css/xterm.css';
+import { useEventBus, EventTypes } from '@/composables/useEventBus';
 
-export default defineComponent({
+export default defineComponent( {
     name: 'BaseTerminal',
     props: {
         options: {
             type: Object,
-            default: () => ({})
+            default: () => ( {} )
         }
     },
-    emits: ['ready'],
-    setup(props, { emit }) {
-        const terminalContainer = ref(null);
+    emits: [ 'ready' ],
+    setup( props, { emit } ) {
+        const terminalContainer = ref( null );
         let terminal = null;
         let fitAddon = null;
+        let webLinksAddon = null;
         let resizeObserver = null;
         let resizeRAF;
 
-        const defaultOptions = {
-            fontFamily: 'JetBrains Mono, Consolas, monospace',
-            fontSize: 14,
-            lineHeight: 1.2,
-            theme: {
-                background: '#1a1b26',
-                foreground: '#a9b1d6',
-                cursor: '#f7768e',
-                cursorAccent: '#1a1b26',
-                selection: '#28324a',
-                black: '#32344a',
-                red: '#f7768e',
-                green: '#9ece6a',
-                yellow: '#e0af68',
-                blue: '#7aa2f7',
-                magenta: '#ad8ee6',
-                cyan: '#449dab',
-                white: '#787c99',
-                brightBlack: '#444b6a',
-                brightRed: '#ff7a93',
-                brightGreen: '#b9f27c',
-                brightYellow: '#ff9e64',
-                brightBlue: '#7da6ff',
-                brightMagenta: '#bb9af7',
-                brightCyan: '#0db9d7',
-                brightWhite: '#acb0d0'
-            },
-            cursorBlink: true,
-            cursorStyle: 'bar',
-            scrollback: 5000,
-            allowTransparency: true
+        const { on, off } = useEventBus();
+
+        const initializeTerminal = async () => {
+            const { Terminal } = await import( '@xterm/xterm' );
+            const { FitAddon } = await import( '@xterm/addon-fit' );
+            const { WebLinksAddon } = await import( '@xterm/addon-web-links' );
+
+            terminal = new Terminal( {
+                fontFamily: 'JetBrains Mono, Consolas, monospace',
+                fontSize: 14,
+                lineHeight: 1.2,
+                theme: {
+                    background: '#1a1b26',
+                    foreground: '#a9b1d6',
+                    cursor: '#f7768e',
+                    cursorAccent: '#1a1b26',
+                    selection: '#28324a',
+                    black: '#32344a',
+                    red: '#f7768e',
+                    green: '#9ece6a',
+                    yellow: '#e0af68',
+                    blue: '#7aa2f7',
+                    magenta: '#ad8ee6',
+                    cyan: '#449dab',
+                    white: '#787c99',
+                    brightBlack: '#444b6a',
+                    brightRed: '#ff7a93',
+                    brightGreen: '#b9f27c',
+                    brightYellow: '#ff9e64',
+                    brightBlue: '#7da6ff',
+                    brightMagenta: '#bb9af7',
+                    brightCyan: '#0db9d7',
+                    brightWhite: '#acb0d0'
+                },
+                cursorBlink: true,
+                cursorStyle: 'bar',
+                scrollback: 5000,
+                allowTransparency: true
+            } );
+
+            fitAddon = new FitAddon();
+            webLinksAddon = new WebLinksAddon();
+            terminal.loadAddon( fitAddon );
+            terminal.loadAddon( webLinksAddon );
+
+            terminal.open( terminalContainer.value );
+            fitAddon.fit();
+
+            resizeObserver = new ResizeObserver( ( entries ) => {
+                if ( entries[ 0 ]?.contentRect ) {
+                    handleResize();
+                }
+            } );
+
+            if ( terminalContainer.value ) {
+                resizeObserver.observe( terminalContainer.value );
+            }
+
+            emit( 'ready', terminal );
         };
 
         const handleResize = () => {
-            if (!fitAddon || !terminalContainer.value) return;
+            if ( !fitAddon || !terminalContainer.value ) return;
 
-            cancelAnimationFrame(resizeRAF);
-            resizeRAF = requestAnimationFrame(() => {
+            cancelAnimationFrame( resizeRAF );
+            resizeRAF = requestAnimationFrame( () => {
                 try {
                     const { width, height } = terminalContainer.value.getBoundingClientRect();
-                    if (width > 0 && height > 0) {
+                    if ( width > 0 && height > 0 ) {
                         fitAddon.fit();
                     }
-                } catch (err) {
-                    console.warn('Terminal fit error:', err);
+                } catch ( err ) {
+                    console.warn( 'Terminal fit error:', err );
                 }
-            });
+            } );
         };
 
-        onMounted(async () => {
-            const { Terminal } = await import('@xterm/xterm');
-            const { FitAddon } = await import('@xterm/addon-fit');
-            const { WebLinksAddon } = await import('@xterm/addon-web-links');
+        onMounted( () => {
+            initializeTerminal();
+        } );
 
-            terminal = new Terminal({
-                ...defaultOptions,
-                ...props.options
-            });
-
-            fitAddon = new FitAddon();
-            terminal.loadAddon(fitAddon);
-            terminal.loadAddon(new WebLinksAddon());
-
-            terminal.open(terminalContainer.value);
-
-            resizeObserver = new ResizeObserver((entries) => {
-                if (entries[0]?.contentRect) {
-                    handleResize();
-                }
-            });
-
-            if (terminalContainer.value) {
-                resizeObserver.observe(terminalContainer.value);
-            }
-
-            setTimeout(() => {
-                handleResize();
-                emit('ready', terminal);
-            }, 0);
-        });
-
-        onBeforeUnmount(() => {
-            if (resizeObserver) {
+        onBeforeUnmount( () => {
+            if ( resizeObserver ) {
                 resizeObserver.disconnect();
             }
-            if (resizeRAF) {
-                cancelAnimationFrame(resizeRAF);
+            if ( resizeRAF ) {
+                cancelAnimationFrame( resizeRAF );
             }
             terminal?.dispose();
-        });
+        } );
 
         return {
             terminalContainer
         };
     }
-});
+} );
 </script>
 
 <style scoped>

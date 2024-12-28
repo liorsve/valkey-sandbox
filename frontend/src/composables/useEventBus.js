@@ -1,37 +1,36 @@
 import mitt from "mitt";
-
-const emitter = mitt();
+import { inject } from "vue";
 
 export const EventTypes = {
   CODE_EXECUTION: "code:execution",
   CODE_RESULT: "code:result",
-  TERMINAL_OUTPUT: "terminal:output",
+  TERMINAL_OUTPUT: "TERMINAL_OUTPUT",
   TERMINAL_CLEAR: "terminal:clear",
   GAME_ACTION: "game:action",
   LEADERBOARD_UPDATE: "leaderboard:update",
   TASK_UPDATE: "task:update",
   CONNECTION_STATUS: "connection:status",
-  ERROR: "error",
+  ERROR: "ERROR",
   EDITOR_LANGUAGE_CHANGED: "editor:language",
+  WS_OPEN: "ws:open",
+  WS_MESSAGE: "ws:message",
+  WS_ERROR: "ws:error",
+  WS_CLOSE: "ws:close",
 };
 
-export function useEventBus() {
-  const emit = (type, data) => {
-    emitter.emit(type, data);
-  };
-
-  const on = (type, handler) => {
-    emitter.on(type, handler);
-  };
-
-  const off = (type, handler) => {
-    emitter.off(type, handler);
-  };
-
+export function createEventBus() {
+  const emitter = mitt();
   return {
-    emit,
-    on,
-    off,
-    EventTypes,
+    on: emitter.on,
+    off: emitter.off,
+    emit: emitter.emit,
   };
+}
+
+export function useEventBus() {
+  const eventBus = inject("eventBus");
+  if (!eventBus) {
+    throw new Error("EventBus not provided");
+  }
+  return eventBus;
 }

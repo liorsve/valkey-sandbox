@@ -20,7 +20,6 @@
 
     <div class="sidebar__content">
       <div class="sidebar__sections">
-        <!-- Enhanced Use Cases UI -->
         <div v-if="currentTab === 'commonUseCases'" class="use-cases">
           <div class="use-cases__grid">
             <button v-for="useCase in useCases" :key="useCase.id"
@@ -36,7 +35,6 @@
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="sidebar__actions">
         <button class="sidebar__action-button sidebar__action-button--primary" @click="handleAction('run')">
           Run Code
@@ -56,7 +54,7 @@
 import { ref, computed, watch, onMounted, inject } from 'vue';
 import { store } from '../../store';
 import { useEventBus, EventTypes } from '../../composables/useEventBus';
-import { wsInstance } from '../../composables/useWebSocket';
+import { useWebSocket } from '../../composables/useWebSocket';
 
 export default {
   name: 'AppSidebar',
@@ -69,7 +67,8 @@ export default {
   emits: [ 'content-update' ],
   setup( props, { emit } ) {
     const getEditorContent = inject( 'getEditorContent' );
-    const { emit: emitEvent } = useEventBus();
+    const eventBus = useEventBus();
+    const wsManager = useWebSocket();
 
     const selectedClient = ref( store.currentClient || store.getDefaultClient() );
     const selectedMode = ref( store.executionMode || store.getDefaultMode() );
@@ -108,9 +107,9 @@ export default {
       try {
         switch ( action ) {
           case 'run': {
-            emitEvent( EventTypes.TERMINAL_CLEAR );
+            eventBus.emit( EventTypes.TERMINAL_CLEAR );
             if ( store.getLanguage( selectedClient.value ) === 'java' || store.getLanguage( selectedClient.value ) === 'go' ) {
-              emitEvent( EventTypes.TERMINAL_OUTPUT, "⚠️  This language is not supported yet" );
+              eventBus.emit( EventTypes.TERMINAL_OUTPUT, "⚠️  This language is not supported yet" );
               return;
             }
             const codeToRun = getEditorContent();
@@ -119,7 +118,7 @@ export default {
               return;
             }
 
-            if ( !wsInstance.ws || wsInstance.ws.readyState !== WebSocket.OPEN ) {
+            if ( !wsManager.isConnectionValid() ) {
               store.addNotification( 'WebSocket connection not ready', 'error' );
               return;
             }
@@ -134,36 +133,80 @@ export default {
               },
             };
 
-            wsInstance.send( message );
+            wsManager.send( message );
             console.log( '[Sidebar] Sending CODE_EXECUTION event...' );
-            emitEvent( EventTypes.CODE_EXECUTION, { status: 'started' } );
+            eventBus.emit( EventTypes.CODE_EXECUTION, { status: 'started' } );
             break;
           }
           case 'clear':
-            emitEvent( EventTypes.TERMINAL_CLEAR );
+            eventBus.emit( EventTypes.TERMINAL_CLEAR );
             break;
         }
       } catch ( error ) {
         console.error( '[Action] Error:', error );
         store.addNotification( error.message, 'error' );
-        emitEvent( EventTypes.ERROR, error.message );
+        eventBus.emit( EventTypes.ERROR, error.message );
+      }
+    };
+
+    const handleWebSocketMessage = ( normalizedMessage ) => {
+      try {
+        const { action, payload } = normalizedMessage;
+        if ( !action ) return;
+
+        let successMessage, errorMessage;
+
+        switch ( action ) {
+          case 'terminalOutput':
+            eventBus.emit( EventTypes.TERMINAL_OUTPUT, payload );
+            break;
+
+          case 'executionResult':
+            successMessage = payload?.success ? `✅ Execution Successful: ${ payload.message }` : null;
+            errorMessage = !payload?.success ? `❌ Execution Failed: ${ payload.error }` : null;
+            eventBus.emit(
+              EventTypes.TERMINAL_OUTPUT,
+              successMessage || errorMessage
+            );
+            break;
+
+          case 'output':
+            if ( payload?.output ) {
+              eventBus.emit( EventTypes.TERMINAL_OUTPUT, payload.output );
+            }
+            break;
+
+          case 'connected':
+            console.debug( '[Sidebar] Connected with ID:', payload?.id );
+            break;
+
+          default:
+            console.debug( '[Sidebar] Unhandled message action:', action );
+        }
+      } catch ( error ) {
+        console.error( '[Sidebar] Error handling WebSocket message:', error );
       }
     };
 
     onMounted( () => {
-      wsInstance.addMessageListener( ( event ) => {
-        try {
-          const data = JSON.parse( event.data );
-          console.log( '[Sidebar] Received WS message:', data );
-          if ( data.action === 'output' && data.data ) {
-            const output = data.data.output;
-            console.log( '[Sidebar] Processing output:', output );
-            emitEvent( EventTypes.TERMINAL_OUTPUT, output );
-          }
-        } catch ( error ) {
-          console.error( '[Sidebar] WebSocket message parsing error:', error );
-        }
-      } );
+      // Add WebSocket message listener just once
+      wsManager.addMessageListener( handleWebSocketMessage );
+
+      // Initialize client, mode, and use case
+      if ( !selectedClient.value ) {
+        selectedClient.value = store.getDefaultClient();
+        store.setClient( selectedClient.value );
+      }
+      if ( !selectedMode.value ) {
+        selectedMode.value = store.getDefaultMode();
+        store.setMode( selectedMode.value );
+      }
+      if ( !selectedUseCase.value && props.currentTab === 'commonUseCases' ) {
+        selectedUseCase.value = 'Session Cache';
+        handleUseCaseChange( 'Session Cache' );
+      }
+      const template = props.currentTab === 'playground' ? selectedMode.value : selectedUseCase.value;
+      updateContent( store.currentClient, template );
     } );
 
     watch( () => props.currentTab, ( newTab ) => {
@@ -197,26 +240,9 @@ export default {
       updateContent( store.currentClient, newMode );
     } );
 
-    onMounted( () => {
-      if ( !selectedClient.value ) {
-        selectedClient.value = store.getDefaultClient();
-        store.setClient( selectedClient.value );
-      }
-      if ( !selectedMode.value ) {
-        selectedMode.value = store.getDefaultMode();
-        store.setMode( selectedMode.value );
-      }
-      if ( !selectedUseCase.value && props.currentTab === 'commonUseCases' ) {
-        selectedUseCase.value = 'Session Cache';
-        handleUseCaseChange( 'Session Cache' );
-      }
-      const template = props.currentTab === 'playground' ? selectedMode.value : selectedUseCase.value;
-      updateContent( store.currentClient, template );
-    } );
-
     return {
-      selectedClient,
       selectedMode,
+      selectedClient,
       selectedUseCase,
       clients,
       modes,

@@ -39,23 +39,16 @@ export default {
         };
 
         const writeToTerminal = ( output ) => {
-            console.log( `[Terminal] Writing output:`, output );
-            if ( !output ) return;
+            if ( !output || !terminalInstance.value ) return;
 
-            let text;
-            if ( typeof output === 'string' ) {
-                text = output;
-            } else {
-                text = JSON.stringify( output, null, 2 )
-                    .replace( /"([^"]+)":/g, '$1:' )
-                    .replace( /["{}[\]]/g, '' )
-                    .trim();
-            }
+            // Handle different output types
+            const lines = ( typeof output === 'string' ? output : JSON.stringify( output, null, 2 ) )
+                .split( '\n' )
+                .filter( line => line.trim() );
 
-            // Split by newlines and filter out empty lines
-            const lines = text.split( '\n' ).filter( line => line.trim() );
+            // Write each line to terminal
             lines.forEach( line => {
-                terminalInstance.value?.writeln( ` ${ line.trim() }` );
+                terminalInstance.value.writeln( ` ${ line.trim() }` );
             } );
         };
 
@@ -85,5 +78,4 @@ export default {
 };
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

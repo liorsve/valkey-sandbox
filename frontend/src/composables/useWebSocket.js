@@ -1,98 +1,129 @@
-import { store } from "../store";
+import { EventTypes } from "@/composables/useEventBus";
+import { inject } from "vue";
 
 class WebSocketManager {
-  constructor() {
+  constructor(eventBus) {
     this.ws = null;
-    this.maxRetries = 5;
-    this.retryCount = 0;
-    this.retryDelay = 2000;
-    this.isConnecting = false;
     this.listeners = new Set();
+    this.retryCount = 0;
+    this.maxRetries = 5;
+    this.retryDelay = 5000;
     this.lastUrl = null;
+    this.eventBus = eventBus;
   }
 
-  async connect(url) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log("[WS] Reusing existing connection");
-      return this.ws;
-    }
-
-    if (this.isConnecting) {
-      console.log("[WS] Connection already in progress");
-      return;
-    }
-
-    this.isConnecting = true;
-    this.lastUrl = url;
-    const wsUrl = this.buildWebSocketUrl(url);
-    console.log("[WS] Connecting to:", wsUrl);
-
-    try {
-      this.ws = new WebSocket(wsUrl);
-      this.setupMessageHandler();
-
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Connection timeout"));
-          this.ws?.close();
-        }, 5000);
-
-        this.ws.onopen = () => {
-          clearTimeout(timeout);
-          this.isConnecting = false;
-          this.retryCount = 0;
-          console.log("[WS] Connected successfully");
-          resolve(this.ws);
-        };
-
-        this.ws.onclose = (event) => {
-          clearTimeout(timeout);
-          this.isConnecting = false;
-          console.log("[WS] Connection closed:", event.code);
-          if (!event.wasClean) {
-            this.handleReconnect();
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          clearTimeout(timeout);
-          this.isConnecting = false;
-          console.error("[WS] Error:", error);
-          reject(error);
-        };
-      });
-    } catch (error) {
-      this.isConnecting = false;
-      throw error;
-    }
-  }
-
-  isConnectionValid() {
-    return this.ws && this.ws.readyState === WebSocket.OPEN;
-  }
-
-  setupMessageHandler() {
-    if (!this.ws) return;
-
-    this.ws.onmessage = (event) => {
-      console.log("[WS] Incoming message:", event.data);
-      this.listeners.forEach((listener) => {
-        try {
-          listener(event);
-        } catch (error) {
-          console.error("[WS] Listener error:", error);
-        }
-      });
-    };
-  }
-
-  buildWebSocketUrl(_url) {
+  buildWebSocketUrl() {
     if (process.env.NODE_ENV === "development") {
       return "ws://localhost:3000/appws";
     }
 
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${wsProtocol}//${window.location.host}/appws`;
+  }
+
+  handleMessage(event) {
+    try {
+      if (!event?.data) return;
+
+      // Handle special system messages
+      if (event.data === "connected") {
+        this.notifyListeners({
+          action: "connected",
+          payload: { id: Date.now() + Math.random() },
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      // Parse and normalize message
+      let parsedData;
+      try {
+        parsedData =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch (e) {
+        console.debug("[WS] Non-JSON message:", event.data);
+        return;
+      }
+
+      // Create normalized message structure
+      const message = {
+        action: parsedData.action || parsedData.type || "unknown",
+        payload: null,
+        timestamp: Date.now(),
+      };
+
+      // Handle nested data structures
+      if (parsedData.data) {
+        message.payload =
+          typeof parsedData.data === "object"
+            ? { ...parsedData.data }
+            : { value: parsedData.data };
+      } else if (parsedData.payload) {
+        message.payload = parsedData.payload;
+      }
+
+      // Handle output in data or root
+      if (parsedData.data?.output || parsedData.output) {
+        message.payload = {
+          ...(message.payload || {}),
+          output: parsedData.data?.output || parsedData.output,
+        };
+      }
+
+      // Only notify if we have a valid action
+      if (message.action && message.action !== "unknown") {
+        this.notifyListeners(message);
+      }
+    } catch (error) {
+      console.error("[WS] Message handling error:", error, event);
+    }
+  }
+
+  notifyListeners(message) {
+    if (!message?.action) {
+      console.warn("[WS] Invalid message format:", message);
+      return;
+    }
+    this.eventBus.emit(EventTypes.WS_MESSAGE, message);
+    this.listeners.forEach((listener) => listener(message));
+  }
+
+  connect() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+
+    try {
+      const wsUrl = this.buildWebSocketUrl();
+      console.log("[WS] Connecting to:", wsUrl);
+
+      this.ws = new WebSocket(wsUrl);
+      this.lastUrl = wsUrl;
+
+      this.ws.onopen = () => {
+        this.retryCount = 0;
+        console.log("[WS] Connection established");
+        this.eventBus.emit(EventTypes.WS_OPEN);
+      };
+
+      this.ws.onmessage = (event) => this.handleMessage(event);
+
+      this.ws.onclose = (event) => {
+        console.log("[WS] Connection closed", event.code, event.reason);
+        this.eventBus.emit(EventTypes.WS_CLOSE, event);
+        if (!event.wasClean) {
+          this.handleReconnect();
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("[WS] Connection error:", error);
+        this.eventBus.emit(EventTypes.WS_ERROR, error);
+        this.ws.close();
+      };
+    } catch (error) {
+      console.error("[WS] Setup error:", error);
+      this.eventBus.emit(EventTypes.WS_ERROR, error);
+      this.handleReconnect();
+    }
   }
 
   handleReconnect() {
@@ -103,12 +134,11 @@ class WebSocketManager {
         `[WS] Reconnecting (${this.retryCount}/${this.maxRetries}) in ${delay}ms...`
       );
       setTimeout(() => {
-        if (this.lastUrl) {
-          this.connect(this.lastUrl);
-        }
+        this.connect();
       }, delay);
     } else {
       console.error("[WS] Max reconnection attempts reached");
+      this.eventBus.emit(EventTypes.WS_MAX_RETRIES);
     }
   }
 
@@ -142,6 +172,10 @@ class WebSocketManager {
     }
   }
 
+  isConnectionValid() {
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  }
+
   gracefulClose() {
     if (this.ws) {
       this.ws.close(1000, "Client shutting down");
@@ -150,68 +184,64 @@ class WebSocketManager {
   }
 }
 
-export const wsInstance = new WebSocketManager();
+let wsInstance = null;
 
-export const ensureConnection = async () => {
-  if (!wsInstance.isConnectionValid()) {
-    const wsUrl =
-      process.env.NODE_ENV === "development"
-        ? "ws://localhost:3000/appws"
-        : "/appws";
-    return wsInstance.connect(wsUrl);
+export function createWebSocketManager(eventBus) {
+  if (!wsInstance) {
+    wsInstance = new WebSocketManager(eventBus);
   }
-  return wsInstance.ws;
-};
+  return wsInstance;
+}
 
-window.addEventListener("beforeunload", () => {
-  wsInstance.gracefulClose();
-});
-
-const buildWebSocketUrl = (url) => {
-  if (url.startsWith("ws")) return url;
-
-  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const backendUrl = import.meta.env.VITE_WS_URL;
-
-  if (backendUrl) return backendUrl;
-
-  return `${wsProtocol}//${window.location.host}/appws`;
-};
-
-const connect = () => {
-  if (ws.value && ws.value.readyState === WebSocket.OPEN) return;
-
-  try {
-    const wsUrl = buildWebSocketUrl("/appws");
-    console.log("[WS] Connecting to:", wsUrl);
-
-    ws.value = new WebSocket(wsUrl);
-
-    ws.value.onopen = () => {
-      isConnected.value = true;
-      hasError.value = false;
-      console.log("[WS] Connection established");
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-      }
-    };
-
-    ws.value.onclose = (event) => {
-      isConnected.value = false;
-      console.log("[WS] Connection closed", event.code, event.reason);
-      if (!event.wasClean) {
-        reconnectTimeout = setTimeout(connect, 5000);
-      }
-    };
-
-    ws.value.onerror = (error) => {
-      hasError.value = true;
-      console.error("[WS] Connection error:", error);
-    };
-  } catch (error) {
-    console.error("[WS] Setup error:", error);
-    hasError.value = true;
-    reconnectTimeout = setTimeout(connect, 5000);
+export function useWebSocket() {
+  const wsManager = inject("wsManager");
+  if (!wsManager && !wsInstance) {
+    throw new Error("WebSocket manager not provided");
   }
+  return wsManager || wsInstance;
+}
+
+export function ensureConnection(wsManager = wsInstance) {
+  if (!wsManager) {
+    throw new Error("No WebSocket manager available");
+  }
+
+  if (!wsManager.isConnectionValid()) {
+    wsManager.connect();
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("WebSocket connection timeout"));
+      }, 5000);
+
+      wsManager.eventBus.on("ws:open", () => {
+        clearTimeout(timeout);
+        resolve(wsManager.ws);
+      });
+
+      wsManager.eventBus.on("ws:error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+  }
+  return Promise.resolve(wsManager.ws);
+}
+
+// Export the singleton instance for backward compatibility
+export const wsInstanceSingleton = {
+  get ws() {
+    return wsInstance?.ws;
+  },
+  isConnectionValid() {
+    return wsInstance?.isConnectionValid();
+  },
+  send(data) {
+    return wsInstance?.send(data);
+  },
+  addMessageListener(listener) {
+    return wsInstance?.addMessageListener(listener);
+  },
+  removeMessageListener(listener) {
+    return wsInstance?.removeMessageListener(listener);
+  },
 };

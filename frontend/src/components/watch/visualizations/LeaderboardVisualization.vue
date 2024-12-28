@@ -8,8 +8,8 @@
                         <div class="player-name">{{ player.name }}</div>
                     </div>
                 </div>
-                <button class="start-game-btn" @click="startGame" :disabled="!isConnected">
-                    Start Game
+                <button class="start-game-btn" @click="startGame" :disabled="!isConnected || !ws">
+                    {{ wsButtonText }}
                 </button>
             </div>
             <div v-else key="game" class="game-container">
@@ -52,7 +52,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, inject, watch, nextTick } from 'vue';
 import { useEventBus, EventTypes } from '@/composables/useEventBus';
 import supermanImg from '@/assets/images/superman.jpg';
 import batmanImg from '@/assets/images/batman.jpg';
@@ -64,12 +64,23 @@ import aquamanImg from '@/assets/images/aquaman.jpg';
 export default {
     name: 'LeaderboardVisualization',
     props: {
-        ws: WebSocket,
-        isConnected: Boolean,
-        terminal: Object,
+        ws: {
+            type: [ WebSocket, Object ],
+            default: null
+        },
+        isConnected: {
+            type: Boolean,
+            default: false
+        },
+        terminal: {
+            type: Object,
+            default: null
+        },
     },
     setup( props, { emit } ) {
         const { emit: emitEvent, on, off } = useEventBus();
+        const websocketManager = inject( 'ws' );
+        const terminalRef = inject( 'terminal' );
 
         const gameStarted = ref( false );
         const updatedPlayers = ref( {} );
@@ -91,131 +102,112 @@ export default {
 
         players.value = [ ...initialPlayers ];
 
-        const sortedPlayers = computed( () =>
-            [ ...players.value ].sort( ( a, b ) => b.score - a.score )
-        );
+        const playerScores = ref( {} );
+
+        const sortedPlayers = computed( () => {
+            return Object.entries( playerScores.value )
+                .map( ( [ id, score ] ) => {
+                    const player = initialPlayers.find( p => p.id === parseInt( id ) );
+                    return {
+                        ...player,
+                        score
+                    };
+                } )
+                .sort( ( a, b ) => b.score - a.score );
+        } );
+
+        const wsButtonText = computed( () => {
+            if ( !websocketManager?.readyState === WebSocket.OPEN ) {
+                return 'Waiting for Connection...';
+            }
+            if ( !gameStarted.value ) {
+                return 'Start Game';
+            }
+            return 'Game in Progress';
+        } );
+
+        const sendWebSocketMessage = ( message ) => {
+            if ( websocketManager?.readyState === WebSocket.OPEN ) {
+                websocketManager.send( JSON.stringify( message ) );
+                return true;
+            } else {
+                console.warn( '[WS] Cannot send message, WebSocket not connected' );
+                return false;
+            }
+        };
 
         const startGame = () => {
-            if ( !props.isConnected ) return;
-            gameStarted.value = true;
-            props.ws.send( JSON.stringify( {
+            if ( !websocketManager?.readyState === WebSocket.OPEN ) return;
+
+            if ( sendWebSocketMessage( {
                 action: 'startGame',
                 data: { initialize: true }
-            } ) );
-            terminalWrite( '🎮  Initializing real-time leaderboard in Valkey Cluster...' );
-            terminalWrite( '\x1b[1mSADD players\x1b[0m // Setting up player pool' );
-            terminalWrite( '\x1b[1mZADD leaderboard\x1b[0m // Initializing sorted set' );
+            } ) ) {
+                gameStarted.value = true;
+            }
         };
 
         const updatePlayerScore = ( playerId, change ) => {
-            if ( !props.isConnected || !playerId ) return;
+            if ( !props.isConnected || !props.ws || !playerId ) return;
 
-            updatedPlayers.value[ playerId ] = true;
-            setTimeout( () => {
-                updatedPlayers.value[ playerId ] = false;
-            }, 1000 );
-
-            props.ws.send( JSON.stringify( {
+            if ( sendWebSocketMessage( {
                 action: 'updateScore',
                 data: {
                     playerId: parseInt( playerId ),
                     change: parseInt( change )
                 }
-            } ) );
+            } ) ) {
+                updatedPlayers.value[ playerId ] = true;
+                setTimeout( () => {
+                    updatedPlayers.value[ playerId ] = false;
+                }, 1000 );
+            }
         };
 
         const handleLeaderboardUpdate = ( data ) => {
             if ( !Array.isArray( data ) ) {
-                console.error( 'Invalid leaderboard data:', data );
+                console.error( 'Invalid leaderboard data format:', data );
                 return;
             }
 
-            const oldState = players.value.reduce( ( acc, p ) => ( {
-                ...acc,
-                [ p.id ]: {
-                    score: p.score,
-                    rank: sortedPlayers.value.findIndex( sp => sp.id === p.id ) + 1
-                }
-            } ), {} );
+            const oldScores = { ...playerScores.value };
 
-            const validPlayers = data.map( player => {
-                if ( !player || typeof player.id !== 'number' ) {
-                    console.error( 'Invalid player data:', player );
-                    return null;
-                }
+            data.forEach( player => {
+                if ( !player || typeof player.id !== 'number' ) return;
 
                 const initialPlayer = initialPlayers.find( p => p.id === player.id );
-                if ( !initialPlayer ) {
-                    console.error( 'No matching initial player for:', player );
-                    return null;
-                }
+                if ( !initialPlayer ) return;
 
-                return {
-                    ...initialPlayer,
-                    score: parseInt( player.score || 0 )
-                };
-            } ).filter( Boolean );
+                const oldScore = oldScores[ player.id ] || 0;
+                const newScore = parseInt( player.score || 0 );
 
-            console.log( 'Updated players:', validPlayers );
-            players.value = validPlayers;
+                playerScores.value[ player.id ] = newScore;
 
-            validPlayers.forEach( player => {
-                const oldData = oldState[ player.id ];
-                if ( !oldData ) return;
-
-                const scoreDiff = player.score - oldData.score;
-                if ( scoreDiff !== 0 ) {
+                if ( newScore !== oldScore ) {
                     updatedPlayers.value[ player.id ] = true;
                     setTimeout( () => {
                         updatedPlayers.value[ player.id ] = false;
                     }, 1000 );
 
-                    terminalWrite( `\x1b[1mZINCRBY leaderboard\x1b[0m ${ scoreDiff } player:${ player.id }` );
-                    terminalWrite( `📊  Updated score for ${ player.name }: ${ oldData.score } → ${ player.score }` );
-
                     addNotification( {
-                        message: `${ player.name } ${ scoreDiff > 0 ? 'gained' : 'lost' } ${ Math.abs( scoreDiff ) } points`,
-                        type: scoreDiff > 0 ? 'earned' : 'lost'
+                        message: `${ initialPlayer.name } ${ newScore > oldScore ? 'gained' : 'lost' } ${ Math.abs( newScore - oldScore ) } points`,
+                        type: newScore > oldScore ? 'earned' : 'lost'
                     } );
                 }
             } );
-
-            emitEvent( EventTypes.LEADERBOARD_UPDATE, players.value );
         };
 
-        const handleWebSocketMessage = ( event ) => {
+        const handleWebSocketMessage = ( message ) => {
             try {
-                const message = JSON.parse( event.data );
-                // Only process messages if the component is mounted and game is active
-                if ( !gameStarted.value && message.action !== 'startGame' ) {
-                    console.log( '[Leaderboard] Ignoring message, game not started:', message.action );
-                    return;
-                }
-
-                console.log( '[Leaderboard] Processing message:', message.action );
-
-                switch ( message.action ) {
-                    case 'leaderboardUpdate':
-                        if ( message.operations ) {
-                            message.operations.forEach( op => {
-                                terminalWrite( `🔷 ${ op }` );
-                            } );
-                        }
-                        handleLeaderboardUpdate( message.data );
-                        break;
-                    case 'gameCommand':
-                        if ( message.data.type === 'startGame' ) {
-                            terminalWrite( '🎮 Game started! Initializing players...' );
-                        }
-                        break;
-                    case 'error':
-                        terminalWrite( `❌ Error: ${ message.message }` );
-                        emitEvent( EventTypes.ERROR, message.message );
-                        break;
+                const data = JSON.parse( message.data );
+                if ( data.action === 'updateLeaderboard' ) {
+                    handleLeaderboardUpdate( data.payload );
+                    addNotification( { type: 'info', message: 'Leaderboard updated!' } );
+                } else {
+                    console.warn( '[LeaderboardVisualization] Unhandled message action:', data.action );
                 }
             } catch ( error ) {
-                console.error( '[Leaderboard] Error handling message:', error );
-                emitEvent( EventTypes.ERROR, 'Error processing server message' );
+                console.error( '[LeaderboardVisualization] Error parsing WebSocket message:', error );
             }
         };
 
@@ -243,9 +235,9 @@ export default {
             }
         };
 
-        const handleWebSocket = ( newWs ) => {
-            if ( newWs ) {
-                newWs.onmessage = handleWebSocketMessage;
+        const handleWebSocket = ( message ) => {
+            if ( message.action === 'output' ) {
+                handleLeaderboardUpdate( message.data.output );
             }
         };
 
@@ -255,9 +247,9 @@ export default {
             notifications.value = [];
             notificationQueue.value = [];
 
-            if ( props.ws?.readyState === WebSocket.OPEN ) {
+            if ( websocketManager?.readyState === WebSocket.OPEN ) {
                 try {
-                    props.ws.send( JSON.stringify( {
+                    websocketManager.send( JSON.stringify( {
                         action: 'cleanup',
                         data: {
                             component: 'leaderboard',
@@ -272,43 +264,66 @@ export default {
 
         watch(
             () => props.ws,
-            handleWebSocket,
+            ( newWs ) => {
+                if ( newWs ) {
+                    console.log( 'WebSocket connection status:', newWs.readyState );
+                    newWs.onmessage = handleWebSocketMessage;
+                }
+            },
             { immediate: true }
         );
 
         onMounted( () => {
-            emit( 'terminal-resize', 'full-height' );
-            handleWebSocket( props.ws );
-            if ( props.terminal ) {
-                terminalWrite( '\n🏆  Leaderboard Demo with Valkey-Glide' );
-                terminalWrite( '📊  Real-time sorted sets in action' );
-                terminalWrite( '⚡ See how Valkey handles concurrent updates\n' );
-                terminalWrite( '\x1b[1;32mℹ️  Press Start Game to begin!\x1b[0m\n' );
+            if ( websocketManager ) {
+                websocketManager.addMessageListener( handleWebSocketMessage );
             }
 
-            on( EventTypes.GAME_ACTION, ( action ) => {
+            nextTick( () => {
+                if ( terminalRef?.value ) {
+                    terminalWrite( '🏆  Leaderboard Demo with Valkey-Glide' );
+                    terminalWrite( '📊  Real-time sorted sets in action' );
+                    terminalWrite( '⚡ See how Valkey handles concurrent updates\n' );
+                    terminalWrite( '\x1b[1;32mℹ️  Press Start Game to begin!\x1b[0m\n' );
+                }
+            } );
+
+            eventOn( EventTypes.GAME_ACTION, ( action ) => {
                 if ( action.type === 'startGame' ) {
                     terminalWrite( '🎮 Game started! Initializing players...' );
                 }
             } );
         } );
 
-        onBeforeUnmount( async () => {
-            cleanup();
-            if ( props.ws ) {
-                props.ws.removeEventListener( 'message', handleWebSocketMessage );
+        watch(
+            () => props.ws,
+            ( newWs ) => {
+                if ( newWs ) {
+                    newWs.onmessage = handleWebSocketMessage;
+                }
             }
+        );
+
+        onBeforeUnmount( () => {
+            cleanup();
+            off( EventTypes.WS_MESSAGE, handleWebSocketMessage );
             emit( 'terminal-resize', 'normal-height' );
-            off( EventTypes.GAME_ACTION );
         } );
 
         const terminalWrite = ( message ) => {
-            emitEvent( EventTypes.TERMINAL_WRITE, message );
+            if ( terminalRef?.value?.writeln ) {
+                terminalRef.value.writeln( message );
+            } else {
+                emitEvent( EventTypes.TERMINAL_OUTPUT, message );
+            }
         };
+
+        // Initialize scores
+        players.value.forEach( player => {
+            playerScores.value[ player.id ] = player.score;
+        } );
 
         return {
             initialPlayers,
-            players,
             sortedPlayers,
             gameStarted,
             updatedPlayers,
@@ -316,7 +331,8 @@ export default {
             startGame,
             updatePlayerScore,
             terminalWrite,
-            cleanup
+            cleanup,
+            wsButtonText,
         };
     }
 };
@@ -693,6 +709,7 @@ export default {
 
 .score-changed {
     animation: highlight 2s ease-in-out;
+    z-index: 1;
 }
 
 @keyframes highlight {
@@ -809,6 +826,8 @@ export default {
     opacity: 0.5;
     cursor: not-allowed;
     background-color: #666;
+    min-width: 200px;
+    /* Ensure consistent width for different text lengths */
 }
 
 .list-move,

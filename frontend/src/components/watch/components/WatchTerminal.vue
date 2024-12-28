@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { defineComponent, ref } from 'vue';
+import { defineComponent, ref, onBeforeUnmount } from 'vue';
 import BaseTerminal from '@/components/base/BaseTerminal.vue';
 import { useEventBus, EventTypes } from '@/composables/useEventBus';
 
@@ -24,33 +24,34 @@ export default defineComponent( {
             theme: {
                 background: '#1a1a1a',
                 foreground: '#ffffff',
-                cursor: '#ffffff'
-            }
+                cursor: '#ffffff',
+            },
         };
 
         const onTerminalReady = ( term ) => {
             terminal.value = term;
-            term.writeln( '\x1b[1;34m=== Valkey Watch Terminal ===\x1b[0m' );
             term.writeln( ' Ready to watch your actions in real-time...' );
             term.writeln( '' );
 
             emit( 'ready', term );
 
-            on( EventTypes.TERMINAL_OUTPUT, ( message ) => {
+            const handleOutput = ( message ) => {
                 term.writeln( message );
-            } );
+            };
 
-            on( EventTypes.TERMINAL_CLEAR, () => {
-                term.clear();
+            on( EventTypes.TERMINAL_OUTPUT, handleOutput );
+
+            onBeforeUnmount( () => {
+                off( EventTypes.TERMINAL_OUTPUT, handleOutput );
             } );
         };
 
         return {
             terminal,
             terminalOptions,
-            onTerminalReady
+            onTerminalReady,
         };
-    }
+    },
 } );
 </script>
 

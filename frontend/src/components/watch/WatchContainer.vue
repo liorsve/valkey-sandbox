@@ -5,7 +5,6 @@
             <button v-if="hasError" @click="handleReload">Reload</button>
         </div>
         <template v-else>
-            <!-- Show action select when no action is selected -->
             <ActionSelect v-if="!hasSelection" @select="handleActionSelect" />
 
             <div v-else class="visualization-layout">
@@ -23,7 +22,7 @@
 </template>
 
 <script>
-import { defineComponent, onMounted, computed, toRefs, onBeforeUnmount, nextTick, watch } from 'vue';
+import { defineComponent, onMounted, computed, toRefs, onBeforeUnmount, nextTick, watch, ref, provide } from 'vue';
 import { useWatchInAction } from '@/composables/useWatchInAction';
 import { store } from '@/store';
 import WatchEditor from './components/WatchEditor.vue';
@@ -31,7 +30,8 @@ import WatchTerminal from './components/WatchTerminal.vue';
 import ActionSelect from './ActionSelect.vue';
 import LeaderboardVisualization from './visualizations/LeaderboardVisualization.vue';
 import TaskManagerVisualization from './visualizations/TaskManagerVisualization.vue';
-import { useEventBus } from '@/composables/useEventBus';
+import { useEventBus, EventTypes } from '@/composables/useEventBus';
+import { useWebSocket } from '@/composables/useWebSocket';
 
 export default defineComponent( {
     name: 'WatchContainer',
@@ -43,21 +43,26 @@ export default defineComponent( {
         TaskManagerVisualization
     },
     setup() {
+        const wsManager = useWebSocket();
+
         const {
-            ws,
             isConnected,
-            terminalInstance,
             editorContent,
             currentVisualization,
             currentLanguage,
             isEditorReady,
             hasError,
-            handleTerminalReady,
             handleTerminalWrite,
             handleEditorReady,
             handleCodeUpdate,
             handleReplace
         } = useWatchInAction();
+
+        const terminalInstance = ref( null );
+
+        // Single provide call for each dependency
+        provide( 'websocket', wsManager );
+        provide( 'terminal', terminalInstance );
 
         const selectedAction = computed( () => store.watchState?.selectedAction );
         const selectedTemplate = computed( () => store.currentUseCase );
@@ -99,8 +104,8 @@ export default defineComponent( {
         const { on, off } = useEventBus();
 
         const cleanupAndReset = () => {
-            if ( ws.value?.readyState === WebSocket.OPEN ) {
-                ws.value.send( JSON.stringify( {
+            if ( wsManager.ws.value?.readyState === WebSocket.OPEN ) {
+                wsManager.ws.value.send( JSON.stringify( {
                     action: 'cleanup',
                     data: { force: true }
                 } ) );
@@ -159,8 +164,8 @@ export default defineComponent( {
                 }
                 store.clearWatchState();
                 try {
-                    if ( ws?.readyState === WebSocket.OPEN ) {
-                        ws.send( JSON.stringify( { action: 'cleanup', force: true } ) );
+                    if ( wsManager.ws?.readyState === WebSocket.OPEN ) {
+                        wsManager.ws.send( JSON.stringify( { action: 'cleanup', force: true } ) );
                         await new Promise( resolve => setTimeout( resolve, 500 ) );
                     }
                 } catch ( error ) {
@@ -193,9 +198,16 @@ export default defineComponent( {
                 cleanup();
             } );
         } );
+
+        const handleTerminalReady = ( term ) => {
+            terminalInstance.value = term;
+            term.writeln( '\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m' );
+            term.writeln( '❌ Error: undefined' );
+        };
+
         return {
             store,
-            ws,
+            ws: wsManager.ws,
             isConnected,
             selectedAction,
             selectedTemplate,

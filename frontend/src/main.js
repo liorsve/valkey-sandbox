@@ -1,12 +1,15 @@
 import { createApp } from "vue";
 import App from "./App.vue";
+import store from "./store";
 import { install as VueMonacoEditorPlugin } from "@guolao/vue-monaco-editor";
-import { store } from "./store";
 import "./styles/variables.css";
+import { initializeApp } from "./boot";
 
 window.Storage = store;
 
 const app = createApp(App);
+
+const { eventBus, wsManager } = initializeApp(app);
 
 app.use(VueMonacoEditorPlugin, {
   paths: {

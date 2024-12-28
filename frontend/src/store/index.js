@@ -6,9 +6,9 @@ const DEFAULT_STATE = {
   executionMode: "cluster",
   currentTab: "playground",
   currentUseCase: "Session Cache",
+  leaderboard: [],
 };
 
-// Update how we get saved state
 const savedState = (() => {
   const stored = localStorage.getItem("valkey-sandbox-state");
   if (!stored) return DEFAULT_STATE;
@@ -55,7 +55,6 @@ const CONFIG = {
 };
 
 export const store = reactive({
-  // Initialize with guaranteed values
   currentClient: savedState.currentClient || DEFAULT_STATE.currentClient,
   executionMode: savedState.executionMode || DEFAULT_STATE.executionMode,
   currentTab: savedState.currentTab || DEFAULT_STATE.currentTab,
@@ -67,11 +66,11 @@ export const store = reactive({
     selectedClient: null,
     selectedAction: null,
   },
+  leaderboard: savedState.leaderboard || DEFAULT_STATE.leaderboard,
 
   setLastEditorContent(content) {
     this.lastEditorContent = content;
   },
-  // Client methods
   getAllClients() {
     return CONFIG.clients;
   },
@@ -87,7 +86,6 @@ export const store = reactive({
     ];
   },
 
-  // Getters
   getSidebarSections(tab) {
     const sections = [
       {
@@ -126,7 +124,7 @@ export const store = reactive({
     const template = dataNavigator.getTemplate(clientId, templateName);
 
     if (template && template.code) {
-      return template.code; // Safely access the code string
+      return template.code;
     }
     console.warn(
       `No template found for clientId "${clientId}" and templateName "${templateName}".`
@@ -142,7 +140,6 @@ export const store = reactive({
       );
     }
 
-    // For playground, use stored or default mode
     if (this.currentTab === "playground") {
       return this.getTemplateCode(
         this.currentClient || DEFAULT_STATE.currentClient,
@@ -150,7 +147,6 @@ export const store = reactive({
       );
     }
 
-    // For common use cases
     if (this.currentTab === "commonUseCases") {
       return this.getTemplateCode(
         this.currentClient || DEFAULT_STATE.currentClient,
@@ -158,14 +154,12 @@ export const store = reactive({
       );
     }
 
-    // Default fallback
     return this.getTemplateCode(
       DEFAULT_STATE.currentClient,
       DEFAULT_STATE.executionMode
     );
   },
 
-  // Actions
   setClient(clientDisplayName) {
     this.currentClient = clientDisplayName;
     this.saveState();
@@ -180,7 +174,6 @@ export const store = reactive({
     const previousTab = this.currentTab;
     this.currentTab = tab;
 
-    // Clear watch state when switching away from or to watch-in-action
     if (tab === "watch-in-action" || previousTab === "watch-in-action") {
       this.clearWatchState();
     }
@@ -342,6 +335,11 @@ export const store = reactive({
       { deep: true }
     );
   },
+
+  updateLeaderboard(newData) {
+    this.leaderboard = newData;
+  },
 });
 
 store.initializeDefaults();
+export default store;
