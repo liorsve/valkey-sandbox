@@ -63,13 +63,14 @@ export default defineComponent( {
     } );
 
     const handleTabChange = ( tab ) => {
+      if ( tab === 'watchInAction' == store.currentTab ) {
+        store.clearWatchState();
+      }
       const { emit: emitEvent } = useEventBus();
       const prevTab = store.currentTab;
-      store.setTab( tab ); // Use setter method
+      store.setTab( tab );
 
-      // Clear terminal on tab change
       emitEvent( EventTypes.TERMINAL_CLEAR );
-
       if ( prevTab !== tab ) {
         if ( tab === 'commonUseCases' ) {
           if ( !store.currentClient.includes( 'glide' ) ) {

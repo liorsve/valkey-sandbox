@@ -145,25 +145,4 @@ export default defineComponent( {
     border-radius: var(--radius-md);
     overflow: hidden;
 }
-
-.replace-button {
-    position: fixed;
-    top: var(--spacing-md);
-    left: var(--spacing-md);
-    padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, #4a148c, #7b1fa2);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    z-index: 100;
-    transition: transform 0.2s;
-}
-
-.replace-button:hover {
-    transform: translateY(-1px);
-}
 </style>

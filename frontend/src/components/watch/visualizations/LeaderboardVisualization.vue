@@ -236,6 +236,16 @@ export default {
             }
         };
 
+        const cleanup = () => {
+            gameStarted.value = false;
+            players.value = [ ...initialPlayers ];
+            notifications.value = [];
+            notificationQueue.value = [];
+            if ( props.ws?.readyState === WebSocket.OPEN ) {
+                props.ws.send( JSON.stringify( { action: 'cleanup' } ) );
+            }
+        };
+
         watch(
             () => props.ws,
             handleWebSocket,
@@ -262,6 +272,7 @@ export default {
         onBeforeUnmount( () => {
             emit( 'terminal-resize', 'normal-height' );
             off( EventTypes.GAME_ACTION );
+            cleanup();
             if ( props.ws ) {
                 props.ws.removeEventListener( 'message', handleWebSocketMessage );
             }
@@ -280,7 +291,8 @@ export default {
             notifications,
             startGame,
             updatePlayerScore,
-            terminalWrite
+            terminalWrite,
+            cleanup
         };
     }
 };

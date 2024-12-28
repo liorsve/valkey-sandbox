@@ -339,25 +339,18 @@ export default {
         };
 
         const cleanup = () => {
-            if ( props.ws?.readyState === WebSocket.OPEN ) {
-                props.ws.send( JSON.stringify( {
-                    action: 'cancelTaskManager'
-                } ) );
-            }
             taskQueue.value = [];
             buttonState.value = 'set';
-
-            if ( triangle.value ) {
-                triangle.value.style.transform = 'translateX(-50%) translateY(-50%)';
-                triangle.value.style.borderBottomColor = '#6a11cb';
-                triangle.value.classList.remove( 'locked' );
+            if ( props.ws?.readyState === WebSocket.OPEN ) {
+                props.ws.send( JSON.stringify( { action: 'cleanup' } ) );
             }
         };
 
         onBeforeUnmount( () => {
             cleanup();
-            window.removeEventListener( 'beforeunload', cleanup );
-            emit( 'terminal-resize', 'normal-height' );
+            if ( props.ws ) {
+                props.ws.removeEventListener( 'message', handleWebSocketMessage );
+            }
         } );
 
         onMounted( () => {

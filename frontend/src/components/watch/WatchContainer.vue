@@ -1,9 +1,5 @@
 <template>
     <div class="watch-container">
-        <button v-if="hasSelection" class="replace-button" @click="handleReplace">
-            <span class="button-icon">⟲</span>
-            <span class="button-text">Back to Select</span>
-        </button>
         <div v-if="hasError" class="error-state">
             <p>{{ hasError ? 'Failed to load the selected template.' : 'Initializing...' }}</p>
             <button v-if="hasError" @click="handleReload">Reload</button>
@@ -159,6 +155,24 @@ export default defineComponent( {
             onBeforeUnmount( () => {
                 useEventBus().off( 'tab-changed', handleTabChange );
             } );
+
+            const cleanup = () => {
+                if ( currentVisualization.value?.__vueParent$?.exposed?.cleanup ) {
+                    currentVisualization.value.__vueParent$?.exposed?.cleanup();
+                }
+                store.clearWatchState();
+            };
+
+            useEventBus().on( 'tab-changed', ( newTab ) => {
+                if ( newTab === 'watchInAction' && store.watchState?.selectedAction ) {
+                    cleanup();
+                }
+            } );
+
+            onBeforeUnmount( () => {
+                useEventBus().off( 'tab-changed' );
+                cleanup();
+            } );
         } );
         return {
             store,
@@ -232,102 +246,6 @@ export default defineComponent( {
     height: inherit;
     display: flex;
     flex-direction: column;
-}
-
-.replace-button {
-    position: fixed;
-    top: 10px;
-    left: calc(var(--sidebar-width) - 80px);
-    width: 160px;
-    height: 40px;
-    padding: 0 var(--spacing-sm);
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-    color: var(--text-primary);
-    border: none;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xs);
-    z-index: 1000;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: var(--font-tabs);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    box-shadow:
-        0 2px 6px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(var(--primary-rgb), 0.1),
-        0 0 15px rgba(var(--primary-rgb), 0.2);
-    backdrop-filter: blur(6px);
-
-    &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -20px;
-
-        right: -20px;
-        bottom: -1px;
-        background: linear-gradient(135deg,
-                rgba(var(--primary-rgb), 0.5),
-                rgba(var(--accent-rgb), 0.5));
-        border-radius: inherit;
-        z-index: -1;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        filter: blur(6px);
-    }
-
-    &::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -80px;
-
-        width: calc(100% + 160px);
-
-        height: 100%;
-        background: linear-gradient(to right,
-                var(--primary-hover),
-                var(--primary-color) 50%,
-                var(--primary-hover));
-        z-index: -1;
-    }
-}
-
-.replace-button:hover {
-    transform: scale(1.05);
-    box-shadow:
-        0 4px 8px rgba(0, 0, 0, 0.2),
-        0 0 20px rgba(var(--primary-rgb), 0.4),
-        0 0 0 1px rgba(var(--primary-rgb), 0.2),
-        -3px 0 10px rgba(0, 0, 0, 0.3);
-
-    &::before {
-        opacity: 1;
-    }
-}
-
-.button-icon {
-    font-size: 16px;
-    animation: float 2s ease-in-out infinite paused;
-}
-
-.replace-button:hover .button-icon {
-    animation-play-state: running;
-}
-
-@keyframes float {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-3px) rotate(180deg);
-    }
 }
 
 .error-state {

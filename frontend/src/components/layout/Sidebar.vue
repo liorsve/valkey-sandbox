@@ -71,7 +71,6 @@ export default {
     const getEditorContent = inject( 'getEditorContent' );
     const { emit: emitEvent } = useEventBus();
 
-    // Initialize with stored values from store or defaults
     const selectedClient = ref( store.currentClient || store.getDefaultClient() );
     const selectedMode = ref( store.executionMode || store.getDefaultMode() );
     const selectedUseCase = ref( store.currentUseCase );
@@ -80,7 +79,6 @@ export default {
     const modes = computed( () => store.getAllModes() );
     const useCases = computed( () => store.getAllUseCases() );
 
-    // Filter available clients based on current tab
     const availableClients = computed( () => {
       if ( props.currentTab === 'commonUseCases' || props.currentTab === 'challenges' ) {
         return store.getGlideClients();
@@ -102,7 +100,7 @@ export default {
     };
 
     const handleUseCaseChange = ( newUseCase ) => {
-      store.setUseCase( newUseCase ); // Use setter method
+      store.setUseCase( newUseCase );
       updateContent( store.currentClient, newUseCase );
     };
 
@@ -110,6 +108,11 @@ export default {
       try {
         switch ( action ) {
           case 'run': {
+            emitEvent( EventTypes.TERMINAL_CLEAR );
+            if ( store.getLanguage( selectedClient.value ) === 'java' || store.getLanguage( selectedClient.value ) === 'go' ) {
+              emitEvent( EventTypes.TERMINAL_OUTPUT, "⚠️  This language is not supported yet" );
+              return;
+            }
             const codeToRun = getEditorContent();
             if ( !codeToRun ) {
               store.addNotification( 'No code to run', 'error' );
