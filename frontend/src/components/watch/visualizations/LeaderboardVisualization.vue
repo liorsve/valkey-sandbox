@@ -230,7 +230,7 @@ export default {
                         handleOperations(data.data.operations);
                     }
                 } else {
-                    console.warn('[LeaderboardVisualization] Unhandled message action:', data.action);
+                    console.debug('[LeaderboardVisualization] Unhandled message action:', data.action);
                 }
             } catch (error) {
                 console.error('[LeaderboardVisualization] Error:', error);

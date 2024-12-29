@@ -5,11 +5,20 @@ import { cleanupCluster } from "../utils/cleanUpServer.js";
 export class TaskManagerService {
   constructor() {
     this.client = null;
+    this.initializing = false;
+    this.initialized = false;
     this.lockTimeout = null;
   }
 
   async initialize(mode = "cluster") {
-    if (!this.client) {
+    if (this.initialized) return;
+    if (this.initializing) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return await this.initialize();
+    }
+
+    try {
+      this.initializing = true;
       const host =
         process.env[
           mode === "cluster" ? "VALKEY_CLUSTER_HOST" : "VALKEY_STANDALONE_HOST"
@@ -24,6 +33,13 @@ export class TaskManagerService {
         clientName: `task-manager-${Date.now()}`,
         clusterMode: mode === "cluster",
       });
+
+      this.initialized = true;
+    } catch (error) {
+      console.error("[TaskManagerService] Initialization error:", error);
+      throw error;
+    } finally {
+      this.initializing = false;
     }
   }
 
@@ -196,7 +212,11 @@ export class TaskManagerService {
 
   async cleanup(mode = "cluster") {
     try {
-      await cleanupCluster(mode);
+      if (this.client) {
+        await cleanupCluster(mode);
+        this.client.close();
+        this.client = null;
+      }
     } catch (error) {
       console.error("[TaskManager] Cleanup error:", error);
       throw error;

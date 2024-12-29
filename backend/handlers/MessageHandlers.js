@@ -1,21 +1,15 @@
 import { WS_READY_STATES, TIMEOUTS } from "../constants.js";
 import { cleanupCluster } from "../utils/cleanUpServer.js";
 import { ExecutorService } from "../services/ExecutorService.js";
+import { TaskManagerService } from "../services/TaskManagerService.js";
+import { LeaderboardService } from "../services/LeaderboardService.js";
 
 export class MessageHandlers {
-  constructor(state, leaderboardService, taskManager) {
-    if (!leaderboardService) {
-      throw new Error("LeaderboardService is required");
-    }
-    if (!taskManager) {
-      throw new Error("TaskManager is required");
-    }
-
+  constructor(state) {
     this.state = state;
-    this.leaderboardService = leaderboardService;
-    this.taskManager = taskManager;
     this.executorService = new ExecutorService();
-
+    this.taskManager = new TaskManagerService();
+    this.leaderboardService = new LeaderboardService();
     this.handlers = new Map([
       ["init", this.handleInit.bind(this)],
       ["runCode", this.handleRunCode.bind(this)],
@@ -98,10 +92,20 @@ export class MessageHandlers {
     );
   }
 
+  async ensureServiceInitialized(ws, serviceName) {
+    if (!ws[serviceName]) {
+      ws[serviceName] =
+        serviceName === "leaderboardService"
+          ? new LeaderboardService()
+          : new TaskManagerService();
+    }
+    await ws[serviceName].initialize();
+  }
+
   async handleStartGame(ws) {
     try {
-      await this.leaderboardService.initialize();
-      const players = await this.leaderboardService.initializeLeaderboard();
+      await this.ensureServiceInitialized(ws, "leaderboardService");
+      const players = await ws.leaderboardService.initializeLeaderboard();
       this.sendToClient(ws, "leaderboardUpdate", players);
     } catch (error) {
       console.error("[LeaderboardService] Start game error:", error);
@@ -111,8 +115,8 @@ export class MessageHandlers {
 
   async handleUpdateScore(ws, data) {
     try {
-      await this.leaderboardService.initialize();
-      const { state, operations } = await this.leaderboardService.updateScore(
+      await this.ensureServiceInitialized(ws, "leaderboardService");
+      const { state, operations } = await ws.leaderboardService.updateScore(
         data.data.playerId,
         data.data.change
       );
@@ -124,7 +128,13 @@ export class MessageHandlers {
   }
 
   async handleStartTasks(ws) {
-    await this.taskManager.startTasks(ws);
+    try {
+      await this.ensureServiceInitialized(ws, "taskManager");
+      await ws.taskManager.startTasks(ws);
+    } catch (error) {
+      console.error("[TaskManager] Start tasks error:", error);
+      this.handleError(ws, error);
+    }
   }
 
   async handleTaskCompleted(ws) {
@@ -146,11 +156,15 @@ export class MessageHandlers {
 
   async handleCleanup(ws) {
     try {
-      if (this.taskManager) {
-        await this.taskManager.cancelProcess(ws);
+      if (ws.taskManager) {
+        await ws.taskManager.cleanup();
+        ws.taskManager = null;
+      } else if (ws.leaderboardService) {
+        await ws.leaderboardService.cleanup();
+        ws.leaderboardService = null;
+      } else {
+        await cleanupCluster();
       }
-
-      await cleanupCluster("cluster");
       this.sendToClient(ws, "cleanup", { status: "success" });
     } catch (error) {
       console.error("[Cleanup] Error:", error);
@@ -173,7 +187,13 @@ export class MessageHandlers {
   }
 
   async handleSetTasks(ws, data) {
-    await this.taskManager.startTasks(ws, data.data.tasks);
+    try {
+      await this.ensureServiceInitialized(ws, "taskManager");
+      await ws.taskManager.startTasks(ws, data.data);
+    } catch (error) {
+      console.error("[TaskManager] Set tasks error:", error);
+      this.handleError(ws, error);
+    }
   }
 
   handleError(ws, error) {

@@ -142,4 +142,18 @@ export class LeaderboardService {
       throw error;
     }
   }
+
+  async cleanup() {
+    try {
+      if (this.client) {
+        await cleanupCluster();
+        this.client.close();
+        this.client = null;
+      }
+      this.initialized = false;
+    } catch (error) {
+      console.error("[LeaderboardService] Cleanup error:", error);
+      throw error;
+    }
+  }
 }

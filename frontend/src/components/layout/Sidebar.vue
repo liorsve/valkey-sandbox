@@ -100,6 +100,7 @@ export default {
 
     const handleUseCaseChange = ( newUseCase ) => {
       store.setUseCase( newUseCase );
+      selectedUseCase.value = newUseCase;
       updateContent( store.currentClient, newUseCase );
     };
 

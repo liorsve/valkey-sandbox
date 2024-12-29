@@ -2,10 +2,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
-import { GlideClusterClient } from "@valkey/valkey-glide";
 import { MessageHandlers } from "./handlers/MessageHandlers.js";
-import { LeaderboardService } from "./services/LeaderboardService.js";
-import { TaskManagerService } from "./services/TaskManagerService.js";
 
 // Prevent memory leaks
 process.setMaxListeners(5);
@@ -16,7 +13,6 @@ const port = process.env.PORT || 3000;
 // WebSocket state
 const wsConnections = new Map();
 const outputCache = new Map();
-let glideClient = null;
 
 app.use(
   cors({
@@ -33,64 +29,18 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Add Glide client initialization
-const initializeGlideClient = async () => {
-  if (!glideClient) {
-    const host = process.env.VALKEY_CLUSTER_HOST || "valkey-cluster";
-    const port = parseInt(process.env.VALKEY_CLUSTER_PORT || "7000");
-
-    console.log(
-      `[Server] Attempting to connect to Valkey cluster at ${host}:${port}`
-    );
-
-    const retryStrategy = (times) => {
-      const delay = Math.min(times * 1000, 5000);
-      console.log(`[Server] Retry attempt ${times}, waiting ${delay}ms`);
-      return delay;
-    };
-
-    glideClient = await GlideClusterClient.createClient({
-      addresses: [{ host, port }],
-      clientName: `ws-client-${Date.now()}`,
-      clusterMode: true,
-      connectionTimeout: 10000,
-      retryStrategy,
-      maxRetries: 20,
-    });
-  }
-  return glideClient;
-};
-
 const startServer = async () => {
   const server = createServer(app);
-
-  // Create WebSocket server
   const wss = new WebSocketServer({ noServer: true });
 
-  // Initialize Glide client
-  try {
-    await initializeGlideClient();
-    console.log("[Server] Glide client initialized");
-  } catch (error) {
-    console.error("[Server] Failed to initialize Glide client:", error);
-  }
-
-  // Initialize services
-  const leaderboardService = new LeaderboardService();
-  const taskManager = new TaskManagerService();
   const state = {
     connections: wsConnections,
     outputCache,
   };
 
-  // Create message handlers instance
-  const messageHandlers = new MessageHandlers(
-    state,
-    leaderboardService,
-    taskManager
-  );
+  // Create message handlers instance without initializing services
+  const messageHandlers = new MessageHandlers(state);
 
-  // Handle WebSocket connection
   wss.on("connection", async (ws) => {
     const id = Date.now() + Math.random();
     ws.id = id;
@@ -98,13 +48,6 @@ const startServer = async () => {
 
     console.log(`[WSS] Client connected (ID: ${id})`);
     ws.send(JSON.stringify({ action: "connected", data: { id } }));
-
-    // Initialize leaderboard service on connection
-    try {
-      await leaderboardService.initialize();
-    } catch (error) {
-      console.error("[WSS] Failed to initialize LeaderboardService:", error);
-    }
 
     ws.on("message", async (msg) => {
       try {
@@ -120,9 +63,19 @@ const startServer = async () => {
       }
     });
 
-    ws.on("close", () => {
-      wsConnections.delete(id);
-      console.log(`[WSS] Client disconnected (ID: ${id})`);
+    ws.on("close", async () => {
+      try {
+        if (ws.leaderboardService) {
+          await ws.leaderboardService.cleanup();
+        }
+        if (ws.taskManager) {
+          await ws.taskManager.cleanup();
+        }
+        wsConnections.delete(id);
+        console.log(`[WSS] Client disconnected and cleaned up (ID: ${id})`);
+      } catch (error) {
+        console.error("[WSS] Cleanup error on disconnect:", error);
+      }
     });
   });
 
@@ -158,4 +111,4 @@ process.on("uncaughtException", (err) => {
 const { server, wss } = await startServer();
 
 // Export for use in other modules if needed
-export { server, wss, wsConnections, outputCache, glideClient };
+export { server, wss, wsConnections, outputCache };
