@@ -48,23 +48,26 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onBeforeUnmount, watch, inject } from 'vue';
 import { useEventBus, EventTypes } from '@/composables/useEventBus';
 import ValkeyLogo from '@/assets/images/Valkey-logo.svg';
 
 export default {
     name: 'TaskManagerVisualization',
     props: {
-        ws: WebSocket,
+        ws: {
+            type: [WebSocket, Object],
+            default: null
+        },
         isConnected: Boolean,
         terminal: Object,
     },
-
-    setup( props, { emit } ) {
-        const { emit: emitEvent, on, off } = useEventBus();
-        const logoSrc = ref( ValkeyLogo );
-
-        const tasks = ref( [
+    setup(props, { emit }) {
+        const { emit: emitEvent } = useEventBus();
+        const terminalRef = inject('terminal');
+        const logoSrc = ref(ValkeyLogo);
+        
+        const tasks = ref([
             { id: 1, action: 'Flip Right' },
             { id: 2, action: 'Flip Left' },
             { id: 3, action: 'Flip Up' },
@@ -72,230 +75,320 @@ export default {
             { id: 5, action: 'Grow' },
             { id: 6, action: 'Shrink' },
             { id: 7, action: 'Change Random Color' },
-        ] );
+        ]);
 
-        const selectedTask = ref( tasks.value[ 0 ] );
-        const taskQueue = ref( [] );
-        const logoContainer = ref( null );
-        const triangle = ref( null );
-        const lockIconRef = ref( null );
-        const unlockIconRef = ref( null );
-        const buttonState = ref( 'set' );
-        const showEmptyQueuePopup = ref( false );
-        const taskStatus = ref( '' );
+        // Add state management
+        const gameState = ref({
+            isProcessing: false,
+            currentTask: null,
+            taskQueue: [],
+            completedTasks: [],
+        });
+
+        const selectedTask = ref(tasks.value[0]);
+        const taskQueue = ref([]);
+        const logoContainer = ref(null);
+        const lockIconRef = ref(null);
+        const unlockIconRef = ref(null);
+        const buttonState = ref('set');
+        const showEmptyQueuePopup = ref(false);
+
+        // Define all handlers first
+        const handleWebSocketError = (error) => {
+            console.error('[TaskManager] WebSocket error:', error);
+            terminalWrite('❌ Connection error. Attempting to reconnect...');
+            buttonState.value = 'set';
+        };
+
+        const terminalWrite = (message) => {
+            if (props.terminal?.writeln) {
+                props.terminal.writeln(message);
+            } else if (terminalRef?.value?.writeln) {
+                terminalRef.value.writeln(message);
+            } else {
+                emit('terminal-write', message.trim() + '\n');
+            }
+        };
+
+        const messageHandler = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                
+                switch (message.action) {
+                    case 'taskUpdate':
+                        handleTaskUpdate(message.data);
+                        break;
+                    case 'gameCommand':
+                        handleGameCommand(message.data);
+                        break;
+                    case 'error':
+                        console.error('[TaskManager] Server error:', message.error);
+                        terminalWrite(`❌ Error: ${message.error}`);
+                        break;
+                }
+            } catch (error) {
+                console.error('[TaskManager] Error handling message:', error);
+            }
+        };
+
+        // Then define the setup function
+        const setupWebSocket = (ws) => {
+            if (!ws) return;
+            
+            ws.removeEventListener('message', messageHandler);
+            ws.removeEventListener('error', handleWebSocketError);
+            
+            ws.addEventListener('message', messageHandler);
+            ws.addEventListener('error', handleWebSocketError);
+            
+            console.log('[TaskManager] WebSocket handlers configured');
+        };
+
+        // Then setup watchers
+        watch(
+            () => props.ws,
+            (newWs) => {
+                if (newWs) setupWebSocket(newWs);
+            },
+            { immediate: true }
+        );
 
         const addTask = () => {
-            if ( taskQueue.value.length < 6 ) {
-                taskQueue.value.push( {
+            if (taskQueue.value.length < 6) {
+                taskQueue.value.push({
                     ...selectedTask.value,
-                    uniqueId: Date.now() + Math.random().toString( 36 ).substr( 2, 9 )
-                } );
+                    uniqueId: Date.now() + Math.random().toString(36).substr(2, 9)
+                });
             }
         };
 
         const setTasks = () => {
-            if ( !props.isConnected || !props.ws || props.ws.readyState !== WebSocket.OPEN ) {
-                console.warn( '[TaskManager] WebSocket not ready. Current state:', props.ws?.readyState );
-                terminalWrite( '⚠️ Connection not ready. Please wait...' );
+            if (!props.isConnected || !props.ws || props.ws.readyState !== WebSocket.OPEN) {
+                console.warn('[TaskManager] WebSocket not ready. Current state:', props.ws?.readyState);
+                terminalWrite('⚠️ Connection not ready. Please wait...');
                 return;
             }
 
-            if ( taskQueue.value.length === 0 ) {
+            if (taskQueue.value.length === 0) {
                 showEmptyQueuePopup.value = true;
                 return;
             }
 
             try {
-                const taskData = taskQueue.value.map( task => ( {
+                // Generate a structured session ID
+                const sessionId = `tm_${Date.now()}_${taskQueue.value.length}_${taskQueue.value.map(t => t.action.charAt(0)).join('')}`;
+                const taskData = taskQueue.value.map((task, index) => ({
+                    id: `${sessionId}_${task.action.toLowerCase().replace(/\s+/g, '_')}_${index}`,
                     action: task.action,
-                    uniqueId: task.uniqueId
-                } ) );
+                    uniqueId: task.uniqueId,
+                    order: index
+                }));
 
-                terminalWrite( '🔧  Initializing distributed Task Queue in Valkey Cluster...' );
-                terminalWrite( '📝  \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism' );
+                terminalWrite(`🔧 Creating task session: ${sessionId}`);
+                terminalWrite('📝 \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism');
 
-                props.ws.send( JSON.stringify( {
+                props.ws.send(JSON.stringify({
                     action: 'setTasks',
-                    data: taskData
-                } ) );
+                    data: {
+                        sessionId,
+                        tasks: taskData,
+                        metadata: {
+                            createdAt: Date.now(),
+                            taskCount: taskQueue.value.length,
+                            taskTypes: taskQueue.value.map(t => t.action),
+                            clientId: props.ws.id
+                        }
+                    }
+                }));
 
-                buttonState.value = 'invoke';
-            } catch ( error ) {
-                console.error( '[TaskManager] Error sending tasks:', error );
-                terminalWrite( `❌ Error: ${ error.message }` );
-                emitEvent( EventTypes.ERROR, error.message );
+                // Wait for server confirmation before changing state
+                gameState.value.isProcessing = false;
+                gameState.value.currentTask = null;
+            } catch (error) {
+                console.error('[TaskManager] Error sending tasks:', error);
+                terminalWrite(`❌ Error: ${error.message}`);
+                emitEvent(EventTypes.ERROR, error.message);
             }
         };
 
         const invokeTaskManager = () => {
-            if ( props.ws && props.ws.readyState === WebSocket.OPEN ) {
-                console.log( 'Sending invokeTaskManager action' );
-                props.ws.send( JSON.stringify( {
+            if (props.ws && props.ws.readyState === WebSocket.OPEN) {
+                console.log('Sending invokeTaskManager action');
+                props.ws.send(JSON.stringify({
                     action: 'invokeTaskManager',
-                } ) );
-                terminalWrite( '🚀 Invoking Task Manager...\n' );
+                }));
+                terminalWrite('🚀 Invoking Task Manager...\n');
                 buttonState.value = 'cancel';
             } else {
-                console.log( '[WS] Cannot send message: WebSocket not connected.' );
-                terminalWrite( 'Not connected to server. Retrying connection...\n' );
+                console.log('[WS] Cannot send message: WebSocket not connected.');
+                terminalWrite('Not connected to server. Retrying connection...\n');
             }
         };
 
         const cancelTaskManager = () => {
-            props.ws.send( JSON.stringify( {
+            props.ws.send(JSON.stringify({
                 action: 'cancelTaskManager'
-            } ) );
-            terminalWrite( '⛔ Task Manager cancelled.\n' );
+            }));
+            terminalWrite('⛔ Task Manager cancelled.\n');
             buttonState.value = 'tryAgain';
         };
 
         const resetTaskManager = () => {
             taskQueue.value = [];
             buttonState.value = 'set';
-            terminalWrite( '🔄 Reset complete. Please add tasks.\n' );
+            terminalWrite('🔄 Reset complete. Please add tasks.\n');
         };
 
-        const handleWebSocketMessage = ( event ) => {
-            try {
-                const message = JSON.parse( event.data );
-                switch ( message.action ) {
-                    case 'taskUpdate':
-                        emitTaskUpdate( message.data );
-                        if ( message.data?.clusterOperations ) {
-                            message.data.clusterOperations.forEach( op => {
-                                terminalWrite( `🔷 ${ op }` );
-                            } );
-                        }
-                        break;
-
-                    case 'lockAcquired':
-                        emitLockStatus( true );
-                        terminalWrite( '🔒 Lock acquired in Valkey Cluster' );
-                        animateLocking( true );
-                        break;
-
-                    case 'lockReleased':
-                        emitLockStatus( false );
-                        terminalWrite( '🔓 Lock released in Valkey Cluster' );
-                        animateLocking( false );
-                        break;
-
-                    case 'taskCompleted':
-                        terminalWrite( '✅ Task completed successfully' );
-                        break;
-
-                    case 'error':
-                        terminalWrite( `❌ Error: ${ message.message }` );
-                        emitEvent( EventTypes.ERROR, message.message );
-                        break;
-
-                    case 'gameCommand':
-                        handleCommand( message.data );
-                        break;
+        const handleTaskUpdate = (data) => {
+            if (data?.status) {
+                terminalWrite(`ℹ️ ${data.status}`);
+                // Only update button state after server confirmation
+                if (data.status.includes('initialized')) {
+                    buttonState.value = 'invoke';
                 }
-            } catch ( error ) {
-                console.error( '[TaskManager] Error handling message:', error );
-                emitEvent( EventTypes.ERROR, 'Error processing server message' );
+            }
+            if (data?.clusterOperations?.length) {
+                data.clusterOperations.forEach(op => {
+                    terminalWrite(`🔷 ${op}`);
+                });
             }
         };
 
-        const terminalWrite = ( message ) => {
-            emit( 'terminal-write', message.trim() + '\n' );
+        const handleGameCommand = (command) => {
+            if (!command || typeof command !== 'object') return;
+            
+            const { type, task, message, operations } = command;
+            
+            if (operations?.length) {
+                operations.forEach(op => terminalWrite(`🔷 ${op}`));
+            }
+            
+            switch (type) {
+                case 'lockAcquired':
+                    gameState.value.isProcessing = true;
+                    terminalWrite('🔒 Lock acquired in Valkey Cluster');
+                    animateLocking(true);
+                    break;
+
+                case 'performTask':
+                    if (task) {
+                        gameState.value.currentTask = task;
+                        terminalWrite(`⚡ Executing task: ${task}`);
+                        performTask(task);
+                    }
+                    break;
+
+                case 'lockReleased':
+                    gameState.value.isProcessing = false;
+                    terminalWrite('🔓 Lock released in Valkey Cluster');
+                    animateLocking(false);
+                    break;
+
+                case 'complete':
+                    gameState.value.isProcessing = false;
+                    gameState.value.currentTask = null;
+                    terminalWrite('✅ All tasks completed successfully');
+                    buttonState.value = 'tryAgain';
+                    break;
+            }
         };
 
-        const performTask = ( action ) => {
-            const el = logoContainer.value?.querySelector( '.valkey-logo' );
-            const lockIcon = lockIconRef.value;
-            const unlockIcon = unlockIconRef.value;
-            if ( !el || !lockIcon || !unlockIcon ) return;
+        const showLockAnimation = async () => {
+            lockIconRef.value?.classList.add('show', 'grow');
+            await new Promise(r => setTimeout(r, 1000));
+            lockIconRef.value?.classList.add('fade-out');
+            await new Promise(r => setTimeout(r, 800));
+            lockIconRef.value?.classList.remove('show', 'grow', 'fade-out');
+        };
 
-            el.style.borderBottomColor = '#6a11cb';
+        const showUnlockAnimation = async () => {
+            unlockIconRef.value?.classList.add('show', 'shrink');
+            await new Promise(r => setTimeout(r, 1000));
+            unlockIconRef.value?.classList.add('fade-out');
+            await new Promise(r => setTimeout(r, 800));
+            unlockIconRef.value?.classList.remove('show', 'shrink', 'fade-out');
+        };
 
-            const sequence = async () => {
-                lockIcon.classList.add( 'show', 'grow' );
-                await new Promise( r => setTimeout( r, 1000 ) );
-                lockIcon.classList.add( 'fade-out' );
-                await new Promise( r => setTimeout( r, 800 ) );
-                lockIcon.classList.remove( 'show', 'grow', 'fade-out' );
+        const executeTaskAnimation = async (el, taskAction) => {
+            el.classList.add('move-to-center');
+            await new Promise(r => setTimeout(r, 600));
 
-                await new Promise( r => setTimeout( r, 300 ) );
+            const baseTransform = 'translateX(-50%) translateY(-50%)';
+            switch (taskAction) {
+                case 'Flip Right':
+                    el.style.transform = `${baseTransform} rotateY(180deg)`;
+                    break;
+                case 'Flip Left':
+                    el.style.transform = `${baseTransform} rotateY(-180deg)`;
+                    break;
+                case 'Flip Up':
+                    el.style.transform = `${baseTransform} rotateX(-180deg)`;
+                    break;
+                case 'Flip Down':
+                    el.style.transform = `${baseTransform} rotateX(180deg)`;
+                    break;
+                case 'Grow':
+                    el.style.transform = `${baseTransform} scale(1.5)`;
+                    break;
+                case 'Shrink':
+                    el.style.transform = `${baseTransform} scale(0.5)`;
+                    break;
+                case 'Change Random Color':
+                    el.style.borderBottomColor = getRandomColor();
+                    break;
+            }
 
-                el.classList.add( 'move-to-center' );
-                await new Promise( r => setTimeout( r, 600 ) );
+            await new Promise(r => setTimeout(r, 1000));
+            el.style.transform = baseTransform;
+            el.classList.remove('move-to-center');
+        };
 
-                const baseTransform = 'translateX(-50%) translateY(-50%)';
-                switch ( action.action || action ) {
-                    case 'Flip Right':
-                        el.style.transform = `${ baseTransform } rotateY(180deg)`;
-                        break;
-                    case 'Flip Left':
-                        el.style.transform = `${ baseTransform } rotateY(-180deg)`;
-                        break;
-                    case 'Flip Up':
-                        el.style.transform = `${ baseTransform } rotateX(-180deg)`;
-                        break;
-                    case 'Flip Down':
-                        el.style.transform = `${ baseTransform } rotateX(180deg)`;
-                        break;
-                    case 'Grow':
-                        el.style.transform = `${ baseTransform } scale(1.5)`;
-                        break;
-                    case 'Shrink':
-                        el.style.transform = `${ baseTransform } scale(0.5)`;
-                        break;
-                    case 'Change Random Color':
-                        el.style.borderBottomColor = getRandomColor();
-                        break;
+        const animateTask = async (taskAction) => {
+            const el = logoContainer.value?.querySelector('.valkey-logo');
+            if (!el) return;
+            
+            // Show lock animation
+            await showLockAnimation();
+            
+            // Perform task animation
+            await executeTaskAnimation(el, taskAction);
+            
+            // Show unlock animation
+            await showUnlockAnimation();
+        };
+
+        const performTask = async (taskAction) => {
+            try {
+                await animateTask(taskAction);
+                if (props.ws?.readyState === WebSocket.OPEN) {
+                    props.ws.send(JSON.stringify({ 
+                        action: 'taskCompleted',
+                        data: { status: 'completed' }
+                    }));
                 }
-
-                await new Promise( r => setTimeout( r, 1000 ) );
-
-                if ( ( action.action || action ) !== 'Change Random Color' ) {
-                    el.style.transform = baseTransform;
-                } else {
-                    el.style.borderBottomColor = '#6a11cb';
-                }
-
-                el.classList.remove(
-                    'flip-right', 'flip-left', 'flip-up', 'flip-down',
-                    'grow', 'shrink', 'move-to-center'
-                );
-                await new Promise( r => setTimeout( r, 600 ) );
-
-                await new Promise( r => setTimeout( r, 300 ) );
-
-                unlockIcon.classList.add( 'show', 'shrink' );
-                await new Promise( r => setTimeout( r, 1000 ) );
-                unlockIcon.classList.add( 'fade-out' );
-                await new Promise( r => setTimeout( r, 800 ) );
-                unlockIcon.classList.remove( 'show', 'shrink', 'fade-out' );
-
-                await new Promise( r => setTimeout( r, 300 ) );
-
-                props.ws.send( JSON.stringify( { action: 'taskCompleted' } ) );
-            };
-
-            sequence();
+            } catch (error) {
+                console.error('[TaskManager] Task execution error:', error);
+            }
         };
 
         const getRandomColor = () => {
             const letters = '0123456789ABCDEF';
             let color = '#';
-            for ( let i = 0; i < 6; i++ ) {
-                color += letters[ Math.floor( Math.random() * 16 ) ];
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
             }
             return color;
         };
 
-        const animateLocking = ( isLocked ) => {
+        const animateLocking = (isLocked) => {
             const el = triangle.value;
-            if ( !el ) return;
-            if ( isLocked ) {
-                el.classList.add( 'locked' );
-                terminalWrite( '🔒 Lock acquired.\n' );
+            if (!el) return;
+            if (isLocked) {
+                el.classList.add('locked');
+                terminalWrite('🔒 Lock acquired.\n');
             } else {
-                el.classList.remove( 'locked' );
-                terminalWrite( '🔓 Lock released.\n' );
+                el.classList.remove('locked');
+                terminalWrite('🔓 Lock released.\n');
             }
         };
 
@@ -303,118 +396,49 @@ export default {
             showEmptyQueuePopup.value = false;
         };
 
-        const handleCommand = ( command ) => {
-            if ( !command || typeof command !== 'object' ) return;
-            const { type, task, message, step } = command;
-
-            switch ( type ) {
-                case 'lockAcquired':
-                    terminalWrite( '🔒  \x1b[1mSET task-lock\x1b[0m "locked" EX 30 NX' );
-                    terminalWrite( '✨  Lock acquired in Valkey Cluster - Ready to process tasks' );
-                    animateLocking( true );
-                    break;
-
-                case 'performTask':
-                    terminalWrite( `⚡  \x1b[1mLPOP task-queue\x1b[0m // Processing task: ${ task }` );
-                    terminalWrite( `📍  Task execution progress: ${ step }/total` );
-                    performTask( task );
-                    break;
-
-                case 'lockReleased':
-                    terminalWrite( '🔓  \x1b[1mDEL task-lock\x1b[0m // Released distributed lock' );
-                    terminalWrite( '🔄  Task Manager ready for next batch' );
-                    animateLocking( false );
-                    break;
-
-                case 'complete':
-                    terminalWrite( '✅  Queue processed successfully in Valkey Cluster!' );
-                    terminalWrite( '📊  All distributed tasks executed and synchronized' );
-                    buttonState.value = 'tryAgain';
-                    break;
-            }
-
-            if ( props.ws && props.ws.readyState === WebSocket.OPEN ) {
-                props.ws.send( JSON.stringify( { action: 'gameCommand', data: command } ) );
-            }
-        };
-
-        const handleTerminalWrite = ( message ) => {
-            emit( 'terminal-write', message );
-        };
-
-        const handleWebSocket = ( newWs ) => {
-            if ( newWs ) {
-                newWs.onmessage = handleWebSocketMessage;
-            }
-        };
-
         const cleanup = () => {
-            taskQueue.value = [];
-            buttonState.value = 'set';
-            if ( props.ws?.readyState === WebSocket.OPEN ) {
+            if (props.ws?.readyState === WebSocket.OPEN) {
                 try {
-                    props.ws.send( JSON.stringify( {
+                    props.ws.send(JSON.stringify({
                         action: 'cleanup',
-                        data: { force: true }
-                    } ) );
-                } catch ( error ) {
-                    console.error( '[TaskManager] Cleanup error:', error );
+                        data: {
+                            force: true,
+                            component: 'taskManager'
+                        }
+                    }));
+                } catch (error) {
+                    console.error('[TaskManager] Cleanup error:', error);
                 }
             }
-        };
-
-        const handleWebSocketError = ( error ) => {
-            console.error( '[TaskManager] WebSocket error:', error );
-            terminalWrite( '❌ Connection error. Attempting to reconnect...' );
+            taskQueue.value = [];
             buttonState.value = 'set';
+            gameState.value = {
+                isProcessing: false,
+                currentTask: null,
+                taskQueue: [],
+                completedTasks: []
+            };
         };
 
         onBeforeUnmount( () => {
             cleanup();
             if ( props.ws ) {
-                props.ws.removeEventListener( 'message', handleWebSocketMessage );
+                props.ws.removeEventListener( 'message', messageHandler );
                 props.ws.removeEventListener( 'error', handleWebSocketError );
             }
         } );
 
-        onMounted( () => {
-            window.addEventListener( 'beforeunload', cleanup );
-            emit( 'terminal-resize', 'full-height' );
-
-            if ( props.ws ) {
-                props.ws.addEventListener( 'error', handleWebSocketError );
-                handleWebSocket( props.ws );
-            }
-
-            terminalWrite( '\n🔄  Task Manager Demo with Valkey-Glide' );
-            terminalWrite( '🔒  Watch distributed locks in action' );
-            terminalWrite( '📋  See how task queues are' );
-        } );
-
         watch(
-            () => props.ws,
-            handleWebSocket,
-            { immediate: true }
+            () => props.isConnected,
+            (newState) => {
+                if (newState) {
+                    terminalWrite('🔗 Connection established');
+                } else {
+                    terminalWrite('⚠️ Connection lost');
+                    buttonState.value = 'set';
+                }
+            }
         );
-
-        watch( () => props.isConnected, ( newState ) => {
-            if ( newState ) {
-                terminalWrite( '🔗 Connection established' );
-            } else {
-                terminalWrite( '⚠️ Connection lost' );
-                buttonState.value = 'set';
-            }
-        } );
-
-        watch( () => props.ws, ( newWs, oldWs ) => {
-            if ( oldWs ) {
-                oldWs.removeEventListener( 'message', handleWebSocketMessage );
-            }
-            if ( newWs ) {
-                newWs.addEventListener( 'message', handleWebSocketMessage );
-                console.log( '[TaskManager] WebSocket connection updated' );
-            }
-        }, { immediate: true } );
 
         return {
             tasks,
@@ -425,18 +449,17 @@ export default {
             invokeTaskManager,
             cancelTaskManager,
             resetTaskManager,
-            triangle,
             lockIcon: lockIconRef,
             unlockIcon: unlockIconRef,
             buttonState,
             showEmptyQueuePopup,
             closePopup,
-            handleCommand,
-            handleTerminalWrite,
-            taskStatus,
+            handleGameCommand,
             cleanup,
             logoSrc,
             logoContainer,
+            gameState,
+            handleTaskUpdate
         };
     }
 };

@@ -52,7 +52,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, inject, watch, nextTick } from 'vue';
+import { ref, computed, onBeforeUnmount, inject, watch } from 'vue';
 import { useEventBus, EventTypes } from '@/composables/useEventBus';
 import supermanImg from '@/assets/images/superman.jpg';
 import batmanImg from '@/assets/images/batman.jpg';

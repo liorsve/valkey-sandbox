@@ -190,7 +190,6 @@ export default {
     };
 
     onMounted( () => {
-      // Add WebSocket message listener just once
       wsManager.addMessageListener( handleWebSocketMessage );
 
       // Initialize client, mode, and use case

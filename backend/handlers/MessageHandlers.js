@@ -107,6 +107,7 @@ export class MessageHandlers {
       await this.ensureServiceInitialized(ws, "leaderboardService");
       const players = await ws.leaderboardService.initializeLeaderboard();
       this.sendToClient(ws, "leaderboardUpdate", players);
+      console.log("[MessageHandlers] Leaderboard initialized and updated");
     } catch (error) {
       console.error("[LeaderboardService] Start game error:", error);
       this.handleError(ws, error);
@@ -121,6 +122,9 @@ export class MessageHandlers {
         data.data.change
       );
       this.sendToClient(ws, "leaderboardUpdate", { state, operations });
+      console.log(
+        "[MessageHandlers] Score updated and leaderboard sent to client"
+      );
     } catch (error) {
       console.error("[LeaderboardService] Update score error:", error);
       this.handleError(ws, error);
@@ -129,24 +133,71 @@ export class MessageHandlers {
 
   async handleStartTasks(ws) {
     try {
+      console.log("[MessageHandlers] Handling StartTasks action");
       await this.ensureServiceInitialized(ws, "taskManager");
+
       await ws.taskManager.startTasks(ws);
+      console.log(
+        "[MessageHandlers] taskManager.startTasks executed successfully"
+      );
     } catch (error) {
       console.error("[TaskManager] Start tasks error:", error);
       this.handleError(ws, error);
     }
   }
 
+  async handleSetTasks(ws, data) {
+    try {
+      await this.ensureServiceInitialized(ws, "taskManager");
+
+      const result = await ws.taskManager.startTasks(ws, data.data);
+      console.log(
+        "[MessageHandlers] taskManager.startTasks executed with result:",
+        result
+      );
+
+      this.sendToClient(ws, "taskUpdate", {
+        status: `Task queue initialized with ${result.queueLength} tasks`,
+        clusterOperations: result.operations,
+      });
+    } catch (error) {
+      console.error("[TaskManager] Set tasks error:", error);
+      this.handleError(ws, error);
+    }
+  }
+
   async handleTaskCompleted(ws) {
-    await this.taskManager.checkLock(ws);
+    try {
+      await this.ensureServiceInitialized(ws, "taskManager");
+      const result = await ws.taskManager.processNextTask(ws);
+
+      if (!result) {
+        this.sendToClient(ws, "gameCommand", {
+          type: "complete",
+          message: "All tasks completed",
+        });
+        console.log(
+          "[MessageHandlers] All tasks completed and gameCommand sent to client"
+        );
+      }
+    } catch (error) {
+      console.error("[TaskManager] Task completion error:", error);
+      this.handleError(ws, error);
+    }
   }
 
   async handleCancelTaskManager(ws) {
     try {
       if (this.taskManager) {
         await this.taskManager.cancelProcess(ws);
+        console.log(
+          "[MessageHandlers] Task manager cancelled and resources cleaned up"
+        );
       } else {
         this.sendToClient(ws, "taskCancelled", { status: "success" });
+        console.log(
+          "[MessageHandlers] Task manager was not running. Sent cancellation status to client"
+        );
       }
     } catch (error) {
       console.error("[TaskManager] Cancel error:", error);
@@ -159,11 +210,14 @@ export class MessageHandlers {
       if (ws.taskManager) {
         await ws.taskManager.cleanup();
         ws.taskManager = null;
+        console.log("[MessageHandlers] Task manager cleaned up");
       } else if (ws.leaderboardService) {
         await ws.leaderboardService.cleanup();
         ws.leaderboardService = null;
+        console.log("[MessageHandlers] Leaderboard service cleaned up");
       } else {
         await cleanupCluster();
+        console.log("[MessageHandlers] Cluster cleaned up");
       }
       this.sendToClient(ws, "cleanup", { status: "success" });
     } catch (error) {
@@ -175,6 +229,7 @@ export class MessageHandlers {
   sendToClient(ws, action, data) {
     if (ws.readyState === WS_READY_STATES.OPEN) {
       ws.send(JSON.stringify({ action, data }));
+      console.log(`[MessageHandlers] Sent action: ${action} to client`);
     }
   }
 
@@ -184,20 +239,12 @@ export class MessageHandlers {
 
   async handleInit(ws, data) {
     this.sendToClient(ws, "initialized", { id: ws.id });
-  }
-
-  async handleSetTasks(ws, data) {
-    try {
-      await this.ensureServiceInitialized(ws, "taskManager");
-      await ws.taskManager.startTasks(ws, data.data);
-    } catch (error) {
-      console.error("[TaskManager] Set tasks error:", error);
-      this.handleError(ws, error);
-    }
+    console.log("[MessageHandlers] Initialization message sent to client");
   }
 
   handleError(ws, error) {
     console.error("[WSS] Error:", error);
     this.sendToClient(ws, "error", { message: error.message });
+    console.log("[MessageHandlers] Error message sent to client");
   }
 }

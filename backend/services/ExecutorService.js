@@ -1,16 +1,10 @@
 import axios from "axios";
-import e from "express";
 import fs from "fs/promises";
-import path from "path";
 
 const TEMP_DIR = "/app/temp";
 const EXECUTOR_URL =
   process.env.EXECUTOR_SERVICE_URL || "http://docker-executor:3001";
 
-const extensions = {
-  python: "py",
-  javascript: "js",
-};
 
 export class ExecutorService {
   constructor() {

@@ -84,8 +84,27 @@ class WebSocketManager {
       console.warn("[WS] Invalid message format:", message);
       return;
     }
-    this.eventBus.emit(EventTypes.WS_MESSAGE, message);
-    this.listeners.forEach((listener) => listener(message));
+
+    // Define which actions belong to which components
+    const componentRoutes = {
+      taskUpdate: "taskManager",
+      gameCommand: "taskManager",
+      terminalOutput: "global",
+      executionResult: "global",
+      output: "global",
+      connected: "global",
+    };
+
+    const targetComponent = componentRoutes[message.action] || "global";
+
+    this.listeners.forEach((listener) => {
+      if (
+        listener.component === "global" ||
+        listener.component === targetComponent
+      ) {
+        listener.callback(message);
+      }
+    });
   }
 
   connect() {
@@ -142,12 +161,16 @@ class WebSocketManager {
     }
   }
 
-  addMessageListener(listener) {
+  addMessageListener(listener, component = "global") {
     if (typeof listener !== "function") {
       console.warn("[WS] Invalid listener type:", typeof listener);
       return;
     }
-    this.listeners.add(listener);
+    // Store listener with component info
+    this.listeners.add({
+      callback: listener,
+      component,
+    });
   }
 
   removeMessageListener(listener) {
