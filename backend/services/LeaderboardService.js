@@ -136,7 +136,7 @@ export class LeaderboardService {
       });
 
       const state = await this.getLeaderboardState();
-      return { state, operations };
+      return { operations, state };
     } catch (error) {
       console.error("[LeaderboardService] Score update error:", error);
       throw error;

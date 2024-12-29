@@ -9,17 +9,36 @@ const DEFAULT_STATE = {
   leaderboard: [],
 };
 
-const savedState = (() => {
-  const stored = localStorage.getItem("valkey-sandbox-state");
-  if (!stored) return DEFAULT_STATE;
+const VALID_TABS = [
+  "playground",
+  "watchInAction",
+  "commonUseCases",
+  "community",
+];
 
-  const parsed = JSON.parse(stored);
-  return {
-    ...DEFAULT_STATE,
-    ...parsed,
-    currentClient: parsed.currentClient || DEFAULT_STATE.currentClient,
-    executionMode: parsed.executionMode || DEFAULT_STATE.executionMode,
-  };
+// Separate hash validation from state initialization
+const getTabFromHash = () => {
+  const hashTab = window.location.hash.slice(1);
+  return VALID_TABS.includes(hashTab) ? hashTab : DEFAULT_STATE.currentTab;
+};
+
+// Initialize saved state without depending on getInitialTab
+const savedState = (() => {
+  try {
+    const stored = localStorage.getItem("valkey-sandbox-state");
+    if (!stored) return { ...DEFAULT_STATE };
+
+    const parsed = JSON.parse(stored);
+    return {
+      ...DEFAULT_STATE,
+      ...parsed,
+      currentClient: parsed.currentClient || DEFAULT_STATE.currentClient,
+      executionMode: parsed.executionMode || DEFAULT_STATE.executionMode,
+    };
+  } catch (error) {
+    console.error("[Store] Error parsing saved state:", error);
+    return { ...DEFAULT_STATE };
+  }
 })();
 
 const CONFIG = {
@@ -52,6 +71,15 @@ const CONFIG = {
     { id: "Task Manager", name: "Task Manager" },
     { id: "Recommendation System", name: "Recommendation System" },
   ],
+};
+
+const isValidHash = (hash) => {
+  return [
+    "playground",
+    "watchInAction",
+    "commonUseCases",
+    "community",
+  ].includes(hash);
 };
 
 export const store = reactive({
@@ -171,13 +199,23 @@ export const store = reactive({
   },
 
   setTab(tab) {
+    if (!VALID_TABS.includes(tab)) {
+      console.warn("[Store] Invalid tab:", tab);
+      return;
+    }
+
     const previousTab = this.currentTab;
     this.currentTab = tab;
 
-    if (tab === "watch-in-action" || previousTab === "watch-in-action") {
+    // Only clear watch state when explicitly moving away from watch
+    if (previousTab === "watch-in-action") {
       this.clearWatchState();
     }
 
+    // Update URL hash
+    window.history.replaceState(null, "", `#${tab}`);
+
+    // Save state after tab change
     this.saveState();
   },
 
@@ -210,16 +248,22 @@ export const store = reactive({
   },
 
   saveState() {
-    localStorage.setItem(
-      "valkey-sandbox-state",
-      JSON.stringify({
-        currentClient: this.currentClient,
-        executionMode: this.executionMode,
-        currentTab: this.currentTab,
-        currentUseCase: this.currentUseCase,
-        watchState: this.watchState,
-      })
-    );
+    const stateToSave = {
+      currentClient: this.currentClient,
+      executionMode: this.executionMode,
+      currentUseCase: this.currentUseCase,
+      watchState: this.watchState,
+      lastSaved: Date.now(),
+    };
+
+    try {
+      localStorage.setItem("valkey-sandbox-state", JSON.stringify(stateToSave));
+      console.debug("[Store] State saved:", stateToSave);
+      return true;
+    } catch (error) {
+      console.error("[Store] Failed to save state:", error);
+      return false;
+    }
   },
 
   setWatchState(client, action, language) {
@@ -274,14 +318,49 @@ export const store = reactive({
   },
 
   initializeDefaults() {
+    // Handle watch-in-action special case
+    const hashTab = getTabFromHash();
+    if (hashTab === "watchInAction" && !this.watchState?.selectedAction) {
+      this.currentTab = "playground";
+      window.history.replaceState(null, "", "#playground");
+      return;
+    }
+
+    // Set currentTab from hash
+    this.currentTab = hashTab;
+
+    // Initialize other state
     if (!this.currentClient) {
-      this.setClient(DEFAULT_STATE.currentClient);
+      this.currentClient =
+        savedState.currentClient || DEFAULT_STATE.currentClient;
     }
     if (!this.executionMode) {
-      this.setMode(DEFAULT_STATE.executionMode);
+      this.executionMode =
+        savedState.executionMode || DEFAULT_STATE.executionMode;
     }
-    this.saveState();
+    if (!this.currentUseCase) {
+      this.currentUseCase =
+        savedState.currentUseCase || DEFAULT_STATE.currentUseCase;
+    }
+
+    // Initialize watchers
     this.initializeWatchers();
+
+    // Save initial state
+    this.saveState();
+
+    console.debug("[Store] Initialized with tab:", this.currentTab);
+  },
+
+  isValidTab(tab) {
+    return [
+      "playground",
+      "watchInAction",
+      "commonUseCases",
+      "community",
+      "helpfulResources",
+      "about",
+    ].includes(tab);
   },
 
   translateClientName(clientId) {
@@ -341,5 +420,20 @@ export const store = reactive({
   },
 });
 
+// Remove duplicate event listeners, keep only the essential ones
+window.addEventListener("hashchange", () => {
+  const newTab = window.location.hash.slice(1);
+  if (VALID_TABS.includes(newTab)) {
+    if (newTab === "watchInAction" && !store.watchState?.selectedAction) {
+      window.history.replaceState(null, "", "#playground");
+      store.setTab("playground");
+    } else {
+      store.setTab(newTab);
+    }
+  }
+});
+
+// Initialize store
 store.initializeDefaults();
+
 export default store;

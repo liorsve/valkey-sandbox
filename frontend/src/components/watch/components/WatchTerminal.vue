@@ -5,18 +5,21 @@
 </template>
 
 <script>
-import { defineComponent, ref, onBeforeUnmount } from 'vue';
+import { defineComponent, ref } from 'vue';
 import BaseTerminal from '@/components/base/BaseTerminal.vue';
 import { useEventBus, EventTypes } from '@/composables/useEventBus';
 
-export default defineComponent( {
+export default defineComponent({
     name: 'WatchTerminal',
     components: { BaseTerminal },
-    emits: [ 'ready' ],
+    emits: ['ready'],
 
-    setup( _, { emit } ) {
-        const terminal = ref( null );
+    setup(_, { emit }) {
+        const terminal = ref(null);
         const { on, off } = useEventBus();
+        const cleanupHandlers = ref(() => {
+            off(EventTypes.TERMINAL_OUTPUT, handleOutput);
+        });
 
         const terminalOptions = {
             cursorBlink: true,
@@ -28,31 +31,29 @@ export default defineComponent( {
             },
         };
 
-        const onTerminalReady = ( term ) => {
+        const handleOutput = (message) => {
+            terminal.value?.writeln(message);
+        };
+
+        on(EventTypes.TERMINAL_OUTPUT, handleOutput);
+
+        const onTerminalReady = (term) => {
             terminal.value = term;
-            term.writeln( ' Ready to watch your actions in real-time...' );
-            term.writeln( '' );
-
-            emit( 'ready', term );
-
-            const handleOutput = ( message ) => {
-                term.writeln( message );
-            };
-
-            on( EventTypes.TERMINAL_OUTPUT, handleOutput );
-
-            onBeforeUnmount( () => {
-                off( EventTypes.TERMINAL_OUTPUT, handleOutput );
-            } );
+            emit('ready', term);
         };
 
         return {
             terminal,
             terminalOptions,
             onTerminalReady,
+            cleanupHandlers  // Expose with proper name
         };
     },
-} );
+    
+    beforeUnmount() {
+        this.cleanupHandlers?.();
+    }
+});
 </script>
 
 <style scoped>

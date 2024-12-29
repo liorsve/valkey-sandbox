@@ -30,7 +30,7 @@ import WatchTerminal from './components/WatchTerminal.vue';
 import ActionSelect from './ActionSelect.vue';
 import LeaderboardVisualization from './visualizations/LeaderboardVisualization.vue';
 import TaskManagerVisualization from './visualizations/TaskManagerVisualization.vue';
-import { useEventBus, EventTypes } from '@/composables/useEventBus';
+import { useEventBus } from '@/composables/useEventBus';
 import { useWebSocket } from '@/composables/useWebSocket';
 
 export default defineComponent( {
@@ -44,6 +44,10 @@ export default defineComponent( {
     },
     setup() {
         const wsManager = useWebSocket();
+        const terminalInstance = ref(null);
+
+        provide('websocket', wsManager);
+        provide('terminal', terminalInstance);
 
         const {
             isConnected,
@@ -58,11 +62,25 @@ export default defineComponent( {
             handleReplace
         } = useWatchInAction();
 
-        const terminalInstance = ref( null );
+        const cleanup = async () => {
+            if (currentVisualization.value?.__vueParent$?.exposed?.cleanup) {
+                await currentVisualization.value.__vueParent$?.exposed?.cleanup();
+            }
+            if (wsManager.ws?.readyState === WebSocket.OPEN) {
+                await wsManager.send({ action: 'cleanup', force: true });
+            }
+            store.clearWatchState();
+        };
 
-        // Single provide call for each dependency
-        provide( 'websocket', wsManager );
-        provide( 'terminal', terminalInstance );
+        const handleTabChange = () => {
+            cleanup();
+        };
+
+        const handleTerminalReady = (term) => {
+            terminalInstance.value = term;
+            term.writeln('\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m');
+            term.writeln(' Ready to watch your actions in real-time...');
+        };
 
         const selectedAction = computed( () => store.watchState?.selectedAction );
         const selectedTemplate = computed( () => store.currentUseCase );
@@ -103,16 +121,6 @@ export default defineComponent( {
 
         const { on, off } = useEventBus();
 
-        const cleanupAndReset = () => {
-            if ( wsManager.ws.value?.readyState === WebSocket.OPEN ) {
-                wsManager.ws.value.send( JSON.stringify( {
-                    action: 'cleanup',
-                    data: { force: true }
-                } ) );
-            }
-            store.clearWatchState();
-        };
-
         onMounted( () => {
             if ( !editorContent.value ) {
                 editorContent.value = store.getInitialCode();
@@ -123,55 +131,18 @@ export default defineComponent( {
                 window.dispatchEvent( new Event( 'resize' ) );
             } );
 
-            on( 'tab-changed', ( newTab ) => {
-                cleanupAndReset();
-            } );
+            on( 'tab-changed', handleTabChange );
 
             const tabElement = document.querySelector( '[data-tab="watch-in-action"]' );
             if ( tabElement ) {
                 tabElement.addEventListener( 'click', () => {
-                    cleanupAndReset();
+                    cleanup();
                     store.watchState = { selectedAction: null, selectedClient: null };
                     nextTick( () => {
                         window.location.hash = '#select-screen';
                     } );
                 } );
             }
-
-            onBeforeUnmount( () => {
-                off( 'tab-changed' );
-                cleanupAndReset();
-            } );
-
-            const handleTabChange = ( tab ) => {
-                store.clearWatchState();
-
-                if ( tab === 'watch-in-action' ) {
-                    store.watchState.selectedAction = null;
-                    store.watchState.selectedClient = null;
-                }
-            };
-
-            useEventBus().on( 'tab-changed', handleTabChange );
-
-            onBeforeUnmount( () => {
-                useEventBus().off( 'tab-changed', handleTabChange );
-            } );
-
-            const cleanup = async () => {
-                if ( currentVisualization.value?.__vueParent$?.exposed?.cleanup ) {
-                    currentVisualization.value.__vueParent$?.exposed?.cleanup();
-                }
-                store.clearWatchState();
-                try {
-                    if ( wsManager.ws?.readyState === WebSocket.OPEN ) {
-                        wsManager.ws.send( JSON.stringify( { action: 'cleanup', force: true } ) );
-                        await new Promise( resolve => setTimeout( resolve, 500 ) );
-                    }
-                } catch ( error ) {
-                    console.error( '[WatchContainer] Cleanup error:', error );
-                }
-            };
 
             watch(
                 () => store.currentTab,
@@ -183,9 +154,9 @@ export default defineComponent( {
             );
 
             onBeforeUnmount( async () => {
+                off( 'tab-changed' );
                 await cleanup();
             } );
-
 
             useEventBus().on( 'tab-changed', ( newTab ) => {
                 if ( newTab === 'watchInAction' && store.watchState?.selectedAction ) {
@@ -199,11 +170,10 @@ export default defineComponent( {
             } );
         } );
 
-        const handleTerminalReady = ( term ) => {
-            terminalInstance.value = term;
-            term.writeln( '\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m' );
-            term.writeln( '❌ Error: undefined' );
-        };
+        onBeforeUnmount(() => {
+            off('tab-changed');
+            cleanup();
+        });
 
         return {
             store,

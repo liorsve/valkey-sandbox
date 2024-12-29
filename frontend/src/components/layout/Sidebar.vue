@@ -29,7 +29,7 @@
                 <span class="use-case-title">{{ useCase.name }}</span>
                 <span class="use-case-indicator"></span>
               </div>
-              <div class="use-case-glow"></div>
+              <div class="use-case-glow" :class="{ active: selectedUseCase === useCase.id }"></div>
             </button>
           </div>
         </div>

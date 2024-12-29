@@ -17,7 +17,11 @@ export function useWatchInAction() {
   const someState = ref(null);
   const { on, off, emit } = eventBus;
 
+  let isConnecting = false;
+
   const connect = async () => {
+    if (isConnecting) return;
+    isConnecting = true;
     try {
       const ws = await ensureConnection(wsManager);
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -30,10 +34,11 @@ export function useWatchInAction() {
       console.error("[WatchInAction] Connection error:", error);
       hasError.value = true;
       isConnected.value = false;
+    } finally {
+      isConnecting = false;
     }
   };
 
-  // Reset state when leaving watch-in-action
   const cleanup = async () => {
     try {
       if (wsManager.isConnectionValid()) {

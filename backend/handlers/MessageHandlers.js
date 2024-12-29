@@ -112,11 +112,11 @@ export class MessageHandlers {
   async handleUpdateScore(ws, data) {
     try {
       await this.leaderboardService.initialize();
-      const { players, operations } = await this.leaderboardService.updateScore(
+      const { state, operations } = await this.leaderboardService.updateScore(
         data.data.playerId,
         data.data.change
       );
-      this.sendToClient(ws, "leaderboardUpdate", players, operations);
+      this.sendToClient(ws, "leaderboardUpdate", { state, operations });
     } catch (error) {
       console.error("[LeaderboardService] Update score error:", error);
       this.handleError(ws, error);
@@ -136,7 +136,6 @@ export class MessageHandlers {
       if (this.taskManager) {
         await this.taskManager.cancelProcess(ws);
       } else {
-        // Graceful handling when taskManager is not available
         this.sendToClient(ws, "taskCancelled", { status: "success" });
       }
     } catch (error) {
@@ -159,9 +158,9 @@ export class MessageHandlers {
     }
   }
 
-  sendToClient(ws, action, data, operations = []) {
+  sendToClient(ws, action, data) {
     if (ws.readyState === WS_READY_STATES.OPEN) {
-      ws.send(JSON.stringify({ action, data, operations }));
+      ws.send(JSON.stringify({ action, data }));
     }
   }
 

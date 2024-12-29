@@ -14,7 +14,6 @@
 <script>
 import { defineComponent, computed, onMounted, ref, provide, inject, onBeforeUnmount } from 'vue';
 import { store } from './store';
-import { ensureConnection } from './composables/useWebSocket';
 import { EventTypes } from './composables/useEventBus';
 import TopTabs from './components/layout/TopTabs.vue';
 import Sidebar from './components/layout/Sidebar.vue';
@@ -70,8 +69,10 @@ export default defineComponent( {
         const { emit: emitEvent } = eventBus;
         const prevTab = store.currentTab;
 
-        // Clear terminal before tab switch
-        emitEvent( EventTypes.TERMINAL_CLEAR );
+        // Only clear terminal if tab is actually changing
+        if ( prevTab !== tab ) {
+          emitEvent( EventTypes.TERMINAL_CLEAR );
+        }
 
         // Only cleanup if we're leaving watch-in-action
         if ( prevTab === 'watchInAction' && tab !== 'watchInAction' ) {
@@ -80,25 +81,21 @@ export default defineComponent( {
 
         store.setTab( tab );
 
-        // Reset watch state when entering watch-in-action
-        if ( tab === 'watchInAction' ) {
-          store.clearWatchState();
-        } else if ( tab === 'commonUseCases' ) {
-          if ( !store.currentClient.includes( 'glide' ) ) {
-            store.setClient( 'glide-node' );
+        // Only update content if tab actually changed
+        if ( prevTab !== tab ) {
+          if ( tab === 'watchInAction' ) {
+            store.clearWatchState();
+          } else if ( tab === 'commonUseCases' ) {
+            // Only update if needed
+            if ( !store.currentUseCase ) {
+              store.setUseCase( 'Session Cache' );
+            }
+            editorContent.value = store.getTemplateCode(
+              store.currentClient,
+              store.currentUseCase
+            ) || "// Template not available.";
           }
-          store.setUseCase( 'Session Cache' );
-          editorContent.value = store.getTemplateCode(
-            store.currentClient,
-            store.currentUseCase
-          ) || "// Template not available.";
-        } else if ( tab === 'playground' ) {
-          editorContent.value = store.getTemplateCode(
-            store.currentClient,
-            store.executionMode
-          ) || "// Template not available.";
         }
-
       } catch ( error ) {
         console.error( '[App] Tab change error:', error );
         store.addNotification( 'Error switching tabs', 'error' );
@@ -162,22 +159,10 @@ export default defineComponent( {
       initializeWebSocket();
       wsManager.addMessageListener( handleWSMessage );
 
-      // Initialize defaults and content
       store.initializeDefaults();
-      const storedTab = localStorage.getItem( 'valkey-currentTab' ) || 'playground';
-      store.setTab( storedTab );
+      editorContent.value = store.getInitialCode();
 
-      editorContent.value = store.getInitialCode() || "// Initial code not available.";
-
-      console.log( 'App mounted, environment:', process.env.NODE_ENV );
-
-      eventBus.on( EventTypes.CODE_EXECUTION, ( payload ) => {
-        console.log( '[App] CODE_EXECUTION event received:', payload );
-      } );
-
-      eventBus.on( EventTypes.CODE_RESULT, ( payload ) => {
-        console.log( '[App] CODE_RESULT event received:', payload );
-      } );
+      console.log( '[App] Mounted with tab:', store.currentTab );
     } );
 
     onBeforeUnmount( () => {

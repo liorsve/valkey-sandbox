@@ -41,6 +41,16 @@ export default defineComponent( {
     },
     setup() {
         const terminalInstance = ref( null );
+
+        // Move provide inside setup at the top
+        provide( 'terminal', terminalInstance );
+
+        const handleTerminalReady = ( terminal ) => {
+            terminalInstance.value = terminal;
+            terminal.clear();
+            terminal.writeln( '\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m' );
+        };
+
         const selectedAction = ref( null );
         const editorContent = ref( '' );
 
@@ -72,13 +82,6 @@ export default defineComponent( {
             } ) );
         };
 
-        const handleTerminalReady = ( terminal ) => {
-            terminalInstance.value = terminal;
-            provide( 'terminal', terminalInstance );
-            terminal.clear();
-            terminal.writeln( '\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m' );
-        };
-
         const handleTerminalWrite = ( message ) => {
             terminalInstance.value?.writeln( message );
         };
@@ -91,8 +94,6 @@ export default defineComponent( {
             wsInstance.ws?.send( JSON.stringify( { action: 'cleanup' } ) );
             selectedAction.value = null;
         };
-
-        provide( 'terminal', terminalInstance );
 
         const visualizeData = ( data ) => {
             const displayClient = store.currentClient;

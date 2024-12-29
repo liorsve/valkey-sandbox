@@ -78,18 +78,19 @@ export default {
         },
     },
     setup( props, { emit } ) {
-        const { emit: emitEvent, on, off } = useEventBus();
-        const websocketManager = inject( 'ws' );
+        const { emit: emitEvent, on: eventOn, off } = useEventBus();
         const terminalRef = inject( 'terminal' );
+
+        let debounceTimeout = null;
+        const DEBOUNCE_DELAY = 300;
+        const MAX_NOTIFICATIONS = 5;
 
         const gameStarted = ref( false );
         const updatedPlayers = ref( {} );
         const players = ref( [] );
         const notifications = ref( [] );
         const notificationQueue = ref( [] );
-        const MAX_NOTIFICATIONS = 4;
-        const DEBOUNCE_DELAY = 200;
-        let debounceTimeout = null;
+        const playerScores = ref( {} );
 
         const initialPlayers = [
             { id: 1, name: 'Superman', score: 0, photo: supermanImg },
@@ -101,8 +102,6 @@ export default {
         ];
 
         players.value = [ ...initialPlayers ];
-
-        const playerScores = ref( {} );
 
         const sortedPlayers = computed( () => {
             return Object.entries( playerScores.value )
@@ -117,7 +116,7 @@ export default {
         } );
 
         const wsButtonText = computed( () => {
-            if ( !websocketManager?.readyState === WebSocket.OPEN ) {
+            if ( !props.isConnected ) {
                 return 'Waiting for Connection...';
             }
             if ( !gameStarted.value ) {
@@ -127,8 +126,8 @@ export default {
         } );
 
         const sendWebSocketMessage = ( message ) => {
-            if ( websocketManager?.readyState === WebSocket.OPEN ) {
-                websocketManager.send( JSON.stringify( message ) );
+            if ( props.ws?.readyState === WebSocket.OPEN ) {
+                props.ws.send( JSON.stringify( message ) );
                 return true;
             } else {
                 console.warn( '[WS] Cannot send message, WebSocket not connected' );
@@ -137,13 +136,13 @@ export default {
         };
 
         const startGame = () => {
-            if ( !websocketManager?.readyState === WebSocket.OPEN ) return;
+            if (!props.ws?.readyState === WebSocket.OPEN) return;
 
-            if ( sendWebSocketMessage( {
+            if (sendWebSocketMessage({
                 action: 'startGame',
                 data: { initialize: true }
-            } ) ) {
-                gameStarted.value = true;
+            })) {
+                terminalWrite('🎲  Starting game...');
             }
         };
 
@@ -164,51 +163,86 @@ export default {
             }
         };
 
-        const handleLeaderboardUpdate = ( data ) => {
-            if ( !Array.isArray( data ) ) {
-                console.error( 'Invalid leaderboard data format:', data );
+        const handleLeaderboardUpdate = (data) => {
+            if (!data) {
+                console.error('[Leaderboard] No data provided');
                 return;
             }
 
+            if (gameStarted.value === false) {
+                gameStarted.value = true;
+                emitEvent(EventTypes.GAME_ACTION, { type: 'startGame' });
+            }
+        
+            // Handle both array format and {state, operations} format
+            const playerData = Array.isArray(data) ? data : 
+                              data.state ? data.state : 
+                              typeof data === 'object' ? [data] : null;
+            
+            if (!playerData) {
+                console.error('[Leaderboard] Invalid data format:', data);
+                return;
+            }
+        
             const oldScores = { ...playerScores.value };
-
-            data.forEach( player => {
-                if ( !player || typeof player.id !== 'number' ) return;
-
-                const initialPlayer = initialPlayers.find( p => p.id === player.id );
-                if ( !initialPlayer ) return;
-
-                const oldScore = oldScores[ player.id ] || 0;
-                const newScore = parseInt( player.score || 0 );
-
-                playerScores.value[ player.id ] = newScore;
-
-                if ( newScore !== oldScore ) {
-                    updatedPlayers.value[ player.id ] = true;
-                    setTimeout( () => {
-                        updatedPlayers.value[ player.id ] = false;
-                    }, 1000 );
-
-                    addNotification( {
-                        message: `${ initialPlayer.name } ${ newScore > oldScore ? 'gained' : 'lost' } ${ Math.abs( newScore - oldScore ) } points`,
+        
+            playerData.forEach(player => {
+                if (!player || typeof player.id !== 'number') return;
+        
+                const initialPlayer = initialPlayers.find(p => p.id === player.id);
+                if (!initialPlayer) return;
+        
+                const oldScore = oldScores[player.id] || 0;
+                const newScore = parseInt(player.score || 0);
+        
+                playerScores.value[player.id] = newScore;
+        
+                if (newScore !== oldScore) {
+                    updatedPlayers.value[player.id] = true;
+                    setTimeout(() => {
+                        updatedPlayers.value[player.id] = false;
+                    }, 1000);
+        
+                    addNotification({
+                        message: `${initialPlayer.name} ${newScore > oldScore ? 'gained' : 'lost'} ${Math.abs(newScore - oldScore)} points`,
                         type: newScore > oldScore ? 'earned' : 'lost'
-                    } );
+                    });
                 }
-            } );
+            });
+        
+            if (data?.operations?.length) {
+                data.operations.forEach(op => {
+                    console.debug('[Leaderboard] Operation:', op);
+                    terminalWrite(`\x1b[2m${op}\x1b[0m`);
+                });
+            }
+        };
+        
+        const handleWebSocketMessage = (event) => {
+            try {
+                console.log('[LeaderboardVisualization] WebSocket message:', event);
+                const data = JSON.parse(event.data);
+                if (data.action === 'leaderboardUpdate') {
+                    if (data.data?.state) {
+                        handleLeaderboardUpdate(data.data.state);
+                    }
+                    if (data.data?.operations) {
+                        handleOperations(data.data.operations);
+                    }
+                } else {
+                    console.warn('[LeaderboardVisualization] Unhandled message action:', data.action);
+                }
+            } catch (error) {
+                console.error('[LeaderboardVisualization] Error:', error);
+            }
         };
 
-        const handleWebSocketMessage = ( message ) => {
-            try {
-                const data = JSON.parse( message.data );
-                if ( data.action === 'updateLeaderboard' ) {
-                    handleLeaderboardUpdate( data.payload );
-                    addNotification( { type: 'info', message: 'Leaderboard updated!' } );
-                } else {
-                    console.warn( '[LeaderboardVisualization] Unhandled message action:', data.action );
-                }
-            } catch ( error ) {
-                console.error( '[LeaderboardVisualization] Error parsing WebSocket message:', error );
-            }
+        const handleOperations = (operations) => {
+            if (!Array.isArray(operations)) return;
+            
+            operations.forEach(op => {
+                terminalWrite(`\x1b[2m${op}\x1b[0m`);
+            });
         };
 
         const addNotification = ( notification ) => {
@@ -235,21 +269,15 @@ export default {
             }
         };
 
-        const handleWebSocket = ( message ) => {
-            if ( message.action === 'output' ) {
-                handleLeaderboardUpdate( message.data.output );
-            }
-        };
-
         const cleanup = () => {
             gameStarted.value = false;
             players.value = [ ...initialPlayers ];
             notifications.value = [];
             notificationQueue.value = [];
 
-            if ( websocketManager?.readyState === WebSocket.OPEN ) {
+            if ( props.ws?.readyState === WebSocket.OPEN ) {
                 try {
-                    websocketManager.send( JSON.stringify( {
+                    props.ws.send( JSON.stringify( {
                         action: 'cleanup',
                         data: {
                             component: 'leaderboard',
@@ -273,49 +301,24 @@ export default {
             { immediate: true }
         );
 
-        onMounted( () => {
-            if ( websocketManager ) {
-                websocketManager.addMessageListener( handleWebSocketMessage );
+        const terminalWrite = (message) => {
+            if (props.terminal?.writeln) {
+                props.terminal.writeln(message);
+            } else if (terminalRef?.value?.writeln) {
+                terminalRef.value.writeln(message);
+            } else {
+                console.debug('[Leaderboard] Terminal message:', message);
             }
-
-            nextTick( () => {
-                if ( terminalRef?.value ) {
-                    terminalWrite( '🏆  Leaderboard Demo with Valkey-Glide' );
-                    terminalWrite( '📊  Real-time sorted sets in action' );
-                    terminalWrite( '⚡ See how Valkey handles concurrent updates\n' );
-                    terminalWrite( '\x1b[1;32mℹ️  Press Start Game to begin!\x1b[0m\n' );
-                }
-            } );
-
-            eventOn( EventTypes.GAME_ACTION, ( action ) => {
-                if ( action.type === 'startGame' ) {
-                    terminalWrite( '🎮 Game started! Initializing players...' );
-                }
-            } );
-        } );
-
-        watch(
-            () => props.ws,
-            ( newWs ) => {
-                if ( newWs ) {
-                    newWs.onmessage = handleWebSocketMessage;
-                }
-            }
-        );
+        };
 
         onBeforeUnmount( () => {
             cleanup();
             off( EventTypes.WS_MESSAGE, handleWebSocketMessage );
             emit( 'terminal-resize', 'normal-height' );
-        } );
-
-        const terminalWrite = ( message ) => {
-            if ( terminalRef?.value?.writeln ) {
-                terminalRef.value.writeln( message );
-            } else {
-                emitEvent( EventTypes.TERMINAL_OUTPUT, message );
+            if ( props.ws ) {
+                props.ws.removeEventListener( 'message', handleWebSocketMessage );
             }
-        };
+        } );
 
         // Initialize scores
         players.value.forEach( player => {
