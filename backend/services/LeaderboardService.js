@@ -44,21 +44,24 @@ export class LeaderboardService {
       "\x1b[1mDEL leaderboard\x1b[0m // Cleaning up previous game"
     );
 
-    operations.push("\x1b[1mSADD players\x1b[0m // Setting up player pool");
     for (const player of DEFAULT_PLAYERS) {
       const playerKey = `${KEYS.PLAYER_PREFIX}${player.id}`;
       await this.client.hset(playerKey, player);
       operations.push(
         `\x1b[1mHSET ${playerKey}\x1b[0m // Adding player ${player.name}`
       );
-
-      await this.client.zadd(KEYS.LEADERBOARD, [
-        { element: playerKey, score: player.score },
-      ]);
-      operations.push(
-        `\x1b[1mZADD leaderboard\x1b[0m // Setting initial score for ${player.name}`
-      );
     }
+
+    const zaddOperations = DEFAULT_PLAYERS.map((player) => ({
+      score: player.score,
+      element: `${KEYS.PLAYER_PREFIX}${player.id}`,
+    }));
+
+    await this.client.zadd(KEYS.LEADERBOARD, zaddOperations);
+
+    operations.push(
+      `\x1b[1mZADD leaderboard\x1b[0m // Setting scores for ${DEFAULT_PLAYERS.length} players in batch`
+    );
 
     console.log("Successfully initialized leaderboard in Valkey cluster");
     const currentState = await this.getLeaderboardState();
