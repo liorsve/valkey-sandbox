@@ -22,6 +22,7 @@ class WebSocketManager {
   }
 
   handleMessage(event) {
+    console.log("handleMessage", event);
     try {
       if (!event?.data) return;
 
@@ -85,18 +86,19 @@ class WebSocketManager {
       return;
     }
 
-    // Define which actions belong to which components
+    // Route all terminal/output related actions to sidebar
     const componentRoutes = {
       taskUpdate: "taskManager",
       gameCommand: "taskManager",
       leaderboardUpdate: "leaderboard",
-      output: "global",
-      terminalOutput: "global",
-      executionResult: "global",
+      output: "sidebar", // Route to sidebar instead of playground
+      terminalOutput: "sidebar", // Route to sidebar instead of playground
+      executionResult: "sidebar", // Route to sidebar instead of playground
       connected: "global",
     };
 
     const targetComponent = componentRoutes[message.action] || "global";
+    console.debug(`[WS] Routing ${message.action} to ${targetComponent}`);
 
     this.listeners.forEach((listener) => {
       if (
@@ -174,17 +176,35 @@ class WebSocketManager {
       console.warn("[WS] Invalid listener type:", typeof listener);
       return;
     }
+
+    if (component !== "global") {
+      const existing = Array.from(this.listeners).find(
+        (l) => l.component === component
+      );
+      if (existing) {
+        console.debug(
+          `[WS] Removing existing listener for component: ${component}`
+        );
+        this.removeMessageListener(component);
+      }
+    }
+
     const listenerObj = {
       callback: listener,
       component,
       id: Date.now() + Math.random(),
     };
+
     this.listeners.add(listenerObj);
-    return listenerObj.id; // Return ID for removal
+    console.debug(`[WS] Added listener for component: ${component}`);
+    return listenerObj.id;
   }
 
   removeMessageListener(listenerIdOrComponent) {
     if (!this.listeners) return;
+
+    const before = this.listeners.size;
+
     if (typeof listenerIdOrComponent === "string") {
       // Remove by component name
       this.listeners = new Set(
@@ -196,6 +216,13 @@ class WebSocketManager {
       // Remove by listener ID
       this.listeners = new Set(
         Array.from(this.listeners).filter((l) => l.id !== listenerIdOrComponent)
+      );
+    }
+
+    const removed = before - this.listeners.size;
+    if (removed > 0) {
+      console.debug(
+        `[WS] Removed ${removed} listener(s) for: ${listenerIdOrComponent}`
       );
     }
   }

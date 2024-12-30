@@ -2,26 +2,44 @@
   <div class="app">
     <TopTabs :activeTab="store.currentTab" @change-tab="handleTabChange" />
     <main class="app-main">
-      <Sidebar v-if="store.currentTab !== 'watchInAction'" :current-tab="store.currentTab"
-        @content-update="handleContentUpdate" />
-      <component :is="currentView" ref="mainComponent" :current-tab="store.currentTab" :content="editorContent"
-        :language="currentLanguage" :terminal-visible="store.terminalVisible" class="main-content"
-        :class="{ 'full-width': store.currentTab === 'watchInAction' }" />
+      <Sidebar
+        v-if="store.currentTab !== 'watchInAction'"
+        :current-tab="store.currentTab"
+        @content-update="handleContentUpdate"
+      />
+      <component
+        :is="currentView"
+        ref="mainComponent"
+        :current-tab="store.currentTab"
+        :content="editorContent"
+        :language="currentLanguage"
+        :terminal-visible="store.terminalVisible"
+        class="main-content"
+        :class="{ 'full-width': store.currentTab === 'watchInAction' }"
+      />
     </main>
   </div>
 </template>
 
 <script>
-import { defineComponent, computed, onMounted, ref, provide, inject, onBeforeUnmount } from 'vue';
-import { store } from './store';
-import { EventTypes } from './composables/useEventBus';
-import TopTabs from './components/layout/TopTabs.vue';
-import Sidebar from './components/layout/Sidebar.vue';
-import PlaygroundContainer from './components/playground/PlaygroundContainer.vue';
-import WatchContainer from './components/watch/WatchContainer.vue';
+import {
+  defineComponent,
+  computed,
+  onMounted,
+  ref,
+  provide,
+  inject,
+  onBeforeUnmount,
+} from "vue";
+import { store } from "./store";
+import { EventTypes } from "./composables/useEventBus";
+import TopTabs from "./components/layout/TopTabs.vue";
+import Sidebar from "./components/layout/Sidebar.vue";
+import PlaygroundContainer from "./components/playground/PlaygroundContainer.vue";
+import WatchContainer from "./components/watch/WatchContainer.vue";
 
-export default defineComponent( {
-  name: 'App',
+export default defineComponent({
+  name: "App",
   components: {
     TopTabs,
     Sidebar,
@@ -29,147 +47,157 @@ export default defineComponent( {
     WatchContainer,
   },
   setup() {
-    const mainComponent = ref( null );
-    const editorContent = ref( store.getInitialCode() || "// Initial code not available." );
+    const mainComponent = ref(null);
+    const editorContent = ref(
+      store.getInitialCode() || "// Initial code not available."
+    );
 
     const getEditorContent = () => {
-      return mainComponent.value?.getCurrentContent?.() || '';
+      return mainComponent.value?.getCurrentContent?.() || "";
     };
 
-    provide( 'getEditorContent', getEditorContent );
-    provide( 'editorContent', editorContent );
+    provide("getEditorContent", getEditorContent);
+    provide("editorContent", editorContent);
 
-    const eventBus = inject( 'eventBus' );
-    const wsManager = inject( 'wsManager' );
+    const eventBus = inject("eventBus");
+    const wsManager = inject("wsManager");
+    const playgroundComponents = ["playground", "commonUseCases"];
 
-    const currentView = computed( () => {
+    const currentView = computed(() => {
       const tab = store.currentTab;
-      if ( !tab ) return PlaygroundContainer;
+      if (!tab) return PlaygroundContainer;
 
-      switch ( tab ) {
-        case 'watchInAction':
+      switch (tab) {
+        case "watchInAction":
           return WatchContainer;
-        case 'playground':
-        case 'commonUseCases':
+        case playgroundComponents.includes(tab):
+          return PlaygroundContainer;
         default:
           return PlaygroundContainer;
       }
-    } );
+    });
 
-    const currentLanguage = computed( () => {
-      return store.getLanguage( store.currentClient );
-    } );
+    const currentLanguage = computed(() => {
+      return store.getLanguage(store.currentClient);
+    });
 
-    const editorLanguage = computed( () => {
-      return store.getLanguage( selectedClient.value );
-    } );
+    const editorLanguage = computed(() => {
+      return store.getLanguage(selectedClient.value);
+    });
 
-    const handleTabChange = async ( tab ) => {
+    const handleTabChange = async (tab) => {
       try {
         const { emit: emitEvent } = eventBus;
         const prevTab = store.currentTab;
 
-        // Only clear terminal if tab is actually changing
-        if ( prevTab !== tab ) {
-          emitEvent( EventTypes.TERMINAL_CLEAR );
-        }
-
-        // Only cleanup if we're leaving watch-in-action
-        if ( prevTab === 'watchInAction' && tab !== 'watchInAction' ) {
-          await cleanupWatchComponents();
-        }
-
-        store.setTab( tab );
-
-        // Only update content if tab actually changed
-        if ( prevTab !== tab ) {
-          if ( tab === 'watchInAction' ) {
-            store.clearWatchState();
-          } else if ( tab === 'commonUseCases' ) {
-            // Only update if needed
-            if ( !store.currentUseCase ) {
-              store.setUseCase( 'Session Cache' );
-            }
-            editorContent.value = store.getTemplateCode(
-              store.currentClient,
-              store.currentUseCase
-            ) || "// Template not available.";
+        // Cleanup old tab
+        if (prevTab !== tab) {
+          emitEvent(EventTypes.TERMINAL_CLEAR);
+          // Avoid removing message listeners for playground components while switching between them
+          if (
+            !(
+              playgroundComponents.includes(prevTab) &&
+              playgroundComponents.includes(tab)
+            )
+          ) {
+            wsManager.removeMessageListener("sidebar");
+          }
+          wsManager.removeMessageListener("watchInAction");
+          if (prevTab === "watchInAction") {
+            await cleanupWatchComponents();
           }
         }
-      } catch ( error ) {
-        console.error( '[App] Tab change error:', error );
-        store.addNotification( 'Error switching tabs', 'error' );
+
+        store.setTab(tab);
+
+        // Only update content if tab actually changed
+        if (prevTab !== tab) {
+          if (tab === "watchInAction") {
+            store.clearWatchState();
+          } else if (tab === "commonUseCases") {
+            if (!store.currentUseCase) {
+              store.setUseCase("Session Cache");
+            }
+            editorContent.value =
+              store.getTemplateCode(
+                store.currentClient,
+                store.currentUseCase
+              ) || "// Template not available.";
+          }
+        }
+      } catch (error) {
+        console.error("[App] Tab change error:", error);
+        store.addNotification("Error switching tabs", "error");
       }
     };
 
     const cleanupWatchComponents = async () => {
       try {
-        if ( wsManager?.isConnectionValid() ) {
-          await wsManager.send( {
-            action: 'cleanup',
-            data: { force: true }
-          } );
+        if (wsManager?.isConnectionValid()) {
+          await wsManager.send({
+            action: "cleanup",
+            data: { force: true },
+          });
         }
         store.clearWatchState();
-      } catch ( error ) {
-        console.error( '[App] Cleanup error:', error );
+      } catch (error) {
+        console.error("[App] Cleanup error:", error);
       }
     };
 
-    const handleContentUpdate = ( content ) => {
+    const handleContentUpdate = (content) => {
       editorContent.value = content;
     };
 
     const initializeWebSocket = () => {
-      console.log( '[App] Initializing global WebSocket...' );
+      console.log("[App] Initializing global WebSocket...");
       try {
         wsManager.connect();
 
-        onMounted( () => {
-          const healthCheck = setInterval( () => {
-            if ( !wsManager.isConnectionValid() ) {
-              wsManager.connect().catch( err => {
-                console.warn( '[App] Reconnection attempt failed:', err );
-              } );
+        onMounted(() => {
+          const healthCheck = setInterval(() => {
+            if (!wsManager.isConnectionValid()) {
+              wsManager.connect().catch((err) => {
+                console.warn("[App] Reconnection attempt failed:", err);
+              });
             }
-          }, 30000 );
+          }, 30000);
 
-          onBeforeUnmount( () => clearInterval( healthCheck ) );
-        } );
-
-      } catch ( error ) {
-        console.error( '[App] WebSocket initialization error:', error );
-        store.addNotification( 'WebSocket connection failed', 'error' );
+          onBeforeUnmount(() => clearInterval(healthCheck));
+        });
+      } catch (error) {
+        console.error("[App] WebSocket initialization error:", error);
+        store.addNotification("WebSocket connection failed", "error");
       }
     };
 
-    const handleWSMessage = ( message ) => {
+    const handleWSMessage = (message) => {
       try {
-        if ( message.action === 'connected' ) {
-          store.setConnection( true );
-        } else if ( message.action === 'updateLeaderboard' ) {
-          store.updateLeaderboard( message.payload );
+        if (message.action === "connected") {
+          store.setConnection(true);
+        } else if (message.action === "updateLeaderboard") {
+          store.updateLeaderboard(message.payload);
         }
-      } catch ( error ) {
-        console.error( '[App] Message parse error:', error );
+      } catch (error) {
+        console.error("[App] Message parse error:", error);
       }
     };
 
-    onMounted( () => {
+    onMounted(() => {
       initializeWebSocket();
-      wsManager.addMessageListener( handleWSMessage );
+      wsManager.addMessageListener(handleWSMessage);
 
       store.initializeDefaults();
       editorContent.value = store.getInitialCode();
 
-      console.log( '[App] Mounted with tab:', store.currentTab );
-    } );
+      console.log("[App] Mounted with tab:", store.currentTab);
+    });
 
-    onBeforeUnmount( () => {
-      wsManager.removeMessageListener( handleWSMessage );
-      eventBus.off( EventTypes.CODE_EXECUTION );
-      eventBus.off( EventTypes.CODE_RESULT );
-    } );
+    onBeforeUnmount(() => {
+      wsManager.removeMessageListener(handleWSMessage);
+      eventBus.off(EventTypes.CODE_EXECUTION);
+      eventBus.off(EventTypes.CODE_RESULT);
+    });
 
     return {
       store,
@@ -180,10 +208,10 @@ export default defineComponent( {
       editorContent,
       editorLanguage,
       mainComponent,
-      getEditorContent
+      getEditorContent,
     };
-  }
-} );
+  },
+});
 </script>
 
 <style>

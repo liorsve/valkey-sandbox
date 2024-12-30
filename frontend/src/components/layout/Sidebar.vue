@@ -51,7 +51,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, inject } from 'vue';
+import { ref, computed, watch, onMounted, inject, onBeforeUnmount } from 'vue';
 import { store } from '../../store';
 import { useEventBus, EventTypes } from '../../composables/useEventBus';
 import { useWebSocket } from '../../composables/useWebSocket';
@@ -150,49 +150,49 @@ export default {
       }
     };
 
-    const handleWebSocketMessage = ( normalizedMessage ) => {
+    const handleWebSocketMessage = (normalizedMessage) => {
       try {
-        const { action, payload } = normalizedMessage;
-        if ( !action ) return;
-
-        let successMessage, errorMessage;
-
-        switch ( action ) {
-          case 'terminalOutput':
-            eventBus.emit( EventTypes.TERMINAL_OUTPUT, payload );
-            break;
-
-          case 'executionResult':
-            successMessage = payload?.success ? `✅ Execution Successful: ${ payload.message }` : null;
-            errorMessage = !payload?.success ? `❌ Execution Failed: ${ payload.error }` : null;
-            eventBus.emit(
-              EventTypes.TERMINAL_OUTPUT,
-              successMessage || errorMessage
-            );
-            break;
-
-          case 'output':
-            if ( payload?.output ) {
-              eventBus.emit( EventTypes.TERMINAL_OUTPUT, payload.output );
-            }
-            break;
-
-          case 'connected':
-            console.debug( '[Sidebar] Connected with ID:', payload?.id );
-            break;
-
-          default:
-            console.debug( '[Sidebar] Unhandled message action:', action );
-        }
-      } catch ( error ) {
-        console.error( '[Sidebar] Error handling WebSocket message:', error );
+          const { action, payload } = normalizedMessage;
+          if (!action) return;
+  
+          let successMessage, errorMessage;
+  
+          switch (action) {
+              case 'terminalOutput':
+                  eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload);
+                  break;
+  
+              case 'executionResult':
+                  successMessage = payload?.success ? `✅ Execution Successful: ${payload.message}` : null;
+                  errorMessage = !payload?.success ? `❌ Execution Failed: ${payload.error}` : null;
+                  eventBus.emit(
+                      EventTypes.TERMINAL_OUTPUT,
+                      successMessage || errorMessage
+                  );
+                  break;
+  
+              case 'output':
+                  if (payload?.output) {
+                      eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload.output);
+                  }
+                  break;
+  
+              case 'connected':
+                  console.debug('[Sidebar] Connected with ID:', payload?.id);
+                  break;
+  
+              default:
+                  console.debug('[Sidebar] Unhandled message action:', action);
+          }
+      } catch (error) {
+          console.error('[Sidebar] Error handling WebSocket message:', error);
       }
-    };
+  };
+
+    const wsListenerId = ref(null);
 
     onMounted( () => {
-      wsManager.addMessageListener( handleWebSocketMessage );
-
-      // Initialize client, mode, and use case
+      wsListenerId.value = wsManager.addMessageListener( handleWebSocketMessage, 'sidebar' );
       if ( !selectedClient.value ) {
         selectedClient.value = store.getDefaultClient();
         store.setClient( selectedClient.value );
@@ -207,7 +207,16 @@ export default {
       }
       const template = props.currentTab === 'playground' ? selectedMode.value : selectedUseCase.value;
       updateContent( store.currentClient, template );
-    } );
+      
+      onBeforeUnmount(() => {
+        if (wsListenerId.value) {
+          wsManager.removeMessageListener(wsListenerId.value);
+          wsListenerId.value = null;
+        }
+        eventBus.off(EventTypes.CODE_EXECUTION);
+        eventBus.off(EventTypes.CODE_RESULT);
+      });
+    });
 
     watch( () => props.currentTab, ( newTab ) => {
       if ( newTab === 'commonUseCases' ) {

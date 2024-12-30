@@ -13,12 +13,13 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, onMounted } from 'vue';
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { store } from '@/store';
+import { useEventBus, EventTypes } from '@/composables/useEventBus';
 import Editor from '../Editor.vue';
 import AppTerminal from '../AppTerminal.vue';
 
-export default defineComponent( {
+export default defineComponent({
     name: 'PlaygroundContainer',
     components: {
         Editor,
@@ -43,16 +44,17 @@ export default defineComponent( {
             default: true,
         },
     },
-    setup( props, { expose } ) {
-        const currentContent = ref( props.content || store.getInitialCode() || "// Default initial content." );
-        const editorComponent = ref( null );
-        const terminal = ref( null );
+    setup(props, { expose }) {
+        const currentContent = ref(props.content || store.getInitialCode() || "// Default initial content.");
+        const editorComponent = ref(null);
+        const terminal = ref(null);
+        const eventBus = useEventBus();
 
-        const editorLanguage = computed( () => {
-            return store.getLanguage( store.currentClient );
-        } );
+        const editorLanguage = computed(() => {
+            return store.getLanguage(store.currentClient);
+        });
 
-        const handleEditorContentChange = ( newContent ) => {
+        const handleEditorContentChange = (newContent) => {
             currentContent.value = newContent;
         };
 
@@ -77,18 +79,18 @@ export default defineComponent( {
         expose( {
             getCurrentContent,
             editorComponent,
-        } );
+        });
 
-        onMounted( () => {
-            if ( props.content ) {
-                store.setLastEditorContent( props.content );
+        onMounted(() => {
+            if (props.content) {
+                store.setLastEditorContent(props.content);
             }
         } );
 
         watch(
             () => props.content,
-            ( newContent ) => {
-                if ( newContent !== currentContent.value ) {
+            (newContent) => {
+                if (newContent !== currentContent.value) {
                     currentContent.value = newContent;
                 }
             },
@@ -104,7 +106,7 @@ export default defineComponent( {
             terminal,
         };
     },
-} );
+});
 </script>
 
 <style scoped>
