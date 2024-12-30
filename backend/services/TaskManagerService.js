@@ -1,6 +1,7 @@
 import { GlideClusterClient } from "@valkey/valkey-glide";
 import { KEYS, TIMEOUTS } from "../constants.js";
 import { cleanupCluster } from "../utils/cleanUpServer.js";
+import { sendToWebSocket } from "../utils/websocketUtils.js";
 
 export class TaskManagerService {
   constructor() {
@@ -51,20 +52,10 @@ export class TaskManagerService {
     }
 
     try {
-      // First check if session is still valid
-      const sessionKey = `${KEYS.SESSION.PREFIX}${sessionId}`;
-      const sessionExists = await this.client.exists([sessionKey]);
-
-      if (!sessionExists) {
-        console.log(`[TaskManager] Session ${sessionId} expired or invalid`);
-        await this.emergencyCleanup(ws, sessionId);
-        return;
-      }
-
-      // Check lock and process task if available
       const lockKey = KEYS.TASK.LOCK(sessionId);
       const lockExists = (await this.client.get(lockKey)) === "locked";
 
+      // If lock is released, process next task
       if (!lockExists) {
         await this.processNextTask(ws, sessionId);
       }
@@ -85,21 +76,77 @@ export class TaskManagerService {
       }
 
       const task = JSON.parse(taskJson);
+      const lockKey = KEYS.TASK.LOCK(sessionId);
+      const lockSet = await this.client.set(lockKey, "locked", {
+        conditionalSet: "onlyIfDoesNotExist",
+        expiry: { type: "EX", count: TIMEOUTS.LOCK / 1000 },
+      });
+      if (!lockSet) {
+        return false;
+      }
       const operations = [
         `LPOP ${queueKey} "Processing next task"`,
         `GET ${KEYS.TASK.LOCK(sessionId)} "Checking lock status"`,
+        `SET ${lockKey} "locked" NX EX ${TIMEOUTS.LOCK / 1000}`,
       ];
-
-      await this.executeTask(ws, sessionId, task, operations);
+      sendToWebSocket(ws, "gameCommand", {
+        type: "performTask",
+        task: task.action,
+        step: `${task.index + 1}/${task.total}`,
+        operations,
+      });
       return true;
     } catch (error) {
       console.error("[TaskManager] Process task error:", error);
+      sendToWebSocket(ws, "error", { message: error.message });
       throw error;
     }
   }
 
-  async executeTask(ws, sessionId, task, operations = []) {
+  async releaseLock(ws, sessionId) {
     try {
+      const lockKey = KEYS.TASK.LOCK(sessionId);
+      await this.client.del([lockKey]);
+
+      sendToWebSocket(ws, "gameCommand", {
+        type: "lockReleased",
+        operations: [`DEL ${lockKey} "Released task lock"`],
+      });
+
+      return true;
+    } catch (error) {
+      console.error("[TaskManager] Release lock error:", error);
+      throw error;
+    }
+  }
+
+  async completeAllTasks(ws) {
+    if (ws.lockTimeout) {
+      clearTimeout(ws.lockTimeout);
+      ws.lockTimeout = null;
+    }
+
+    sendToWebSocket(ws, "gameCommand", {
+      type: "complete",
+      message: "All tasks completed",
+    });
+
+    clearInterval(ws.taskManagerInterval);
+    this.cleanup();
+  }
+
+  async startTasks(ws, sessionId) {
+    try {
+      console.log(`[TaskManager] Starting tasks for session ${sessionId}`);
+      await this.initialize();
+
+      // Initialize session
+      const sessionKey = `${KEYS.SESSION.PREFIX}${sessionId}`;
+      await this.client.set(sessionKey, "active", {
+        expiry: { type: "EX", count: TIMEOUTS.SESSION / 1000 },
+      });
+
+      // Try to acquire lock and process first task
       const lockKey = KEYS.TASK.LOCK(sessionId);
       const lockSet = await this.client.set(lockKey, "locked", {
         conditionalSet: "onlyIfDoesNotExist",
@@ -107,114 +154,33 @@ export class TaskManagerService {
       });
 
       if (!lockSet) {
-        return false;
+        throw new Error("Could not acquire task lock");
       }
 
-      operations.push(`SET ${lockKey} "locked" NX EX ${TIMEOUTS.LOCK / 1000}`);
-
-      ws.send(
-        JSON.stringify({
-          action: "gameCommand",
-          data: {
-            type: "performTask",
-            task: task.action,
-            step: `${task.index + 1}/${task.total}`,
-            operations,
-          },
-        })
-      );
-
-      return true;
-    } catch (error) {
-      console.error("[TaskManager] Execute task error:", error);
-      throw error;
-    }
-  }
-
-  async completeTask(ws, sessionId) {
-    try {
-      const lockKey = KEYS.TASK.LOCK(sessionId);
-      await this.client.del([lockKey]);
-      return this.processNextTask(ws, sessionId);
-    } catch (error) {
-      console.error("[TaskManager] Complete task error:", error);
-      throw error;
-    }
-  }
-
-  async completeAllTasks(ws, sessionId) {
-    if (ws.lockTimeout) {
-      clearTimeout(ws.lockTimeout);
-      ws.lockTimeout = null;
-    }
-
-    this.sendGameCommand(ws, "complete", "All tasks completed");
-    clearInterval(ws.taskManagerInterval);
-    await this.client.del([KEYS.TASK.LOCK(sessionId)]);
-
-    if (this.client) {
-      this.client.close();
-      this.client = null;
-    }
-  }
-
-  async startTasks(ws, { sessionId, tasks }) {
-    try {
-      console.log(`[TaskManager] Starting tasks for session ${sessionId}`);
-      await this.initialize();
-
-      const operations = [];
-      const sessionKey = `${KEYS.SESSION.PREFIX}${sessionId}`;
+      // Pop and process first task
       const queueKey = KEYS.TASK.QUEUE(sessionId);
-      const lockKey = KEYS.TASK.LOCK(sessionId);
-
-      // Clean existing session data
-      await this.client.del([sessionKey, queueKey, lockKey]);
-      operations.push(`DEL ${queueKey} ${lockKey} "Cleaning session data"`);
-
-      // Set session with expiry
-      await this.client.set(sessionKey, "active", {
-        expiry: { type: "EX", count: TIMEOUTS.SESSION / 1000 },
-      });
-      operations.push(
-        `SET ${sessionKey} "active" EX ${TIMEOUTS.SESSION / 1000}`
-      );
-
-      // Prepare all tasks in one array
-      const taskDataArray = tasks.map((task, index) =>
-        JSON.stringify({
-          id: `task_${index}`,
-          action: task.action,
-          index,
-          total: tasks.length,
-          timestamp: Date.now(),
-        })
-      );
-
-      // Queue all tasks in one operation
-      if (taskDataArray.length > 0) {
-        await this.client.rpush(queueKey, taskDataArray);
-        operations.push(
-          `RPUSH ${queueKey} "Queued ${taskDataArray.length} tasks in bulk"`
-        );
-      }
-
+      const firstTaskJson = await this.client.lpop(queueKey);
       const queueLength = await this.client.llen(queueKey);
-      operations.push(`LLEN ${queueKey} "Queue contains ${queueLength} tasks"`);
-
-      // Send initialization success to client
-      ws.send(
-        JSON.stringify({
-          action: "taskUpdate",
-          data: {
-            status: `Task queue initialized with ${queueLength} tasks`,
-            operations,
-            sessionId,
-          },
-        })
+      console.log(
+        `[TaskManager] Setting up check interval: ${TIMEOUTS.CHECK_INTERVAL}ms`
       );
-
-      return { status: "success", operations, queueLength };
+      ws.taskManagerInterval = setInterval(
+        () => this.checkLock(ws, sessionId),
+        TIMEOUTS.CHECK_INTERVAL
+      );
+      if (firstTaskJson) {
+        const firstTask = JSON.parse(firstTaskJson);
+        sendToWebSocket(ws, "gameCommand", {
+          type: "performTask",
+          task: firstTask.action,
+          operations: [
+            `SET ${lockKey} "locked" NX EX ${TIMEOUTS.LOCK / 1000}`,
+            `LPOP ${queueKey} "Starting first task"`,
+            `LLEN ${queueKey} "Remaining tasks in queue: ${queueLength}"`,
+          ],
+        });
+      }
+      return { status: "success", queueLength };
     } catch (error) {
       console.error("[TaskManager] Start tasks error:", error);
       await this.emergencyCleanup(ws, sessionId);
@@ -222,73 +188,16 @@ export class TaskManagerService {
     }
   }
 
-  async clearExistingTasks(operations) {
-    try {
-      await this.client.del([KEYS.QUEUE]);
-      operations.push('DEL task-queue "Cleaning up previous tasks"');
-
-      await this.client.del([KEYS.LOCK]);
-      operations.push('DEL task-lock "Releasing any existing locks"');
-
-      return true;
-    } catch (error) {
-      console.error("[TaskManager] Clear tasks error:", error);
-      throw error;
-    }
-  }
-
-  async queueTasks(sessionId, tasks, operations) {
-    try {
-      for (const [index, task] of tasks.entries()) {
-        const taskData = {
-          ...task,
-          index,
-          total: tasks.length,
-        };
-        const taskStr = JSON.stringify(taskData);
-        await this.client.rpush(KEYS.QUEUE, taskStr);
-        operations.push(
-          `RPUSH ${KEYS.QUEUE} "Task ${index + 1}/${tasks.length}: ${
-            task.action
-          }"`
-        );
-      }
-      return true;
-    } catch (error) {
-      console.error("[TaskManager] Queue tasks error:", error);
-      throw error;
-    }
-  }
-
-  sendGameCommand(ws, type, message) {
-    ws.send(
-      JSON.stringify({
-        action: "gameCommand",
-        data: { type, message },
-      })
-    );
-  }
-
   async cancelProcess(ws) {
     console.log("[TaskManager] Canceling process, cleaning up resources");
     clearInterval(ws.taskManagerInterval);
-
     if (ws.lockTimeout) {
       clearTimeout(ws.lockTimeout);
       ws.lockTimeout = null;
     }
-
     if (this.client) {
       try {
-        const [lockDeleted, queueDeleted] = await Promise.all([
-          this.client.exists([KEYS.LOCK]) && this.client.del([KEYS.LOCK]),
-          this.client.exists([KEYS.QUEUE]) && this.client.del([KEYS.QUEUE]),
-        ]);
-
-        console.log(
-          `[TaskManager] Resources cleaned up: lockDeleted=${lockDeleted}, queueDeleted=${queueDeleted}`
-        );
-
+        await this.cleanup();
         console.log("[TaskManager] Resources cleaned up successfully");
       } catch (error) {
         console.error("[TaskManager] Error during cleanup:", error);
@@ -301,12 +210,13 @@ export class TaskManagerService {
     }
   }
 
-  async cleanup(mode = "cluster") {
+  async cleanup() {
     try {
       if (this.client) {
-        await cleanupCluster(mode);
+        await cleanupCluster();
         this.client.close();
         this.client = null;
+        this.initialized = false;
       }
     } catch (error) {
       console.error("[TaskManager] Cleanup error:", error);
@@ -321,53 +231,66 @@ export class TaskManagerService {
         clearInterval(ws.taskManagerInterval);
         ws.taskManagerInterval = null;
       }
-
-      if (this.client) {
-        // Clean up all session-related keys
-        const sessionKey = `${KEYS.SESSION.PREFIX}${sessionId}`;
-        const queueKey = KEYS.TASK.QUEUE(sessionId);
-        const lockKey = KEYS.TASK.LOCK(sessionId);
-
-        const delResult = await this.client.del([
-          sessionKey,
-          queueKey,
-          lockKey,
-        ]);
-        console.log(
-          `[TaskManager] Executed: DEL ${sessionKey}, DEL ${queueKey}, DEL ${lockKey}, Result:`,
-          delResult
-        );
-
-        ws.send(
-          JSON.stringify({
-            action: "gameCommand",
-            data: {
-              type: "error",
-              message: "Task manager reset due to error",
-              operations: [
-                `DEL ${sessionKey} ${queueKey} ${lockKey} "Emergency cleanup"`,
-                "Session invalidated",
-              ],
-            },
-          })
-        );
-      }
+      this.cleanup();
+      sendToWebSocket(ws, "error", {
+        type: "error",
+        message: "Task manager reset due to error",
+      });
     } catch (error) {
       console.error("[TaskManager] Emergency cleanup error:", error);
     }
   }
 
-  async cleanupSession(sessionId) {
+  async initializeTaskQueue(ws, { sessionId, tasks }) {
     try {
-      const sessionKey = `${KEYS.SESSION_PREFIX}${sessionId}`;
-      await this.client.del([sessionKey]);
-      return true;
-    } catch (error) {
-      console.error(
-        `[TaskManager] Error cleaning up session ${sessionId}:`,
-        error
+      console.log(
+        `[TaskManager] Setting up task queue for session ${sessionId}`
       );
-      return false;
+      await this.initialize();
+      await cleanupCluster();
+
+      // Set session with expiry
+      const sessionKey = `${KEYS.SESSION.PREFIX}${sessionId}`;
+      await this.client.set(sessionKey, "active", {
+        expiry: { type: "EX", count: TIMEOUTS.SESSION / 1000 },
+      });
+
+      // Queue all tasks in one operation
+      const queueKey = KEYS.TASK.QUEUE(sessionId);
+      const taskDataArray = tasks.map((task, index) =>
+        JSON.stringify({
+          ...task,
+          index,
+          total: tasks.length,
+          sessionId,
+          timestamp: Date.now(),
+        })
+      );
+
+      let queueLength = 0;
+      if (taskDataArray.length > 0) {
+        await this.client.rpush(queueKey, taskDataArray);
+        queueLength = await this.client.llen(queueKey);
+      }
+
+      // Notify frontend
+      sendToWebSocket(ws, "taskUpdate", {
+        data: {
+          status: "ready",
+          message: `Task queue prepared with ${queueLength} tasks`,
+          sessionId,
+          operations: [
+            `SET ${sessionKey} "active" EX ${TIMEOUTS.SESSION / 1000}`,
+            `RPUSH ${queueKey} "${queueLength} tasks queued"`,
+          ],
+        },
+      });
+
+      return { status: "success", queueLength };
+    } catch (error) {
+      console.error("[TaskManager] Set tasks error:", error);
+      await this.emergencyCleanup(ws, sessionId);
+      throw error;
     }
   }
 }

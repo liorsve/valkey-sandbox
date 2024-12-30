@@ -53,7 +53,7 @@
 
 <script>
 import { ref, computed, onBeforeUnmount, inject, watch } from 'vue';
-import { useEventBus, EventTypes } from '@/composables/useEventBus';
+import { useWebSocket } from '@/composables/useWebSocket';
 import supermanImg from '@/assets/images/superman.jpg';
 import batmanImg from '@/assets/images/batman.jpg';
 import wonderWomanImg from '@/assets/images/wonder_woman.jpg';
@@ -78,8 +78,9 @@ export default {
         },
     },
     setup( props, { emit } ) {
-        const { emit: emitEvent, on: eventOn, off } = useEventBus();
         const terminalRef = inject( 'terminal' );
+        const wsManager = useWebSocket();
+        let wsListenerId = null;
 
         let debounceTimeout = null;
         const DEBOUNCE_DELAY = 300;
@@ -171,7 +172,8 @@ export default {
 
             if (gameStarted.value === false) {
                 gameStarted.value = true;
-                emitEvent(EventTypes.GAME_ACTION, { type: 'startGame' });
+                // Remove unused event emission
+                console.debug('[Leaderboard] Game started');
             }
         
             // Handle both array format and {state, operations} format
@@ -221,16 +223,22 @@ export default {
         const handleWebSocketMessage = (event) => {
             try {
                 console.log('[LeaderboardVisualization] WebSocket message:', event);
-                const data = JSON.parse(event.data);
-                if (data.action === 'leaderboardUpdate') {
-                    if (data.data?.state) {
-                        handleLeaderboardUpdate(data.data.state);
+                
+                // Handle normalized messages from WebSocketManager
+                const message = event?.payload ? event : {
+                    action: event?.action || 'unknown',
+                    payload: event?.data || event
+                };
+
+                if (message.action === 'leaderboardUpdate') {
+                    if (message.payload?.state) {
+                        handleLeaderboardUpdate(message.payload.state);
                     }
-                    if (data.data?.operations) {
-                        handleOperations(data.data.operations);
+                    if (message.payload?.operations) {
+                        handleOperations(message.payload.operations);
                     }
                 } else {
-                    console.debug('[LeaderboardVisualization] Unhandled message action:', data.action);
+                    console.debug('[LeaderboardVisualization] Unhandled message action:', message.action);
                 }
             } catch (error) {
                 console.error('[LeaderboardVisualization] Error:', error);
@@ -269,37 +277,60 @@ export default {
             }
         };
 
-        const cleanup = () => {
-            gameStarted.value = false;
-            players.value = [ ...initialPlayers ];
-            notifications.value = [];
-            notificationQueue.value = [];
+        const initializeWebSocketListener = (ws) => {
+            if (!ws) return;
+            
+            // Cleanup any existing listener first
+            cleanupWebSocketListener();
+            
+            // Register new component-specific listener
+            wsListenerId = wsManager.addMessageListener(handleWebSocketMessage, 'leaderboard');
+            console.log('[Leaderboard] Registered WebSocket listener');
+        };
 
-            if ( props.ws?.readyState === WebSocket.OPEN ) {
-                try {
-                    props.ws.send( JSON.stringify( {
-                        action: 'cleanup',
-                        data: {
-                            component: 'leaderboard',
-                            force: true
-                        }
-                    } ) );
-                } catch ( error ) {
-                    console.error( '[Leaderboard] Cleanup error:', error );
-                }
+        const cleanupWebSocketListener = () => {
+            if (wsListenerId) {
+                wsManager.removeMessageListener(wsListenerId);
+                wsListenerId = null;
+                console.log('[Leaderboard] Cleaned up WebSocket listener');
             }
         };
 
+        // Watch for WebSocket changes
         watch(
             () => props.ws,
-            ( newWs ) => {
-                if ( newWs ) {
-                    console.log( 'WebSocket connection status:', newWs.readyState );
-                    newWs.onmessage = handleWebSocketMessage;
-                }
+            (newWs) => {
+                if (newWs) initializeWebSocketListener(newWs);
             },
             { immediate: true }
         );
+
+        // Ensure cleanup on unmount
+        onBeforeUnmount(() => {
+            cleanupWebSocketListener();
+        });
+
+        const cleanup = () => {
+            if (wsListenerId) {
+                wsManager.removeMessageListener(wsListenerId);
+                wsListenerId = null;
+            }
+            
+            gameStarted.value = false;
+            players.value = [...initialPlayers];
+            notifications.value = [];
+            notificationQueue.value = [];
+
+            if (props.ws?.readyState === WebSocket.OPEN) {
+                props.ws.send(JSON.stringify({
+                    action: 'cleanup',
+                    data: {
+                        component: 'leaderboard',
+                        force: true
+                    }
+                }));
+            }
+        };
 
         const terminalWrite = (message) => {
             if (props.terminal?.writeln) {
@@ -313,11 +344,6 @@ export default {
 
         onBeforeUnmount( () => {
             cleanup();
-            off( EventTypes.WS_MESSAGE, handleWebSocketMessage );
-            emit( 'terminal-resize', 'normal-height' );
-            if ( props.ws ) {
-                props.ws.removeEventListener( 'message', handleWebSocketMessage );
-            }
         } );
 
         // Initialize scores

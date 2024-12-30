@@ -49,7 +49,7 @@
 
 <script>
 import { ref, onBeforeUnmount, watch, inject } from 'vue';
-import { useEventBus, EventTypes } from '@/composables/useEventBus';
+import { useWebSocket } from '@/composables/useWebSocket';
 import ValkeyLogo from '@/assets/images/Valkey-logo.svg';
 
 export default {
@@ -63,8 +63,43 @@ export default {
         terminal: Object,
     },
     setup(props, { emit }) {
-        const { emit: emitEvent } = useEventBus();
         const terminalRef = inject('terminal');
+        const wsManager = useWebSocket();
+        let wsListenerId = null;
+
+        const messageHandler = (event) => {
+            try {
+                // Handle normalized messages from WebSocketManager
+                const message = event?.payload ? event : {
+                    action: event?.action || 'unknown',
+                    payload: event?.data || event
+                };
+
+                console.log('[TaskManager] Processing message:', message);
+
+                switch (message.action) {
+                    case 'taskUpdate':
+                        handleTaskUpdate(message.payload);
+                        break;
+                    case 'gameCommand':
+                        handleGameCommand(message.payload);
+                        break;
+                    case 'error':
+                        terminalWrite(`❌ Error: ${message.payload?.error || 'Unknown error'}`);
+                        buttonState.value = 'tryAgain';
+                        break;
+                    case 'output':
+                        if (message.payload?.output) {
+                            terminalWrite(message.payload.output);
+                        }
+                        break;
+                }
+            } catch (error) {
+                console.error('[TaskManager] Message handling error:', error);
+                terminalWrite(`❌ Internal error: ${error.message}`);
+            }
+        };
+
         const logoSrc = ref(ValkeyLogo);
         
         const tasks = ref([
@@ -94,12 +129,6 @@ export default {
         const showEmptyQueuePopup = ref(false);
 
         // Define all handlers first
-        const handleWebSocketError = (error) => {
-            console.error('[TaskManager] WebSocket error:', error);
-            terminalWrite('❌ Connection error. Attempting to reconnect...');
-            buttonState.value = 'set';
-        };
-
         const terminalWrite = (message) => {
             if (props.terminal?.writeln) {
                 props.terminal.writeln(message);
@@ -110,38 +139,15 @@ export default {
             }
         };
 
-        const messageHandler = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                
-                switch (message.action) {
-                    case 'taskUpdate':
-                        handleTaskUpdate(message.data);
-                        break;
-                    case 'gameCommand':
-                        handleGameCommand(message.data);
-                        break;
-                    case 'error':
-                        console.error('[TaskManager] Server error:', message.error);
-                        terminalWrite(`❌ Error: ${message.error}`);
-                        break;
-                }
-            } catch (error) {
-                console.error('[TaskManager] Error handling message:', error);
-            }
-        };
-
         // Then define the setup function
         const setupWebSocket = (ws) => {
             if (!ws) return;
             
-            ws.removeEventListener('message', messageHandler);
-            ws.removeEventListener('error', handleWebSocketError);
+            if (wsListenerId) {
+                wsManager.removeMessageListener(wsListenerId);
+            }
             
-            ws.addEventListener('message', messageHandler);
-            ws.addEventListener('error', handleWebSocketError);
-            
-            console.log('[TaskManager] WebSocket handlers configured');
+            wsListenerId = wsManager.addMessageListener(messageHandler, 'taskManager');
         };
 
         // Then setup watchers
@@ -164,7 +170,6 @@ export default {
 
         const setTasks = () => {
             if (!props.isConnected || !props.ws || props.ws.readyState !== WebSocket.OPEN) {
-                console.warn('[TaskManager] WebSocket not ready. Current state:', props.ws?.readyState);
                 terminalWrite('⚠️ Connection not ready. Please wait...');
                 return;
             }
@@ -175,54 +180,41 @@ export default {
             }
 
             try {
-                // Generate a structured session ID
-                const sessionId = `tm_${Date.now()}_${taskQueue.value.length}_${taskQueue.value.map(t => t.action.charAt(0)).join('')}`;
+                const sessionId = `tm_${Date.now()}_${taskQueue.value.length}`;
                 const taskData = taskQueue.value.map((task, index) => ({
-                    id: `${sessionId}_${task.action.toLowerCase().replace(/\s+/g, '_')}_${index}`,
+                    id: `${sessionId}_${index}`,
                     action: task.action,
                     uniqueId: task.uniqueId,
                     order: index
                 }));
 
-                terminalWrite(`🔧 Creating task session: ${sessionId}`);
-                terminalWrite('📝 \x1b[1mSET task-queue\x1b[0m with distributed lock mechanism');
-
+                terminalWrite(`🔧 Preparing task queue: ${sessionId}`);
+                
                 props.ws.send(JSON.stringify({
                     action: 'setTasks',
-                    data: {
-                        sessionId,
-                        tasks: taskData,
-                        metadata: {
-                            createdAt: Date.now(),
-                            taskCount: taskQueue.value.length,
-                            taskTypes: taskQueue.value.map(t => t.action),
-                            clientId: props.ws.id
-                        }
-                    }
+                    data: { sessionId, tasks: taskData }
                 }));
 
-                // Wait for server confirmation before changing state
-                gameState.value.isProcessing = false;
-                gameState.value.currentTask = null;
+                gameState.value.sessionId = sessionId; 
             } catch (error) {
-                console.error('[TaskManager] Error sending tasks:', error);
+                console.error('[TaskManager] Error setting tasks:', error);
                 terminalWrite(`❌ Error: ${error.message}`);
-                emitEvent(EventTypes.ERROR, error.message);
             }
         };
 
         const invokeTaskManager = () => {
-            if (props.ws && props.ws.readyState === WebSocket.OPEN) {
-                console.log('Sending invokeTaskManager action');
-                props.ws.send(JSON.stringify({
-                    action: 'invokeTaskManager',
-                }));
-                terminalWrite('🚀 Invoking Task Manager...\n');
-                buttonState.value = 'cancel';
-            } else {
-                console.log('[WS] Cannot send message: WebSocket not connected.');
-                terminalWrite('Not connected to server. Retrying connection...\n');
+            if (!gameState.value.sessionId) {
+                terminalWrite('⚠️ No active task session');
+                return;
             }
+
+            props.ws.send(JSON.stringify({
+                action: 'invokeTaskManager',
+                data: { sessionId: gameState.value.sessionId }
+            }));
+            
+            terminalWrite('🚀 Starting task execution...');
+            buttonState.value = 'cancel';
         };
 
         const cancelTaskManager = () => {
@@ -241,14 +233,13 @@ export default {
 
         const handleTaskUpdate = (data) => {
             if (data?.status) {
-                terminalWrite(`ℹ️ ${data.status}`);
-                // Only update button state after server confirmation
+                terminalWrite(` ℹ️ ${data.status}`);
                 if (data.status.includes('initialized')) {
                     buttonState.value = 'invoke';
                 }
             }
-            if (data?.clusterOperations?.length) {
-                data.clusterOperations.forEach(op => {
+            if (data?.operations?.length) {
+                data.operations.forEach(op => {
                     terminalWrite(`🔷 ${op}`);
                 });
             }
@@ -257,37 +248,41 @@ export default {
         const handleGameCommand = (command) => {
             if (!command || typeof command !== 'object') return;
             
-            const { type, task, message, operations } = command;
-            
-            if (operations?.length) {
-                operations.forEach(op => terminalWrite(`🔷 ${op}`));
+            // Fix the object destructuring
+            console.log('[TaskManager] Game command:', command);
+            if (command.operations?.length) {
+                command.operations.forEach(op => terminalWrite(` 🔷 ${op}`));
+            }
+
+            if (command.step) {
+                terminalWrite(` Step: ${command.step}`);
             }
             
-            switch (type) {
+            switch (command.type) {
                 case 'lockAcquired':
                     gameState.value.isProcessing = true;
-                    terminalWrite('🔒 Lock acquired in Valkey Cluster');
+                    terminalWrite(' 🔒 Lock acquired in Valkey Cluster');
                     animateLocking(true);
                     break;
 
                 case 'performTask':
-                    if (task) {
-                        gameState.value.currentTask = task;
-                        terminalWrite(`⚡ Executing task: ${task}`);
-                        performTask(task);
+                    if (command.task) {
+                        gameState.value.currentTask = command.task;
+                        terminalWrite(`⚡ Executing task: ${command.task}`);
+                        performTask(command.task);
                     }
                     break;
 
                 case 'lockReleased':
                     gameState.value.isProcessing = false;
-                    terminalWrite('🔓 Lock released in Valkey Cluster');
+                    terminalWrite(' 🔓 Lock released in Valkey Cluster');
                     animateLocking(false);
                     break;
 
                 case 'complete':
                     gameState.value.isProcessing = false;
                     gameState.value.currentTask = null;
-                    terminalWrite('✅ All tasks completed successfully');
+                    terminalWrite(' ✅ All tasks completed successfully');
                     buttonState.value = 'tryAgain';
                     break;
             }
@@ -333,13 +328,19 @@ export default {
                 case 'Shrink':
                     el.style.transform = `${baseTransform} scale(0.5)`;
                     break;
-                case 'Change Random Color':
-                    el.style.borderBottomColor = getRandomColor();
+                case 'Change Random Color': {
+                    const color = getRandomColor();
+                    el.style.filter = `drop-shadow(0 0 15px ${color}) brightness(1.3) hue-rotate(${Math.random() * 360}deg)`;
                     break;
+                }
             }
 
             await new Promise(r => setTimeout(r, 1000));
-            el.style.transform = baseTransform;
+            if (taskAction === 'Change Random Color') {
+                el.style.filter = 'drop-shadow(0 0 15px var(--accent-highlight)) brightness(1.3)';
+            } else {
+                el.style.transform = baseTransform;
+            }
             el.classList.remove('move-to-center');
         };
 
@@ -347,13 +348,10 @@ export default {
             const el = logoContainer.value?.querySelector('.valkey-logo');
             if (!el) return;
             
-            // Show lock animation
             await showLockAnimation();
             
-            // Perform task animation
             await executeTaskAnimation(el, taskAction);
             
-            // Show unlock animation
             await showUnlockAnimation();
         };
 
@@ -363,7 +361,7 @@ export default {
                 if (props.ws?.readyState === WebSocket.OPEN) {
                     props.ws.send(JSON.stringify({ 
                         action: 'taskCompleted',
-                        data: { status: 'completed' }
+                        data: { status: 'completed', sessionId: gameState.value.sessionId}
                     }));
                 }
             } catch (error) {
@@ -381,14 +379,13 @@ export default {
         };
 
         const animateLocking = (isLocked) => {
-            const el = triangle.value;
+            const el = logoContainer.value?.querySelector('.valkey-logo');
             if (!el) return;
             if (isLocked) {
                 el.classList.add('locked');
-                terminalWrite('🔒 Lock acquired.\n');
+                terminalWrite(' 🔒 Lock acquired.\n');
             } else {
                 el.classList.remove('locked');
-                terminalWrite('🔓 Lock released.\n');
             }
         };
 
@@ -397,7 +394,11 @@ export default {
         };
 
         const cleanup = () => {
-            if (props.ws?.readyState === WebSocket.OPEN) {
+            if (wsListenerId) {
+                wsManager.removeMessageListener(wsListenerId);
+                wsListenerId = null;
+            }
+                        if (props.ws?.readyState === WebSocket.OPEN) {
                 try {
                     props.ws.send(JSON.stringify({
                         action: 'cleanup',
@@ -420,21 +421,17 @@ export default {
             };
         };
 
-        onBeforeUnmount( () => {
+        onBeforeUnmount(() => {
             cleanup();
-            if ( props.ws ) {
-                props.ws.removeEventListener( 'message', messageHandler );
-                props.ws.removeEventListener( 'error', handleWebSocketError );
-            }
-        } );
+        });
 
         watch(
             () => props.isConnected,
             (newState) => {
                 if (newState) {
-                    terminalWrite('🔗 Connection established');
+                    terminalWrite(' 🔗 Connection established');
                 } else {
-                    terminalWrite('⚠️ Connection lost');
+                    terminalWrite(' ⚠️ Connection lost');
                     buttonState.value = 'set';
                 }
             }

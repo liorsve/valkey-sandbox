@@ -6,7 +6,6 @@ export const WS_READY_STATES = {
 };
 
 export const TIMEOUTS = {
-  CACHE: 5000,
   LOCK: 30000,
   AUTO_RELEASE: 5000,
   CHECK_INTERVAL: 500,

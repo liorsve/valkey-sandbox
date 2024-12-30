@@ -7,13 +7,9 @@ export const EventTypes = {
   TERMINAL_OUTPUT: "TERMINAL_OUTPUT",
   TERMINAL_CLEAR: "terminal:clear",
   GAME_ACTION: "game:action",
-  LEADERBOARD_UPDATE: "leaderboard:update",
-  TASK_UPDATE: "task:update",
-  CONNECTION_STATUS: "connection:status",
   ERROR: "ERROR",
   EDITOR_LANGUAGE_CHANGED: "editor:language",
   WS_OPEN: "ws:open",
-  WS_MESSAGE: "ws:message",
   WS_ERROR: "ws:error",
   WS_CLOSE: "ws:close",
 };

@@ -89,9 +89,10 @@ class WebSocketManager {
     const componentRoutes = {
       taskUpdate: "taskManager",
       gameCommand: "taskManager",
+      leaderboardUpdate: "leaderboard",
+      output: "global",
       terminalOutput: "global",
       executionResult: "global",
-      output: "global",
       connected: "global",
     };
 
@@ -102,7 +103,14 @@ class WebSocketManager {
         listener.component === "global" ||
         listener.component === targetComponent
       ) {
-        listener.callback(message);
+        try {
+          listener.callback(message);
+        } catch (error) {
+          console.error(
+            `[WS] Listener error for ${listener.component}:`,
+            error
+          );
+        }
       }
     });
   }
@@ -166,16 +174,30 @@ class WebSocketManager {
       console.warn("[WS] Invalid listener type:", typeof listener);
       return;
     }
-    // Store listener with component info
-    this.listeners.add({
+    const listenerObj = {
       callback: listener,
       component,
-    });
+      id: Date.now() + Math.random(),
+    };
+    this.listeners.add(listenerObj);
+    return listenerObj.id; // Return ID for removal
   }
 
-  removeMessageListener(listener) {
+  removeMessageListener(listenerIdOrComponent) {
     if (!this.listeners) return;
-    this.listeners.delete(listener);
+    if (typeof listenerIdOrComponent === "string") {
+      // Remove by component name
+      this.listeners = new Set(
+        Array.from(this.listeners).filter(
+          (l) => l.component !== listenerIdOrComponent
+        )
+      );
+    } else {
+      // Remove by listener ID
+      this.listeners = new Set(
+        Array.from(this.listeners).filter((l) => l.id !== listenerIdOrComponent)
+      );
+    }
   }
 
   send(data) {
