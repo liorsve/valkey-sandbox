@@ -89,7 +89,6 @@ export default defineComponent({
     const handleMount = (editorInstance, monaco) => {
       editor.value = editorInstance;
       emit("editor-ready", editorInstance);
-      registerValkeyGlideCompletions(editorInstance);
     };
 
     const handleChange = (value) => {
@@ -103,8 +102,6 @@ export default defineComponent({
     const getCurrentContent = () => {
       return content.value;
     };
-
-    const registerValkeyGlideCompletions = async (monacoInstance) => {};
 
     expose({
       getCurrentContent,
