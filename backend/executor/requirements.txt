@@ -1,0 +1,4 @@
+valkey==6.0.2
+numpy==2.2.1
+valkey-glide==1.2.1
+python-dateutil==2.9.0.post0

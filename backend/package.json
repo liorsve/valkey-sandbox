@@ -1,24 +1,26 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "@valkey/valkey-glide": "1.2.0",
-    "child_process": "^1.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "16.4.7",
-    "express": "5.0.1",
-    "iovalkey": "0.2.1",
-    "socket.io": "^4.0.1",
-    "ws": "8.18.0"
-  },
-  "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
-    "start:prod": "npm start",
-    "start:dev": "npm run dev"
-  },
-  "devDependencies": {
-    "nodemon": "3.1.9"
-  }
+    "name": "valkey-sandbox-backend",
+    "type": "module",
+    "version": "1.0.0",
+    "private": true,
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "dependencies": {
+        "@valkey/valkey-glide": "1.2.1",
+        "express": "^5.0.1",
+        "ws": "^8.18.0",
+        "iovalkey": "^0.2.1",
+        "body-parser": "1.20.3",
+        "morgan": "^1.10.0",
+        "cors": "^2.8.5",
+        "axios": "^1.7.9"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    },
+    "scripts": {
+        "start:dev": "nodemon server.js --ignore temp/* --ignore temp/**/*",
+        "start:prod": "node server.js"
+    }
 }

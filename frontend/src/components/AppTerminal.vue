@@ -1,81 +1,81 @@
 <template>
-    <div ref="terminalContainer" class="terminal-container"></div>
+    <BaseTerminal ref="terminal" :options="terminalOptions" @ready="handleReady" />
 </template>
 
 <script>
-import { onMounted, onBeforeUnmount, ref } from 'vue';
-import { Terminal } from '@xterm/xterm';
-import '@xterm/xterm/css/xterm.css';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import BaseTerminal from './base/BaseTerminal.vue';
+import { useEventBus, EventTypes } from '../composables/useEventBus';
 
 export default {
     name: 'AppTerminal',
-    setup(props, { expose }) {
-        const terminal = ref(null);
-        const terminalContainer = ref(null);
+    components: { BaseTerminal },
+    props: {
+        height: String
+    },
+    emits: [ 'ready' ],
+    setup( props, { emit } ) {
+        const terminal = ref( null );
+        const terminalInstance = ref( null );
+        const { on, off } = useEventBus();
 
-        onMounted(() => {
-            terminal.value = new Terminal({
-                cursorBlink: true,
-                fontSize: 14,
-                theme: {
-                    background: '#0d0d0d',
-                    foreground: '#dddddd',
-                    cursor: '#ffffff',
-                    selectionBackground: '#555555',
-                },
-            });
-            terminal.value.open(terminalContainer.value);
-            terminal.value.write('Welcome to ValKey SandBox!\r\n');
-        });
-
-        const write = (data) => {
-            if (terminal.value) {
-                const sanitizedData = data.replace(/\r/g, '');
-                sanitizedData.split('\n').forEach(line => {
-                    terminal.value.writeln(line.trim());
-                });
+        const terminalOptions = {
+            cursorBlink: true,
+            fontSize: 14,
+            fontWeight: 500,
+            scrollback: 5000,
+            theme: {
+                background: '#1a1b26',
+                foreground: '#a9b1d6',
+                cursor: '#f7768e',
+                selection: '#28324a'
             }
         };
 
-        onBeforeUnmount(() => {
-            if (terminal.value) {
-                terminal.value.dispose();
-            }
-        });
+        const handleReady = ( term ) => {
+            terminalInstance.value = term;
+            term.writeln( '\x1b[1;34m=== Valkey SandBox Terminal ===\x1b[0m' );
+            emit( 'ready', term );
+        };
 
-        expose({
-            write,
-        });
+        const writeToTerminal = ( output ) => {
+            if ( !output || !terminalInstance.value ) return;
+
+            // Handle different output types
+            const lines = ( typeof output === 'string' ? output : JSON.stringify( output, null, 2 ) )
+                .split( '\n' )
+                .filter( line => line.trim() );
+
+            // Write each line to terminal
+            lines.forEach( line => {
+                terminalInstance.value.writeln( ` ${ line.trim() }` );
+            } );
+        };
+
+        const clearTerminal = () => {
+            if ( terminalInstance.value ) {
+                terminalInstance.value.clear();
+                handleReady( terminalInstance.value );
+            }
+        };
+
+        onMounted( () => {
+            on( EventTypes.TERMINAL_OUTPUT, writeToTerminal );
+            on( EventTypes.TERMINAL_CLEAR, clearTerminal );
+        } );
+
+        onBeforeUnmount( () => {
+            off( EventTypes.TERMINAL_OUTPUT, writeToTerminal );
+            off( EventTypes.TERMINAL_CLEAR, clearTerminal );
+        } );
 
         return {
-            terminalContainer,
+            terminal,
+            terminalOptions,
+            handleReady
         };
-    },
+    }
 };
 </script>
 
-<style scoped>
-.terminal-container {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    border: 1px solid #ccc;
-    padding: 10px 10px;
-    background-color: #0d0d0d;
-    display: flex;
-    flex-direction: column;
-}
-
-:deep(.xterm .xterm-viewport),
-:deep(.xterm .xterm-screen) {
-    padding: 10px;
-    box-sizing: border-box;
-    overflow: hidden;
-}
-
-.terminal {
-    flex: 1;
-    max-height: 200px;
-    overflow-y: auto;
-}
-</style>
+<style scoped></style>

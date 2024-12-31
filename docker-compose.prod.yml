@@ -1,0 +1,17 @@
+
+services:
+  backend:
+    ports:
+      - "3000:3000"
+    command: ["npm", "run", "start:prod"]
+    environment:
+      - WDS_SOCKET_PORT=443
+      - NODE_ENV=production
+
+  frontend:
+    ports:
+      - "8080:8080"
+    command: ["npm", "run", "preview"]
+    environment:
+      - NODE_ENV=production
+      - WDS_SOCKET_PORT=443

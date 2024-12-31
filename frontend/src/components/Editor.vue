@@ -1,120 +1,67 @@
 <template>
-  <div ref="editorContainer" class="editor-container">
-    <vue-monaco-editor v-model:value="code" :language="language" theme="vs-dark" :options="MONACO_EDITOR_OPTIONS"
-      @mount="handleMount" @change="onChange" />
-  </div>
+    <BaseEditor ref="editor" v-model="editorContent" :language="language" :read-only="readOnly" :options="editorOptions"
+        @change="handleChange" @editor-ready="handleEditorReady" />
 </template>
 
 <script>
-import { defineComponent, watch, shallowRef, onBeforeUnmount } from 'vue';
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+import { defineComponent, ref, computed, watch } from 'vue';
+import BaseEditor from './base/BaseEditor.vue';
 
 export default defineComponent({
-  components: {
-    VueMonacoEditor,
-  },
-  name: 'CodeEditor',
-  props: {
-    language: {
-      type: String,
-      default: 'javascript',
+    name: 'AppEditor',
+    components: { BaseEditor },
+    props: {
+        content: String,
+        language: String,
+        readOnly: Boolean
     },
-    content: {
-      type: String,
-      default: '',
-    },
-  },
-  emits: ['update:content'],
-  setup(props, { emit }) {
-    const MONACO_EDITOR_OPTIONS = {
-      automaticLayout: true,
-      formatOnType: true,
-      formatOnPaste: true,
-      fixedOverflowWidgets: true,
-      glyphMargin: true,
-      scrollbar: {
-        vertical: 'auto',
-        horizontal: 'auto',
-      },
-      fontSize: 14,
-    };
-    const editorRef = shallowRef();
-    const code = shallowRef(props.content);
+    emits: ['update:content'],
+    setup(props, { emit, expose }) {
+        const monacoEditor = ref(null);
+        const editorContent = ref(props.content || '');
 
-    const handlePaste = () => {
-      editorRef.value?.getAction('editor.action.formatDocument').run();
-    };
+        watch(() => props.content, (newContent) => {
+            if (newContent !== editorContent.value) {
+                editorContent.value = newContent;
+            }
+        }, { immediate: true });
 
-    const handleBlur = () => {
-      editorRef.value?.getAction('editor.action.formatDocument').run();
-    };
+        const editorOptions = {
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            folding: true,
+            lineNumbers: true,
+            automaticLayout: true,
+            fontSize: 14
+        };
 
-    const handleMount = editor => {
-      editorRef.value = editor;
-      code.value = props.content;
-      const editorContainer = editor.getDomNode();
-      if (editorContainer) {
-        editorContainer.style.paddingTop = '10px';
-      }
-    };
+        const handleChange = (value) => {
+            emit('update:content', value);
+        };
 
-    const onChange = (value) => {
-      emit('update:content', value);
-    };
+        const handleEditorReady = (editor) => {
+            monacoEditor.value = editor;
+        };
 
-    watch(() => props.content, (newContent) => {
-      if (code.value !== newContent) {
-        code.value = newContent;
-      }
-    });
+        const getCurrentContent = () => {
+            return editorContent.value;
+        };
 
-    watch(() => props.language, (newLang) => {
-      editorRef.value?.updateOptions({ language: newLang });
-    });
+        expose({
+            getCurrentContent
+        });
 
-    onBeforeUnmount(() => {
-      editorRef.value?.dispose();
-    });
-
-    return {
-      MONACO_EDITOR_OPTIONS,
-      handlePaste,
-      handleBlur,
-      handleMount,
-      editorRef,
-      code,
-      onChange,
-    };
-  },
+        return {
+            monacoEditor,
+            editorContent,
+            editorOptions,
+            handleChange,
+            handleEditorReady
+        };
+    }
 });
 </script>
 
 <style scoped>
-.editor-container {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.terminal-container {
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  padding: 10px 10px;
-  background-color: #0d0d0d;
-  display: flex;
-  flex-direction: column;
-}
-
-:deep(.xterm .xterm-viewport),
-:deep(.xterm .xterm-screen) {
-  box-sizing: border-box;
-}
-
-.terminal {
-  flex: 1;
-  max-height: 250px;
-  overflow-y: auto;
-}
+/* Remove all styles as they're now handled in BaseEditor */
 </style>

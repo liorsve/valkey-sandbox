@@ -1,0 +1,26 @@
+services:
+  backend:
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    command: ["npm", "run", "start:dev"]
+    environment:
+      - NODE_ENV=development
+      - WDS_SOCKET_PORT=443
+    stop_grace_period: 30s
+    restart: always
+
+  frontend:
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev"]
+    environment:
+      - NODE_ENV=development
+      - WDS_SOCKET_PORT=443
+    stop_grace_period: 30s
+    restart: always

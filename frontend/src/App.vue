@@ -1,558 +1,242 @@
 <template>
-  <div id="app" class="appContainer">
-    <TopTabs :activeTab="currentTab" @change-tab="switchTab" />
-    <div class="mainContent" :class="{ 'no-sidebar': hideSidebar }">
-      <div v-if="['playground', 'commonUseCases'].includes(currentTab)" class="content">
-        <Editor class="codeEditor" v-model:content="content" :language="language" />
-        <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
-      </div>
-      <div v-else-if="currentTab === 'watchInAction'" class="content">
-        <div v-if="!selectedGlide" class="overlay">
-          <button class="close-button" @click="closeOverlay">×</button>
-          <div class="selection-container">
-            <div v-if="!selectedAction">
-              <button class="selection-button" @click="selectAction('Leaderboard')">Leaderboard</button>
-              <button class="selection-button" @click="selectAction('Task Manager')">Task Manager</button>
-            </div>
-            <div v-else>
-              <button class="selection-button" @click="selectGlide('valkey-glide (Node)')">Glide - Node.js</button>
-              <button class="selection-button" @click="selectGlide('valkey-glide (Python)')">Glide - Python</button>
-              <button class="selection-button" @click="selectGlide('valkey-glide (Java)')">Glide - Java</button>
-            </div>
-          </div>
-        </div>
-        <div v-else class="watch-content">
-          <div class="editor-terminal">
-            <Editor ref="editor" v-model:content="content" :language="language" :read-only="isReadOnly" />
-            <AppTerminal class="terminal" ref="terminal" :class="terminalClass" />
-          </div>
-          <div class="visualization">
-            <LeaderboardComponent v-if="selectedAction === 'Leaderboard'" @terminal-write="handleTerminalWrite" />
-            <TaskManager v-else-if="selectedAction === 'Task Manager'" @terminal-write="handleTerminalWrite"
-              @terminal-resize="handleTerminalResize" />
-          </div>
-        </div>
-      </div>
-      <AppSidebar class="sidebar" :currentTab="currentTab" :selectedClient="selectedClient"
-        :executionMode="executionMode" @run-code="runCode" @navigate="navigate" @select-usecase="selectUseCase"
-        @update-client="updateClient" @update-mode="updateMode" />
-    </div>
+  <div class="app">
+    <TopTabs :activeTab="store.currentTab" @change-tab="handleTabChange" />
+    <main class="app-main">
+      <Sidebar
+        v-if="store.currentTab !== 'watchInAction'"
+        :current-tab="store.currentTab"
+        @content-update="handleContentUpdate"
+      />
+      <component
+        :is="currentView"
+        ref="mainComponent"
+        :current-tab="store.currentTab"
+        :content="editorContent"
+        :language="currentLanguage"
+        :terminal-visible="store.terminalVisible"
+        class="main-content"
+        :class="{ 'full-width': store.currentTab === 'watchInAction' }"
+      />
+    </main>
   </div>
 </template>
 
 <script>
-import Editor from './components/Editor.vue';
-import AppTerminal from './components/AppTerminal.vue';
-import AppSidebar from './components/Sidebar.vue';
-import LeaderboardComponent from './components/Leaderboard.vue';
-import TaskManager from './components/TaskManager.vue';
-import TopTabs from './components/TopTabs.vue';
-import { codeTemplates } from './assets/codeTemplates';
-import { watchInActionTemplates } from './assets/watchInActionTemplates.js';
+import {
+  defineComponent,
+  computed,
+  onMounted,
+  ref,
+  provide,
+  inject,
+  onBeforeUnmount,
+} from "vue";
+import { store } from "./store";
+import { EventTypes } from "./composables/useEventBus";
+import TopTabs from "./components/layout/TopTabs.vue";
+import Sidebar from "./components/layout/Sidebar.vue";
+import PlaygroundContainer from "./components/playground/PlaygroundContainer.vue";
+import WatchContainer from "./components/watch/WatchContainer.vue";
 
-export default {
-  name: 'App',
-
+export default defineComponent({
+  name: "App",
   components: {
-    Editor,
-    AppTerminal,
-    AppSidebar,
-    LeaderboardComponent,
-    TaskManager,
     TopTabs,
+    Sidebar,
+    PlaygroundContainer,
+    WatchContainer,
   },
+  setup() {
+    const mainComponent = ref(null);
+    const editorContent = ref(
+      store.getInitialCode() || "// Initial code not available."
+    );
 
-  data() {
+    const getEditorContent = () => {
+      return mainComponent.value?.getCurrentContent?.() || "";
+    };
+
+    provide("getEditorContent", getEditorContent);
+    provide("editorContent", editorContent);
+
+    const eventBus = inject("eventBus");
+    const wsManager = inject("wsManager");
+    const playgroundComponents = ["playground", "commonUseCases"];
+
+    const currentView = computed(() => {
+      const tab = store.currentTab;
+      if (!tab) return PlaygroundContainer;
+
+      switch (tab) {
+        case "watchInAction":
+          return WatchContainer;
+        case playgroundComponents.includes(tab):
+          return PlaygroundContainer;
+        default:
+          return PlaygroundContainer;
+      }
+    });
+
+    const currentLanguage = computed(() => {
+      return store.getLanguage(store.currentClient);
+    });
+
+    const editorLanguage = computed(() => {
+      return store.getLanguage(selectedClient.value);
+    });
+
+    const handleTabChange = async (tab) => {
+      try {
+        const { emit: emitEvent } = eventBus;
+        const prevTab = store.currentTab;
+
+        // Cleanup old tab
+        if (prevTab !== tab) {
+          emitEvent(EventTypes.TERMINAL_CLEAR);
+          // Avoid removing message listeners for playground components while switching between them
+          if (
+            !(
+              playgroundComponents.includes(prevTab) &&
+              playgroundComponents.includes(tab)
+            )
+          ) {
+            wsManager.removeMessageListener("sidebar");
+          }
+          wsManager.removeMessageListener("watchInAction");
+          if (prevTab === "watchInAction") {
+            await cleanupWatchComponents();
+          }
+        }
+
+        store.setTab(tab);
+
+        // Only update content if tab actually changed
+        if (prevTab !== tab) {
+          if (tab === "watchInAction") {
+            store.clearWatchState();
+          } else if (tab === "commonUseCases") {
+            if (!store.currentUseCase) {
+              store.setUseCase("Session Cache");
+            }
+            editorContent.value =
+              store.getTemplateCode(
+                store.currentClient,
+                store.currentUseCase
+              ) || "// Template not available.";
+          }
+        }
+      } catch (error) {
+        console.error("[App] Tab change error:", error);
+        store.addNotification("Error switching tabs", "error");
+      }
+    };
+
+    const cleanupWatchComponents = async () => {
+      try {
+        if (wsManager?.isConnectionValid()) {
+          await wsManager.send({
+            action: "cleanup",
+            data: { force: true },
+          });
+        }
+        store.clearWatchState();
+      } catch (error) {
+        console.error("[App] Cleanup error:", error);
+      }
+    };
+
+    const handleContentUpdate = (content) => {
+      editorContent.value = content;
+    };
+
+    const initializeWebSocket = () => {
+      console.log("[App] Initializing global WebSocket...");
+      try {
+        wsManager.connect();
+
+        onMounted(() => {
+          const healthCheck = setInterval(() => {
+            if (!wsManager.isConnectionValid()) {
+              wsManager.connect().catch((err) => {
+                console.warn("[App] Reconnection attempt failed:", err);
+              });
+            }
+          }, 30000);
+
+          onBeforeUnmount(() => clearInterval(healthCheck));
+        });
+      } catch (error) {
+        console.error("[App] WebSocket initialization error:", error);
+        store.addNotification("WebSocket connection failed", "error");
+      }
+    };
+
+    const handleWSMessage = (message) => {
+      try {
+        if (message.action === "connected") {
+          store.setConnection(true);
+        } else if (message.action === "updateLeaderboard") {
+          store.updateLeaderboard(message.payload);
+        }
+      } catch (error) {
+        console.error("[App] Message parse error:", error);
+      }
+    };
+
+    onMounted(() => {
+      initializeWebSocket();
+      wsManager.addMessageListener(handleWSMessage);
+
+      store.initializeDefaults();
+      editorContent.value = store.getInitialCode();
+
+      console.log("[App] Mounted with tab:", store.currentTab);
+    });
+
+    onBeforeUnmount(() => {
+      wsManager.removeMessageListener(handleWSMessage);
+      eventBus.off(EventTypes.CODE_EXECUTION);
+      eventBus.off(EventTypes.CODE_RESULT);
+    });
+
     return {
-      currentTab: 'playground',
-      selectedClient: 'valkey-glide (Python)',
-      executionMode: 'Standalone',
-      clients: [
-        'valkey-glide (Java)',
-        'valkey-glide (Python)',
-        'valkey-glide (Node)',
-        'valkey-py (Python)',
-        'iovalkey (Node)',
-        'valkey-go (Go)',
-        'valkey-java (Java)',
-      ],
-      executionModes: ['Standalone', 'Cluster'],
-      wsRetryCount: 0,
-      ws: null,
-      wsConnected: false,
-      wsBaseUrl: `/appws`,
-      language: 'javascript',
-      currentView: 'editor',
-      selectedUseCase: null,
-      selectedAction: null,
-      selectedGlide: null,
-      content: '',
-      hideSidebar: false,
-      isReadOnly: false,
-      terminalClass: '',
+      store,
+      currentView,
+      currentLanguage,
+      handleTabChange,
+      handleContentUpdate,
+      editorContent,
+      editorLanguage,
+      mainComponent,
+      getEditorContent,
     };
   },
-
-  created() {
-    this.setupWebSocket();
-  },
-
-  beforeUnmount() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    try {
-      this.$refs.editor?.dispose();
-      this.$refs.terminal?.dispose();
-    } catch (error) {
-      console.error('Error during cleanup:', error);
-    }
-  },
-
-  mounted() {
-    this.updateTemplate();
-  },
-
-  watch: {
-    currentTab(newTab, oldTab) {
-      if (newTab !== 'watchInAction') {
-        this.resetWatchInAction();
-        this.hideSidebar = false;
-      }
-      if (newTab === 'watchInAction') {
-        this.isReadOnly = true;
-        this.updateTemplate();
-      } else {
-        this.isReadOnly = false;
-      }
-    },
-    selectedGlide() {
-      if (this.currentTab === 'watchInAction') {
-        this.updateTemplate();
-      }
-    },
-  },
-
-  methods: {
-    getWebSocketUrl() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}/appws`;
-    },
-
-    setupWebSocket() {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        return;
-      }
-
-      const wsUrl = this.getWebSocketUrl();
-      console.log('[WS] Connecting to', wsUrl);
-
-      try {
-        this.ws = new WebSocket(wsUrl);
-
-        this.ws.onopen = () => {
-          console.log('[WS] Connected');
-          this.wsConnected = true;
-          this.wsRetryCount = 0;
-        };
-
-        this.ws.onclose = (event) => {
-          console.log('[WS] Closed:', event.code, event.reason);
-          this.wsConnected = false;
-          this.ws = null;
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('[WS] Error:', error);
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const response = JSON.parse(event.data);
-            if (response.action === 'output') {
-              this.$refs.terminal?.write(response.data);
-            }
-          } catch (error) {
-            console.error('[WS] Message parse error:', error);
-          }
-        };
-      } catch (error) {
-        console.error('[WS] Setup error:', error);
-      }
-    },
-
-    updateTemplate() {
-      if (this.currentTab === 'watchInAction') {
-        const template = watchInActionTemplates[this.selectedGlide]?.[this.selectedAction] || '';
-        if (template) {
-          this.content = template;
-          this.language = this.getLanguageForGlide(this.selectedGlide);
-        }
-      } else {
-        const selectedTemplate = codeTemplates[this.selectedClient];
-        let template;
-        if (this.currentTab === 'commonUseCases') {
-          this.executionMode = 'Cluster';
-          if (this.selectedUseCase) {
-            if (['Task Manager', 'Leaderboard'].includes(this.selectedUseCase)) {
-              template = watchInActionTemplates[this.selectedClient]?.[this.selectedUseCase] ||
-                '// No template available for selected use case';
-            } else {
-              template = selectedTemplate[this.selectedUseCase] || '// No template available for selected use case';
-            }
-          } else {
-            template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
-          }
-        } else {
-          template = selectedTemplate[this.executionMode] || '// No template available for execution mode';
-        }
-        this.content = template;
-        this.updateLanguage();
-      }
-    },
-
-    getTemplate() {
-      const selectedTemplate = codeTemplates[this.selectedClient];
-      if (!selectedTemplate) {
-        return '// No template available for selected client';
-      }
-      return selectedTemplate[this.executionMode] || '// No template available for selected mode';
-    },
-
-    updateLanguage() {
-      const clientLanguageMap = {
-        'valkey-glide (Python)': 'python',
-        'valkey-glide (Java)': 'java',
-        'valkey-glide (Node)': 'javascript',
-        'valkey-py (Python)': 'python',
-        'iovalkey (Node)': 'javascript',
-        'valkey-go (Go)': 'go',
-        'valkey-java (Java)': 'java',
-      };
-      this.language = clientLanguageMap[this.selectedClient] || 'javascript';
-    },
-
-    runCode() {
-      const code = this.content;
-      const language = this.language;
-
-      this.$refs.terminal?.write('\x1b[2J\x1b[3J\x1b[;H');
-
-      if (!this.wsConnected) {
-        this.$refs.terminal?.write('Connecting to server...\n');
-        this.setupWebSocket();
-        setTimeout(() => this.executeCode(language, code), 1000);
-        return;
-      }
-
-      this.executeCode(language, code);
-    },
-
-    executeCode(language, code) {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        try {
-          this.ws.send(
-            JSON.stringify({
-              action: 'runCode',
-              data: {
-                language,
-                code,
-                mode: this.executionMode.toLowerCase(),
-              },
-            })
-          );
-        } catch (error) {
-          console.error('Error sending code:', error);
-          this.$refs.terminal?.write('Error sending code to server\n');
-        }
-      } else {
-        this.$refs.terminal?.write('Not connected to server\n');
-      }
-    },
-
-    navigate(view) {
-      this.currentView = view;
-    },
-
-    switchTab(tabName) {
-      if (this.currentTab === 'watchInAction' && tabName === 'watchInAction') {
-        this.resetWatchInAction();
-      }
-      this.currentTab = tabName;
-      this.selectedUseCase = null;
-      this.updateTemplate();
-    },
-
-    selectUseCase(useCase) {
-      this.selectedUseCase = useCase;
-      this.updateTemplate();
-    },
-
-    selectAction(action) {
-      this.selectedAction = action;
-      this.selectedGlide = null;
-    },
-
-    selectGlide(glide) {
-      this.selectedGlide = glide;
-      this.hideSidebar = true;
-      this.updateTemplateForAction();
-    },
-
-    updateTemplateForAction() {
-      const selectedTemplate = codeTemplates[this.selectedGlide];
-      const templateKey =
-        this.selectedAction.charAt(0).toUpperCase() + this.selectedAction.slice(1);
-      const template =
-        selectedTemplate[templateKey] || '// No template available for selected action';
-      this.content = template;
-      this.updateLanguage();
-    },
-
-    getLanguageForGlide(glide) {
-      switch (glide) {
-        case 'valkey-glide (Python)':
-          return 'python';
-        case 'valkey-glide (Node)':
-          return 'javascript';
-        case 'valkey-glide (Java)':
-          return 'java';
-        default:
-          return 'python';
-      }
-    },
-
-    onContentChange(newContent) {
-      this.content = newContent;
-    },
-    updateClient(newClient, newMode) {
-      this.selectedClient = newClient;
-      this.executionMode = newMode;
-      this.updateTemplate();
-    },
-    updateMode(newClient, newMode) {
-      this.selectedClient = newClient;
-      this.executionMode = newMode;
-      this.updateTemplate();
-    },
-    closeOverlay() {
-      this.resetWatchInAction();
-      this.currentTab = 'playground';
-    },
-    resetWatchInAction() {
-      this.selectedAction = null;
-      this.selectedGlide = null;
-      this.hideSidebar = false;
-    },
-    handleTerminalWrite(message) {
-      this.$refs.terminal?.write(message);
-    },
-    handleTerminalResize(size) {
-      this.terminalClass = size === 'double-height' ? 'double-height' : '';
-    },
-  },
-};
+});
 </script>
 
 <style>
-body {
-  background-color: #121212;
-  color: #ffffff;
-  margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-#app {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.appContainer {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+.app {
   height: 100vh;
-}
-
-.mainContent {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  padding: 15px;
-  gap: 15px;
-  overflow: hidden;
-  position: static;
-}
-
-.mainContent.no-sidebar .sidebar {
-  display: none;
-}
-
-.mainContent.no-sidebar {
-  padding: 0;
-}
-
-.content {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 15px;
-}
-
-.codeEditor {
-  flex: 2;
-  min-height: 0;
-}
-
-.terminal {
-  flex: 1;
-  background-color: #1e1e1e;
-  min-height: 0;
-}
-
-.sidebar {
-  width: 250px;
-  flex-shrink: 0;
-  order: 2;
-}
-
-.editor-terminal,
-.visualization {
-  height: 100%;
-}
-
-.action-selection,
-.glide-selection {
-  display: flex;
-  gap: 10px;
-  margin: 10px 0;
-}
-
-.editor-terminal {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.editor-terminal>* {
-  flex: 1;
+  background: #121212;
+  color: #ffffff;
   overflow: hidden;
+  /* Prevent scrolling on main container */
 }
 
-.visualization {
+.app-main {
   flex: 1;
-  background-color: #1e1e1e;
-  border-radius: 10px;
+  display: flex;
   overflow: hidden;
+  position: relative;
 }
 
-.sidebar {
-  z-index: 10;
+.main-content {
+  flex: 1;
 }
 
-@media (max-width: 768px) {
-  .mainContent {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    order: 1;
-  }
-}
-
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
+.main-content.full-width {
   width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.selection-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.selection-button {
-  padding: 20px 40px;
-  font-size: 24px;
-  background: linear-gradient(45deg, #6a11cb, #2575fc);
-  color: #fff;
-  border: none;
-  border-radius: 15px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  margin-bottom: 20px;
-  margin-right: 20px;
-}
-
-.selection-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-}
-
-.close-button {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 36px;
-  background: none;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-.close-button:hover {
-  color: #ccc;
-}
-
-.watch-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  gap: 15px;
-}
-
-.editor-terminal {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-terminal>* {
-  flex: 1;
-  overflow: hidden;
-}
-
-.visualization {
-  flex: 1;
-  background-color: #1e1e1e;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.content,
-.mainContent {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.double-height {
-  min-height: 500px;
 }
 </style>

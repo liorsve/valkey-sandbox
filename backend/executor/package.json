@@ -1,0 +1,25 @@
+{
+    "name": "valkey-executor",
+    "version": "1.0.0",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "nodemon src/index.js --ignore '/app/temp/*'"
+    },
+    "dependencies": {
+        "express": "5.0.1",
+        "iovalkey": "0.2.1",
+        "@valkey/valkey-glide": "1.2.1"
+    },
+    "devDependencies": {
+        "nodemon": "3.1.9"
+    },
+    "nodemonConfig": {
+        "ignore": [
+            "/app/temp/*",
+            "/app/temp/**/*"
+        ],
+        "delay": "250"
+    }
+}
