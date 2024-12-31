@@ -90,10 +90,8 @@ export default defineComponent({
         const { emit: emitEvent } = eventBus;
         const prevTab = store.currentTab;
 
-        // Cleanup old tab
         if (prevTab !== tab) {
           emitEvent(EventTypes.TERMINAL_CLEAR);
-          // Avoid removing message listeners for playground components while switching between them
           if (
             !(
               playgroundComponents.includes(prevTab) &&
@@ -110,7 +108,6 @@ export default defineComponent({
 
         store.setTab(tab);
 
-        // Only update content if tab actually changed
         if (prevTab !== tab) {
           if (tab === "watchInAction") {
             store.clearWatchState();
