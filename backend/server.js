@@ -3,6 +3,7 @@ import cors from "cors";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { MessageHandlers } from "./handlers/MessageHandlers.js";
+import documentationRoutes from "./routes/documentationRoutes.js";
 
 // Prevent memory leaks
 process.setMaxListeners(5);
@@ -28,6 +29,9 @@ app.use(express.json());
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+// Add documentation routes
+app.use("/api", documentationRoutes);
 
 const startServer = async () => {
   const server = createServer(app);

@@ -3,7 +3,7 @@
     <TopTabs :activeTab="store.currentTab" @change-tab="handleTabChange" />
     <main class="app-main">
       <Sidebar
-        v-if="store.currentTab !== 'watchInAction'"
+        v-if="showDefaultSidebar"
         :current-tab="store.currentTab"
         @content-update="handleContentUpdate"
       />
@@ -15,7 +15,10 @@
         :language="currentLanguage"
         :terminal-visible="store.terminalVisible"
         class="main-content"
-        :class="{ 'full-width': store.currentTab === 'watchInAction' }"
+        :class="{
+          'full-width': store.currentTab === 'watchInAction',
+          'with-sidebar': showDefaultSidebar,
+        }"
       />
     </main>
   </div>
@@ -37,6 +40,7 @@ import TopTabs from "./components/layout/TopTabs.vue";
 import Sidebar from "./components/layout/Sidebar.vue";
 import PlaygroundContainer from "./components/playground/PlaygroundContainer.vue";
 import WatchContainer from "./components/watch/WatchContainer.vue";
+import HelpfulResources from "./components/helpfulresources/HelpfulResources.vue";
 
 export default defineComponent({
   name: "App",
@@ -45,6 +49,7 @@ export default defineComponent({
     Sidebar,
     PlaygroundContainer,
     WatchContainer,
+    HelpfulResources,
   },
   setup() {
     const mainComponent = ref(null);
@@ -70,6 +75,8 @@ export default defineComponent({
       switch (tab) {
         case "watchInAction":
           return WatchContainer;
+        case "helpfulResources":
+          return HelpfulResources;
         case playgroundComponents.includes(tab):
           return PlaygroundContainer;
         default:
@@ -180,6 +187,10 @@ export default defineComponent({
       }
     };
 
+    const showDefaultSidebar = computed(() => {
+      return !["watchInAction", "helpfulResources"].includes(store.currentTab);
+    });
+
     onMounted(() => {
       initializeWebSocket();
       wsManager.addMessageListener(handleWSMessage);
@@ -206,6 +217,7 @@ export default defineComponent({
       editorLanguage,
       mainComponent,
       getEditorContent,
+      showDefaultSidebar,
     };
   },
 });
@@ -235,5 +247,9 @@ export default defineComponent({
 
 .main-content.full-width {
   width: 100%;
+}
+
+.main-content.with-sidebar {
+  margin-left: var(--sidebar-width);
 }
 </style>

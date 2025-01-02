@@ -1,5 +1,6 @@
 import { reactive, watch } from "vue";
 import dataNavigator from "../data/index";
+import documentationService from "../services/documentationService";
 
 const DEFAULT_STATE = {
   currentClient: "glide-node",
@@ -14,6 +15,7 @@ const VALID_TABS = [
   "watchInAction",
   "commonUseCases",
   "community",
+  "helpfulResources",
 ];
 
 // Separate hash validation from state initialization
@@ -79,6 +81,7 @@ const isValidHash = (hash) => {
     "watchInAction",
     "commonUseCases",
     "community",
+    "helpfulResources",
   ].includes(hash);
 };
 
@@ -417,6 +420,42 @@ export const store = reactive({
 
   updateLeaderboard(newData) {
     this.leaderboard = newData;
+  },
+
+  // Add these methods to the store object
+  searchDocumentation: async (query) => {
+    return await documentationService.searchDocs(query);
+  },
+
+  getDocumentationSections: (pageId) => {
+    switch (pageId) {
+      case "commands":
+        return [
+          { id: "strings", title: "Strings" },
+          { id: "hashes", title: "Hashes" },
+          { id: "lists", title: "Lists" },
+          { id: "sets", title: "Sets" },
+          { id: "sorted-sets", title: "Sorted Sets" },
+          { id: "streams", title: "Streams" },
+        ];
+      case "clients":
+        return [
+          { id: "python", title: "Python" },
+          { id: "nodejs", title: "Node.js" },
+          { id: "java", title: "Java" },
+          { id: "go", title: "Go" },
+        ];
+      default:
+        return [];
+    }
+  },
+
+  getGeneralConcepts: async () => {
+    return await documentationService.getGeneralConcepts();
+  },
+
+  getCommandReference: async () => {
+    return await documentationService.getCommandDocs();
   },
 });
 
