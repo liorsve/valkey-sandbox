@@ -1,6 +1,5 @@
 <template>
   <div class="valkey-clients">
-    <!-- Show languages grid when no language is selected -->
     <div v-if="!selectedLang" class="languages-grid">
       <div
         v-for="lang in languages"
@@ -16,7 +15,6 @@
       </div>
     </div>
 
-    <!-- Show clients list when language is selected but no client is selected -->
     <div v-else-if="!selectedClient" class="clients-container">
       <button class="back-btn" @click="handleBack">← Back to Languages</button>
       <h2>{{ selectedLang }} Clients</h2>
@@ -35,7 +33,6 @@
       </div>
     </div>
 
-    <!-- Show client details when both language and client are selected -->
     <div v-else class="client-detail">
       <button class="back-btn" @click="handleBack">
         ← Back to {{ selectedLang }} Clients
@@ -47,9 +44,10 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import documentationService from "@/services/documentationService";
 import cacheService from "@/services/cacheService";
+import store from "@/store";
 
 export default {
   name: "ValkeyClients",
@@ -63,10 +61,18 @@ export default {
     const clientCounts = ref({});
 
     onMounted(async () => {
-      try {
-        languages.value = await documentationService.getClientLanguages();
-      } catch (error) {
-        console.error("Failed to load languages:", error);
+      if (!languages.value.length) {
+        loading.value = true;
+        try {
+          await store.initializeDocumentation("languages");
+          const languagesData = store.documentationState.languages.data;
+          languages.value = Array.isArray(languagesData) ? languagesData : [];
+        } catch (error) {
+          console.error("Failed to load languages:", error);
+          languages.value = ["javascript", "python"];
+        } finally {
+          loading.value = false;
+        }
       }
     });
 

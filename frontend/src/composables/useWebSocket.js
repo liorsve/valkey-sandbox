@@ -10,6 +10,8 @@ class WebSocketManager {
     this.retryDelay = 5000;
     this.lastUrl = null;
     this.eventBus = eventBus;
+    this._healthCheckInterval = null;
+    this._cleanupInProgress = false;
   }
 
   buildWebSocketUrl() {
@@ -118,41 +120,38 @@ class WebSocketManager {
   }
 
   connect() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
-
-    try {
-      const wsUrl = this.buildWebSocketUrl();
-      console.log("[WS] Connecting to:", wsUrl);
-
-      this.ws = new WebSocket(wsUrl);
-      this.lastUrl = wsUrl;
-
-      this.ws.onopen = () => {
-        this.retryCount = 0;
-        console.log("[WS] Connection established");
-        this.eventBus.emit(EventTypes.WS_OPEN);
-      };
-
-      this.ws.onmessage = (event) => this.handleMessage(event);
-
-      this.ws.onclose = (event) => {
-        console.log("[WS] Connection closed", event.code, event.reason);
-        this.eventBus.emit(EventTypes.WS_CLOSE, event);
-        if (!event.wasClean) {
-          this.handleReconnect();
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("[WS] Connection error:", error);
-        this.eventBus.emit(EventTypes.WS_ERROR, error);
-        this.ws.close();
-      };
-    } catch (error) {
-      console.error("[WS] Setup error:", error);
-      this.eventBus.emit(EventTypes.WS_ERROR, error);
-      this.handleReconnect();
+    if (
+      this.isConnectionValid() ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
+      return Promise.resolve(this.ws);
     }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = this.buildWebSocketUrl();
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+          this.retryCount = 0;
+          this.eventBus.emit(EventTypes.WS_OPEN);
+          resolve(this.ws);
+        };
+
+        this.ws.onerror = (error) => {
+          this.eventBus.emit(EventTypes.WS_ERROR, error);
+          reject(error);
+        };
+
+        this.ws.onmessage = (event) => this.handleMessage(event);
+        this.ws.onclose = (event) => {
+          this.eventBus.emit(EventTypes.WS_CLOSE, event);
+          if (!event.wasClean) this.handleReconnect();
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   handleReconnect() {
@@ -172,22 +171,10 @@ class WebSocketManager {
   }
 
   addMessageListener(listener, component = "global") {
-    if (typeof listener !== "function") {
-      console.warn("[WS] Invalid listener type:", typeof listener);
-      return;
-    }
+    if (typeof listener !== "function") return;
 
-    if (component !== "global") {
-      const existing = Array.from(this.listeners).find(
-        (l) => l.component === component
-      );
-      if (existing) {
-        console.debug(
-          `[WS] Removing existing listener for component: ${component}`
-        );
-        this.removeMessageListener(component);
-      }
-    }
+    // Remove existing listener for the component if it exists
+    this.removeMessageListener(component);
 
     const listenerObj = {
       callback: listener,
@@ -196,7 +183,6 @@ class WebSocketManager {
     };
 
     this.listeners.add(listenerObj);
-    console.debug(`[WS] Added listener for component: ${component}`);
     return listenerObj.id;
   }
 
@@ -227,13 +213,26 @@ class WebSocketManager {
     }
   }
 
-  send(data) {
+  async send(data) {
     if (!this.isConnectionValid()) {
       console.warn("[WS] Cannot send message - connection not ready");
       return Promise.reject(new Error("WebSocket connection not ready"));
     }
 
+    // Prevent duplicate cleanup messages
+    if (data.action === "cleanup" && this._cleanupInProgress) {
+      console.debug("[WS] Cleanup already in progress, skipping");
+      return Promise.resolve();
+    }
+
     try {
+      if (data.action === "cleanup") {
+        this._cleanupInProgress = true;
+        setTimeout(() => {
+          this._cleanupInProgress = false;
+        }, 1000);
+      }
+
       const formattedMessage =
         typeof data === "string" ? data : JSON.stringify(data);
       this.ws.send(formattedMessage);
@@ -252,6 +251,26 @@ class WebSocketManager {
     if (this.ws) {
       this.ws.close(1000, "Client shutting down");
       console.log("[WS] WebSocket closed gracefully");
+    }
+  }
+
+  // Add health check method
+  startHealthCheck(interval = 30000) {
+    if (this._healthCheckInterval) return;
+
+    this._healthCheckInterval = setInterval(() => {
+      if (!this.isConnectionValid()) {
+        this.connect().catch((err) => {
+          console.warn("[WS] Reconnection attempt failed:", err);
+        });
+      }
+    }, interval);
+  }
+
+  stopHealthCheck() {
+    if (this._healthCheckInterval) {
+      clearInterval(this._healthCheckInterval);
+      this._healthCheckInterval = null;
     }
   }
 }

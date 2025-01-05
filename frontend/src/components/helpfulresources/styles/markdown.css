@@ -1,0 +1,587 @@
+.markdown-body {
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 45px;
+  background: var(--surface-dark);
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  line-height: 1.6;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--surface-light);
+  background: var(--surface-dark) !important;
+  border: 1px solid var(--primary-color) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+  background-image: linear-gradient(
+    to bottom,
+    var(--surface-dark),
+    var(--surface-darker)
+  ) !important;
+  background: linear-gradient(135deg, var(--surface-dark) 0%, var(--surface-darker) 100%) !important;
+  border: 1px solid var(--primary-color) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(var(--primary-color-rgb), 0.1) !important;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.markdown-body h1 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: var(--primary-color);
+  text-shadow: 0 0 20px rgba(var(--primary-color-rgb), 0.2);
+  background: linear-gradient(90deg, var(--primary-color), transparent) !important;
+  padding: 1rem 2rem !important;
+  border-radius: var(--radius-md) !important;
+  margin-left: -2rem !important;
+  margin-right: -2rem !important;
+}
+
+.markdown-body h2 {
+  font-size: 1.8rem;
+  margin-top: 3rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--surface-light);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--surface-light) !important;
+  position: relative !important;
+  margin-top: 3rem !important;
+}
+
+.markdown-body h2::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100px;
+  height: 2px;
+  background: var(--primary-color) !important;
+}
+
+.markdown-body a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface-darker);
+  border-radius: var(--radius-sm);
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  background: var(--surface-darker) !important;
+  border: 1px solid var(--surface-light) !important;
+  padding: 0.75rem 1.25rem !important;
+  margin: 0.25rem !important;
+  border-radius: var(--radius-md) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.75rem !important;
+  min-width: 0 !important; /* Prevent overflow */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  background: var(--surface-darker) !important;
+  border: 1px solid var(--surface-light) !important;
+  padding: 0.75rem 1.25rem !important;
+  margin: 0 !important;
+  border-radius: var(--radius-md) !important;
+  position: relative !important;
+  padding: 0.75rem 1rem !important;
+  background: var(--surface-darker) !important;
+  border: 1px solid var(--surface-light) !important;
+  border-radius: var(--radius-md) !important;
+  transition: all 0.3s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  color: var(--primary-color) !important;
+}
+
+.markdown-body a:hover {
+  transform: translateY(-2px);
+  background: var(--surface-light);
+  transform: translateY(-2px) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 12px rgba(var(--primary-color-rgb), 0.2) !important;
+  transform: translateY(-2px) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 12px rgba(var(--primary-color-rgb), 0.2) !important;
+  background: var(--surface-dark) !important;
+}
+
+.markdown-body a::before {
+  content: "→";
+  color: var(--primary-color);
+  font-weight: bold;
+  content: "→" !important;
+  font-weight: bold !important;
+}
+
+.markdown-body .anchor {
+  float: left;
+  padding-right: 4px;
+  margin-left: -20px;
+  line-height: 1;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.markdown-body h1:hover .anchor,
+.markdown-body h2:hover .anchor,
+.markdown-body h3:hover .anchor {
+  opacity: 1;
+}
+
+.markdown-body pre {
+  background: var(--surface-darker) !important;
+  border: 1px solid var(--surface-light);
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  background: var(--surface-darker) !important;
+  border: 1px solid var(--surface-light) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  background: var(--surface-darker) !important;
+  border: 1px solid rgba(var(--primary-color-rgb), 0.2) !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  margin: 0 !important;
+  padding: 3rem 1.5rem 1.5rem !important;
+}
+
+.markdown-body pre::before {
+  content: 'TypeScript';
+  position: absolute;
+  top: 0;
+  right: 1rem;
+  background: var(--primary-color);
+  padding: 0.2rem 0.8rem;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--surface-darker);
+  opacity: 0.8;
+}
+
+.markdown-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  padding: 0.2em 0.4em;
+  background: var(--surface-darker);
+  border-radius: 3px;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.markdown-body th {
+  background: var(--surface-darker);
+}
+
+/* Remove list grid styling */
+.markdown-body ul {
+  padding-left: 2rem;
+  list-style: disc;
+}
+
+.markdown-body li {
+  padding: 0.25rem 0;
+  background: none;
+  border: none;
+}
+
+/* Hide emoji markers */
+.markdown-body h2:first-child img,
+.markdown-body h3:first-child img {
+  display: none;
+}
+
+/* Remove visited link color */
+.markdown-body a:visited {
+  color: var(--primary-color);
+}
+
+/* Hide section markers */
+.markdown-body h2 [data-section-marker],
+.markdown-body h3 [data-section-marker] {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .markdown-body {
+    padding: 15px;
+  }
+}
+
+.markdown-body .content-section {
+  background: var(--surface-dark);
+  border: 1px solid var(--surface-light);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved links layout */
+.markdown-body .links-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Three columns */
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(200px, 1fr)) !important;
+  gap: 1rem !important;
+  margin: 2rem 0 !important;
+  max-width: 100% !important;
+  overflow-x: visible !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 1.5rem !important;
+  margin: 2rem 0 !important;
+  grid-auto-rows: auto !important;
+  grid-auto-flow: row !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  gap: 1rem !important;
+  margin: 2rem 0 !important;
+  grid-auto-rows: min-content !important;
+}
+
+.markdown-body pre > code {
+  display: block;
+  background: var(--surface-darker);
+  color: var(--text-primary);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.markdown-body pre > code.language-typescript,
+.markdown-body pre > code.language-ts {
+  background: var(--surface-darker);
+}
+
+.markdown-body pre > code.hljs {
+  background: transparent !important;
+  color: #9cdcfe;
+  padding: 0;
+}
+
+.hljs {
+  background: transparent !important;
+  color: #9cdcfe !important;
+}
+
+/* TypeScript syntax highlighting */
+.hljs-keyword { color: #c586c0 !important; }
+.hljs-string { color: #ce9178 !important; }
+.hljs-function { color: #dcdcaa !important; }
+.hljs-comment { color: #6a9955 !important; }
+.hljs-number { color: #b5cea8 !important; }
+.hljs-literal { color: #569cd6 !important; }
+.hljs-variable { color: #9cdcfe !important; }
+.hljs-operator { color: #d4d4d4 !important; }
+.hljs-type { color: #4ec9b0 !important; }
+.hljs-built_in { color: #4ec9b0 !important; }
+.hljs-class { color: #4ec9b0 !important; }
+.hljs-property { color: #9cdcfe !important; }
+.hljs-params { color: #9cdcfe !important; }
+
+/* Add some nice styling touches */
+.markdown-body p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  color: var(--text-secondary) !important;
+  line-height: 1.8 !important;
+  margin: 1.5rem 0 !important;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--primary-color);
+  margin: 1.5rem 0;
+  padding: 1rem 1.5rem;
+  background: var(--surface-darker);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+/* Syntax highlighting with !important */
+.hljs-keyword { color: #c586c0 !important; font-style: italic !important; }
+.hljs-string { color: #ce9178 !important; }
+.hljs-function { color: #dcdcaa !important; font-weight: 600 !important; }
+.hljs-comment { color: #6a9955 !important; font-style: italic !important; }
+.hljs-number { color: #b5cea8 !important; }
+.hljs-literal { color: #569cd6 !important; font-weight: 600 !important; }
+.hljs-variable { color: #9cdcfe !important; }
+.hljs-operator { color: #d4d4d4 !important; }
+.hljs-class { color: #4ec9b0 !important; font-weight: 600 !important; }
+.hljs-property { color: #9cdcfe !important; }
+.hljs-builtin { color: #4ec9b0 !important; }
+
+/* Code block styling */
+.markdown-body .code-block {
+  position: relative !important;
+  margin: 2rem 0 !important;
+  background: var(--surface-darker) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden !important;
+}
+
+.markdown-body .code-header {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: 0 !important;
+  background: rgba(var(--primary-color-rgb), 0.1) !important;
+  padding: 0.5rem 1rem !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  border-bottom: 1px solid rgba(var(--primary-color-rgb), 0.2) !important;
+}
+
+.markdown-body .code-lang {
+  color: var(--primary-color) !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+
+/* Fix shiki highlighting */
+.markdown-body :deep(.shiki) {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.markdown-body :deep(.shiki code) {
+  counter-reset: step !important;
+  counter-increment: step 0 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.markdown-body :deep(.line) {
+  position: relative !important;
+  padding-left: 1.5rem !important;
+}
+
+.markdown-body :deep(.line::before) {
+  content: counter(step) !important;
+  counter-increment: step !important;
+  position: absolute !important;
+  left: 0 !important;
+  color: var(--text-secondary) !important;
+  opacity: 0.5 !important;
+  font-size: 0.8rem !important;
+  padding-right: 1rem !important;
+}
+
+/* Enhanced emoji styling */
+.markdown-body .emoji {
+  font-size: 1.2em;
+  vertical-align: middle;
+  margin: 0 0.2em;
+}
+
+/* Improved headings with emoji support */
+.markdown-body .markdown-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.markdown-body .markdown-heading .emoji {
+  font-size: 1.5em;
+}
+
+/* Level-specific heading styles */
+.markdown-body .level-1 {
+  font-size: 2.5rem;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 2rem;
+}
+
+.markdown-body .level-2 {
+  font-size: 2rem;
+  color: var(--text-primary);
+  margin-top: 3rem;
+}
+
+.markdown-body .level-3 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+/* Heading anchor links */
+.markdown-body .heading-anchor {
+  margin-left: 0.5rem;
+  opacity: 0;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.markdown-body .markdown-heading:hover .heading-anchor {
+  opacity: 1;
+}
+
+/* Enhanced code blocks */
+.markdown-body .code-block {
+  position: relative;
+  margin: 2rem 0;
+  background: var(--surface-darker);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.markdown-body .code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--surface-light);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.markdown-body .code-lang {
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Enhanced link styling */
+.markdown-body .enhanced-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface-darker);
+  border: 1px solid var(--surface-light);
+  border-radius: var(--radius-md);
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.markdown-body .enhanced-link:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-color);
+  box-shadow: var(--fun-shadow);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .markdown-body .level-1 {
+    font-size: 2rem;
+  }
+  
+  .markdown-body .level-2 {
+    font-size: 1.75rem;
+  }
+  
+  .markdown-body .level-3 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Function Documentation Specific Styles */
+.heading-emoji {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 1.2em;
+  vertical-align: middle;
+}
+
+.function-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary-color);
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.function-link:hover {
+  background: var(--surface-lighter);
+  transform: translateY(-1px);
+}
+
+.function-table {
+  margin: 2rem 0;
+  overflow-x: auto;
+}
+
+.function-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-darker);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.function-table th {
+  background: var(--surface-light);
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.function-table td {
+  padding: 1rem;
+  border-top: 1px solid var(--surface-light);
+}
+
+/* Method section styling */
+.markdown-body h3[id^="gear-"] {
+  margin-top: 3rem;
+  padding: 1rem;
+  background: var(--surface-darker);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary-color);
+}
+
+/* Parameter tables */
+.markdown-body h4 + table {
+  margin-top: 1rem;
+  font-size: 0.9em;
+}
+
+/* Examples sections */
+.markdown-body h4:last-of-type + pre {
+  margin-top: 1rem;
+  background: var(--surface-darker);
+}

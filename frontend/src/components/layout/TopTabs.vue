@@ -11,7 +11,6 @@
       </button>
     </div>
 
-    <!-- Replace button or search box -->
     <div v-if="showHeaderExtra" class="header-extra">
       <template v-if="activeTab === 'watchInAction' && hasSelection">
         <div class="connection-line"></div>
@@ -96,9 +95,6 @@ export default {
     };
 
     const handleTabClick = (tabName) => {
-      if (tabName === "helpfulResources") {
-        store.fetchAllDocumentation();
-      }
       if (
         tabName === "watchInAction" &&
         props.activeTab === "watchInAction" &&
@@ -339,16 +335,15 @@ export default {
 }
 
 .docs-search-container {
-  position: absolute; /* Changed from fixed */
+  position: fixed !important;
   top: 0;
   left: 0;
-  width: var(--sidebar-width);
+  width: calc(var(--sidebar-width) - 32px); /* Further reduced width */
   height: var(--top-tabs-height);
   z-index: 1000;
-  padding: 0.5rem;
+  padding: 0;
   background: var(--surface-darker);
   border-right: 1px solid var(--surface-light);
-  border-bottom: 1px solid var(--surface-light);
 }
 
 .docs-search {
@@ -359,11 +354,11 @@ export default {
 
 .docs-search input {
   width: 100%;
-  max-width: calc(var(--sidebar-width) - 2rem);
   height: 100%;
   padding: 0 1rem;
-  border-radius: var(--radius-md);
   border: 1px solid var(--surface-light);
+  border-left: 0;
+  border-top: 0;
   background: var(--surface-dark);
   color: var(--text-primary);
   font-size: 0.9rem;
@@ -379,7 +374,7 @@ export default {
   position: absolute;
   top: calc(100% + 0.5rem);
   left: 0;
-  width: 100%; /* Match parent width */
+  width: 100%;
   background: var(--surface-dark);
   border: 1px solid var(--surface-light);
   border-radius: var(--radius-md);

@@ -1,8 +1,33 @@
-import { marked } from "marked";
+import { renderMarkdown } from "@/utils/markdownRenderer";
 
 class DocumentationService {
   constructor() {
-    this.API_BASE = "/api";
+    this.API_BASE = "http://localhost:3000/api";
+  }
+
+  async validateResponse(response, context) {
+    if (!response.ok) {
+      throw new Error(
+        `API Error (${response.status}): Failed to fetch ${context}`
+      );
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error(`Invalid response type for ${context}`);
+    }
+
+    const text = await response.text();
+    if (!text) {
+      throw new Error(`Empty response for ${context}`);
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error(`JSON parse error for ${context}:`, text);
+      throw new Error(`Invalid JSON response for ${context}`);
+    }
   }
 
   async fetchContent(path) {
@@ -11,7 +36,7 @@ class DocumentationService {
       if (!response.ok) throw new Error(`Failed to fetch ${path}`);
 
       const { content } = await response.json();
-      return marked(content);
+      return renderMarkdown(content);
     } catch (error) {
       console.error("Documentation fetch error:", error);
       throw error;
@@ -36,40 +61,102 @@ class DocumentationService {
   }
 
   async getGeneralConcepts() {
-    const response = await fetch(`${this.API_BASE}/docs/topics`);
-    const { topics } = await response.json();
-    return topics;
+    try {
+      const response = await fetch(`${this.API_BASE}/docs/topics`);
+      console.log("Topics response:", response); // Debug logging
+      const data = await this.validateResponse(response, "topics");
+
+      if (!data.topics || !Array.isArray(data.topics)) {
+        return this.getDefaultGeneralConcepts();
+      }
+
+      return data.topics;
+    } catch (error) {
+      console.error("Topics fetch error:", error);
+      throw error;
+    }
+  }
+
+  getDefaultGeneralConcepts() {
+    return [
+      {
+        id: "intro",
+        title: "Introduction to Valkey",
+        content: `# Introduction to Valkey
+        
+Valkey is a modern distributed key-value store system designed for high performance and scalability.
+
+## Key Features
+
+- Distributed Architecture
+- High Availability
+- Horizontal Scaling
+- Rich Data Structures
+- Multi-Language Support`,
+      },
+      {
+        id: "architecture",
+        title: "System Architecture",
+        content: `# Valkey Architecture
+
+## Core Components
+
+- Distributed Storage Engine
+- Replication Manager
+- Client Protocol Handler
+- Command Processor`,
+      },
+    ];
   }
 
   async getClientDocs() {
     const files = await this.fetchDirectory("/clients");
     return Promise.all(
       files.map(async (file) => {
-        const content = await this.fetchContent(`/clients/${file.name}`);
+        const rawContent = await this.fetchContent(`/clients/${file.name}`);
         return {
           id: file.name.replace(".md", ""),
           title: file.name.replace(".md", ""),
-          content,
+          content: renderMarkdown(rawContent),
         };
       })
     );
   }
 
   async getModuleDocs() {
-    return this.fetchContent("/modules/community/github.com/README.md");
+    const rawContent = await this.fetchContent(
+      "/modules/community/github.com/README.md"
+    );
+    return renderMarkdown(rawContent);
   }
 
-  async getGlideDocs() {
+  async getRenderedGlideDocs() {
     try {
-      const response = await fetch(`/api/docs/glide/README.md`);
-      if (!response.ok) throw new Error("Failed to fetch Glide docs");
+      const response = await fetch("/docs/GLIDE_DOCS.md");
+      if (!response.ok) throw new Error("Failed to load Glide docs");
 
-      const data = await response.json();
-      return data.content; // Assuming backend returns { content: '...' }
+      const text = await response.text();
+      return text ? renderMarkdown(text) : this.getDefaultGlideDocs();
     } catch (error) {
-      console.error("Failed to load Glide docs:", error);
-      throw error;
+      console.warn("Failed to load Glide docs, using default:", error);
+      return this.getDefaultGlideDocs();
     }
+  }
+
+  getDefaultGlideDocs() {
+    return renderMarkdown(`# Valkey Glide Documentation
+
+## Overview
+
+Valkey Glide is the official client library interface for Valkey.
+
+## Features
+
+- Simple API
+- Type Safety
+- Connection Pooling
+- Automatic Reconnection
+- Transaction Support`);
   }
 
   async getModules() {
@@ -91,9 +178,34 @@ class DocumentationService {
   }
 
   async getCommands() {
-    const response = await fetch(`${this.API_BASE}/docs/commands`);
-    const { commands } = await response.json();
-    return commands;
+    try {
+      const response = await fetch(`${this.API_BASE}/docs/commands`);
+      console.log("Commands response:", response);
+      const data = await this.validateResponse(response, "commands");
+      return data.commands;
+    } catch (error) {
+      console.error("Commands fetch error:", error);
+      throw error;
+    }
+  }
+
+  getDefaultCommands() {
+    return [
+      {
+        name: "GET",
+        category: "Strings",
+        description: "Get the value of a key",
+        syntax: "GET key",
+        examples: ["GET mykey"],
+      },
+      {
+        name: "SET",
+        category: "Strings",
+        description: "Set the string value of a key",
+        syntax: "SET key value [EX seconds] [NX|XX]",
+        examples: ["SET mykey value"],
+      },
+    ];
   }
 
   async getCommandContent(commandId) {
@@ -103,9 +215,14 @@ class DocumentationService {
   }
 
   async getClientLanguages() {
-    const response = await fetch(`${this.API_BASE}/docs/clients/languages`);
-    const { languages } = await response.json();
-    return languages;
+    try {
+      const response = await fetch(`${this.API_BASE}/docs/clients/languages`);
+      const data = await this.validateResponse(response, "languages");
+      return data.languages || [];
+    } catch (error) {
+      console.error("Failed to fetch languages:", error);
+      return ["javascript", "python"];
+    }
   }
 
   async getLanguageClients(language) {

@@ -1,6 +1,6 @@
 import { reactive, watch } from "vue";
 import dataNavigator from "../data/index";
-import documentationService from "../services/documentationService";
+import lazyDocumentation from "../services/lazyDocumentation";
 
 const DEFAULT_STATE = {
   currentClient: "glide-node",
@@ -18,13 +18,11 @@ const VALID_TABS = [
   "helpfulResources",
 ];
 
-// Separate hash validation from state initialization
 const getTabFromHash = () => {
   const hashTab = window.location.hash.slice(1);
   return VALID_TABS.includes(hashTab) ? hashTab : DEFAULT_STATE.currentTab;
 };
 
-// Initialize saved state without depending on getInitialTab
 const savedState = (() => {
   try {
     const stored = localStorage.getItem("valkey-sandbox-state");
@@ -75,16 +73,6 @@ const CONFIG = {
   ],
 };
 
-const isValidHash = (hash) => {
-  return [
-    "playground",
-    "watchInAction",
-    "commonUseCases",
-    "community",
-    "helpfulResources",
-  ].includes(hash);
-};
-
 export const store = reactive({
   currentClient: savedState.currentClient || DEFAULT_STATE.currentClient,
   executionMode: savedState.executionMode || DEFAULT_STATE.executionMode,
@@ -98,6 +86,13 @@ export const store = reactive({
     selectedAction: null,
   },
   leaderboard: savedState.leaderboard || DEFAULT_STATE.leaderboard,
+
+  documentationState: {
+    languages: { loaded: false, data: null },
+    topics: { loaded: false, data: null },
+    commands: { loaded: false, data: null },
+    currentSection: null,
+  },
 
   setLastEditorContent(content) {
     this.lastEditorContent = content;
@@ -148,47 +143,49 @@ export const store = reactive({
     return sections;
   },
 
-  getTemplateCode(clientId, templateName) {
+  async getTemplateCode(clientId, templateName) {
     if (!clientId || !templateName) {
-      return "// Default template due to missing client or template.";
+      return "// Missing client or template name";
     }
-    const template = dataNavigator.getTemplate(clientId, templateName);
 
-    if (template && template.code) {
-      return template.code;
+    try {
+      const template = await dataNavigator.getTemplate(clientId, templateName);
+      return template?.code || "// No template content available";
+    } catch (error) {
+      console.error("[Store] Template loading error:", error);
+      return "// Error loading template";
     }
-    console.warn(
-      `No template found for clientId "${clientId}" and templateName "${templateName}".`
-    );
-    return "// No template available for this configuration";
   },
 
-  getInitialCode() {
-    if (this.currentTab === "watchInAction" && this.watchState.selectedClient) {
-      return this.getTemplateCode(
-        this.watchState.selectedClient,
-        this.watchState.selectedAction
-      );
-    }
+  async getInitialCode() {
+    try {
+      let code = "// Loading...";
 
-    if (this.currentTab === "playground") {
-      return this.getTemplateCode(
-        this.currentClient || DEFAULT_STATE.currentClient,
-        this.executionMode || DEFAULT_STATE.executionMode
-      );
-    }
+      if (
+        this.currentTab === "watchInAction" &&
+        this.watchState.selectedClient
+      ) {
+        code = await this.getTemplateCode(
+          this.watchState.selectedClient,
+          this.watchState.selectedAction
+        );
+      } else if (this.currentTab === "playground") {
+        code = await this.getTemplateCode(
+          this.currentClient || DEFAULT_STATE.currentClient,
+          this.executionMode || DEFAULT_STATE.executionMode
+        );
+      } else if (this.currentTab === "commonUseCases") {
+        code = await this.getTemplateCode(
+          this.currentClient || DEFAULT_STATE.currentClient,
+          this.currentUseCase || DEFAULT_STATE.currentUseCase
+        );
+      }
 
-    if (this.currentTab === "commonUseCases") {
-      return this.getTemplateCode(
-        this.currentClient || DEFAULT_STATE.currentClient,
-        this.currentUseCase || DEFAULT_STATE.currentUseCase
-      );
+      return code || "// No template available";
+    } catch (error) {
+      console.error("[Store] Error loading code:", error);
+      return "// Error loading template";
     }
-
-    return this.getTemplateCode(
-      DEFAULT_STATE.currentClient,
-      DEFAULT_STATE.executionMode
-    );
   },
 
   setClient(clientDisplayName) {
@@ -210,15 +207,12 @@ export const store = reactive({
     const previousTab = this.currentTab;
     this.currentTab = tab;
 
-    // Only clear watch state when explicitly moving away from watch
     if (previousTab === "watch-in-action") {
       this.clearWatchState();
     }
 
-    // Update URL hash
     window.history.replaceState(null, "", `#${tab}`);
 
-    // Save state after tab change
     this.saveState();
   },
 
@@ -250,23 +244,37 @@ export const store = reactive({
     }
   },
 
-  saveState() {
-    const stateToSave = {
-      currentClient: this.currentClient,
-      executionMode: this.executionMode,
-      currentUseCase: this.currentUseCase,
-      watchState: this.watchState,
-      lastSaved: Date.now(),
-    };
-
-    try {
-      localStorage.setItem("valkey-sandbox-state", JSON.stringify(stateToSave));
-      console.debug("[Store] State saved:", stateToSave);
-      return true;
-    } catch (error) {
-      console.error("[Store] Failed to save state:", error);
-      return false;
+  saveState(immediate = false) {
+    if (!this._initialized && !immediate) {
+      return false; // Skip saving during initialization
     }
+
+    // Debounce state saves
+    if (this._saveTimeout) {
+      clearTimeout(this._saveTimeout);
+    }
+
+    this._saveTimeout = setTimeout(() => {
+      const stateToSave = {
+        currentClient: this.currentClient,
+        executionMode: this.executionMode,
+        currentUseCase: this.currentUseCase,
+        watchState: this.watchState,
+        lastSaved: Date.now(),
+      };
+
+      try {
+        localStorage.setItem(
+          "valkey-sandbox-state",
+          JSON.stringify(stateToSave)
+        );
+        console.debug("[Store] State saved in background");
+        return true;
+      } catch (error) {
+        console.error("[Store] Failed to save state:", error);
+        return false;
+      }
+    }, 1000); // Delay saves by 1 second
   },
 
   setWatchState(client, action, language) {
@@ -320,39 +328,41 @@ export const store = reactive({
     return "cluster";
   },
 
-  initializeDefaults() {
-    // Handle watch-in-action special case
-    const hashTab = getTabFromHash();
-    if (hashTab === "watchInAction" && !this.watchState?.selectedAction) {
-      this.currentTab = "playground";
-      window.history.replaceState(null, "", "#playground");
-      return;
+  async initializeDefaults() {
+    if (this._initialized) return;
+
+    try {
+      // Batch all initial state changes
+      const hashTab = getTabFromHash();
+      const initialState = {
+        currentTab:
+          hashTab === "watchInAction" && !this.watchState?.selectedAction
+            ? "playground"
+            : hashTab,
+        currentClient: savedState.currentClient || DEFAULT_STATE.currentClient,
+        executionMode: savedState.executionMode || DEFAULT_STATE.executionMode,
+        currentUseCase:
+          savedState.currentUseCase || DEFAULT_STATE.currentUseCase,
+      };
+
+      // Apply initial state
+      Object.assign(this, initialState);
+
+      // Setup watchers
+      this.initializeWatchers();
+
+      // Load any required templates or initial data
+      if (this.currentTab === "commonUseCases") {
+        await this.getTemplateCode(this.currentClient, this.currentUseCase);
+      }
+
+      this._initialized = true;
+      // Save initial state in background
+      this.saveState();
+    } catch (error) {
+      console.error("[Store] Initialization error:", error);
+      throw error;
     }
-
-    // Set currentTab from hash
-    this.currentTab = hashTab;
-
-    // Initialize other state
-    if (!this.currentClient) {
-      this.currentClient =
-        savedState.currentClient || DEFAULT_STATE.currentClient;
-    }
-    if (!this.executionMode) {
-      this.executionMode =
-        savedState.executionMode || DEFAULT_STATE.executionMode;
-    }
-    if (!this.currentUseCase) {
-      this.currentUseCase =
-        savedState.currentUseCase || DEFAULT_STATE.currentUseCase;
-    }
-
-    // Initialize watchers
-    this.initializeWatchers();
-
-    // Save initial state
-    this.saveState();
-
-    console.debug("[Store] Initialized with tab:", this.currentTab);
   },
 
   isValidTab(tab) {
@@ -422,47 +432,129 @@ export const store = reactive({
     this.leaderboard = newData;
   },
 
-  // Add these methods to the store object
   searchDocumentation: async (query) => {
-    return await documentationService.searchDocs(query);
-  },
-
-  getDocumentationSections: (pageId) => {
-    switch (pageId) {
-      case "commands":
-        return [
-          { id: "strings", title: "Strings" },
-          { id: "hashes", title: "Hashes" },
-          { id: "lists", title: "Lists" },
-          { id: "sets", title: "Sets" },
-          { id: "sorted-sets", title: "Sorted Sets" },
-          { id: "streams", title: "Streams" },
-        ];
-      case "clients":
-        return [
-          { id: "python", title: "Python" },
-          { id: "nodejs", title: "Node.js" },
-          { id: "java", title: "Java" },
-          { id: "go", title: "Go" },
-        ];
-      default:
-        return [];
-    }
+    const docService = await lazyDocumentation.getDocumentationService();
+    return await docService.searchDocs(query);
   },
 
   getGeneralConcepts: async () => {
-    return await documentationService.getGeneralConcepts();
+    const docService = await lazyDocumentation.getDocumentationService();
+    return await docService.getGeneralConcepts();
   },
 
   getCommandReference: async () => {
-    return await documentationService.getCommandDocs();
+    const docService = await lazyDocumentation.getDocumentationService();
+    return await docService.getCommands();
+  },
+
+  async loadDocumentationSection(section) {
+    if (this.documentationState[section]?.loaded) {
+      return this.documentationState[section].data;
+    }
+
+    const docService = await lazyDocumentation.getDocumentationService();
+    try {
+      let data;
+      switch (section) {
+        case "languages":
+          data = await docService.getClientLanguages();
+          break;
+        case "topics":
+          data = await docService.getGeneralConcepts();
+          break;
+        case "commands":
+          data = await docService.getCommands();
+          break;
+      }
+
+      this.documentationState[section] = {
+        loaded: true,
+        data,
+      };
+      return data;
+    } catch (error) {
+      console.error(`Failed to load ${section}:`, error);
+      throw error;
+    }
+  },
+
+  async initializeDocumentation(section) {
+    if (!section || this.documentationState.currentSection === section) return;
+
+    this.documentationState.currentSection = section;
+
+    await this.loadDocumentationSection(section);
+
+    this.backgroundLoadRelatedContent(section);
+  },
+
+  backgroundLoadRelatedContent(section) {
+    const relatedContent = {
+      languages: ["topics"],
+      topics: ["commands"],
+      commands: ["languages"],
+    };
+
+    setTimeout(async () => {
+      try {
+        const related = relatedContent[section] || [];
+        for (const contentType of related) {
+          if (!this.documentationState[contentType].loaded) {
+            await this.loadDocumentationSection(contentType);
+          }
+        }
+      } catch (error) {
+        console.error("Background content load failed:", error);
+      }
+    }, 2000);
+  },
+
+  async getGlideDocs() {
+    try {
+      if (this.documentationState.glide?.loaded) {
+        return this.documentationState.glide.data;
+      }
+
+      const data = await documentationService.getGlideDocs();
+      this.documentationState.glide = {
+        loaded: true,
+        data,
+      };
+      return data;
+    } catch (error) {
+      console.error("Failed to load Glide documentation:", error);
+      return this.getFallbackGlideDocs();
+    }
+  },
+
+  getFallbackGlideDocs() {
+    return `# Valkey Glide Documentation
+
+## Overview
+
+Valkey Glide is the official high-performance client for Valkey, designed for modern distributed applications.
+
+## Features
+
+- High-performance optimized client
+- Built-in clustering support
+- Automatic reconnection handling
+- Connection pooling
+- TypeScript support
+
+## Getting Started
+
+\`\`\`bash
+npm install @valkey/valkey-glide
+\`\`\`
+
+Check the playground for interactive examples!`;
   },
 });
 
-// Remove duplicate event listeners, keep only the essential ones
 window.addEventListener("hashchange", () => {
   const newTab = window.location.hash.slice(1);
-  if (VALID_TABS.includes(newTab)) {
+  if (store.isValidTab(newTab)) {
     if (newTab === "watchInAction" && !store.watchState?.selectedAction) {
       window.history.replaceState(null, "", "#playground");
       store.setTab("playground");
@@ -471,8 +563,5 @@ window.addEventListener("hashchange", () => {
     }
   }
 });
-
-// Initialize store
-store.initializeDefaults();
 
 export default store;

@@ -33,14 +33,23 @@ import {
   provide,
   inject,
   onBeforeUnmount,
+  nextTick,
 } from "vue";
 import { store } from "./store";
 import { EventTypes } from "./composables/useEventBus";
 import TopTabs from "./components/layout/TopTabs.vue";
 import Sidebar from "./components/layout/Sidebar.vue";
-import PlaygroundContainer from "./components/playground/PlaygroundContainer.vue";
-import WatchContainer from "./components/watch/WatchContainer.vue";
-import HelpfulResources from "./components/helpfulresources/HelpfulResources.vue";
+import { defineAsyncComponent } from "vue";
+
+const PlaygroundContainer = defineAsyncComponent(() =>
+  import("./components/playground/PlaygroundContainer.vue")
+);
+const WatchContainer = defineAsyncComponent(() =>
+  import("./components/watch/WatchContainer.vue")
+);
+const HelpfulResources = defineAsyncComponent(() =>
+  import("./components/helpfulresources/HelpfulResources.vue")
+);
 
 export default defineComponent({
   name: "App",
@@ -53,9 +62,46 @@ export default defineComponent({
   },
   setup() {
     const mainComponent = ref(null);
-    const editorContent = ref(
-      store.getInitialCode() || "// Initial code not available."
-    );
+    const eventBus = inject("eventBus");
+    const wsManager = inject("wsManager");
+    const editorContent = ref("// Loading...");
+    const isLoading = ref(true);
+
+    onMounted(async () => {
+      try {
+        // Wait for store initialization
+        await store.initializeDefaults();
+
+        // Load initial content after store is ready
+        const content = await store.getInitialCode();
+        editorContent.value = content;
+
+        // Setup WebSocket after store is initialized
+        if (!wsManager.isConnectionValid()) {
+          wsManager.addMessageListener((message) => {
+            if (message.action === "connected") store.setConnection(true);
+            if (message.action === "updateLeaderboard")
+              store.updateLeaderboard(message.payload);
+          }, "global");
+
+          await wsManager.connect();
+          wsManager.startHealthCheck();
+        }
+      } catch (error) {
+        console.error("App initialization error:", error);
+        editorContent.value = "// Error initializing application";
+      } finally {
+        isLoading.value = false;
+      }
+    });
+
+    // Clean up on unmount
+    onBeforeUnmount(() => {
+      wsManager.stopHealthCheck();
+      wsManager.removeMessageListener("global");
+      eventBus.off(EventTypes.CODE_EXECUTION);
+      eventBus.off(EventTypes.CODE_RESULT);
+    });
 
     const getEditorContent = () => {
       return mainComponent.value?.getCurrentContent?.() || "";
@@ -64,8 +110,6 @@ export default defineComponent({
     provide("getEditorContent", getEditorContent);
     provide("editorContent", editorContent);
 
-    const eventBus = inject("eventBus");
-    const wsManager = inject("wsManager");
     const playgroundComponents = ["playground", "commonUseCases"];
 
     const currentView = computed(() => {
@@ -94,11 +138,16 @@ export default defineComponent({
 
     const handleTabChange = async (tab) => {
       try {
-        const { emit: emitEvent } = eventBus;
         const prevTab = store.currentTab;
 
+        if (prevTab === "watchInAction" && tab !== "watchInAction") {
+          await cleanupWatchComponents();
+        }
+
+        store.setTab(tab);
+
         if (prevTab !== tab) {
-          emitEvent(EventTypes.TERMINAL_CLEAR);
+          eventBus.emit(EventTypes.TERMINAL_CLEAR);
           if (
             !(
               playgroundComponents.includes(prevTab) &&
@@ -108,25 +157,17 @@ export default defineComponent({
             wsManager.removeMessageListener("sidebar");
           }
           wsManager.removeMessageListener("watchInAction");
-          if (prevTab === "watchInAction") {
-            await cleanupWatchComponents();
-          }
-        }
-
-        store.setTab(tab);
-
-        if (prevTab !== tab) {
           if (tab === "watchInAction") {
             store.clearWatchState();
           } else if (tab === "commonUseCases") {
             if (!store.currentUseCase) {
               store.setUseCase("Session Cache");
             }
-            editorContent.value =
-              store.getTemplateCode(
-                store.currentClient,
-                store.currentUseCase
-              ) || "// Template not available.";
+            const content = await store.getTemplateCode(
+              store.currentClient,
+              store.currentUseCase
+            );
+            editorContent.value = content || "// Template not available";
           }
         }
       } catch (error) {
@@ -137,74 +178,39 @@ export default defineComponent({
 
     const cleanupWatchComponents = async () => {
       try {
-        if (wsManager?.isConnectionValid()) {
+        if (
+          wsManager?.isConnectionValid() &&
+          store.currentTab === "watchInAction"
+        ) {
           await wsManager.send({
             action: "cleanup",
-            data: { force: true },
+            data: {
+              force: true,
+              source: "app",
+            },
           });
+          store.clearWatchState();
         }
-        store.clearWatchState();
       } catch (error) {
         console.error("[App] Cleanup error:", error);
       }
     };
 
-    const handleContentUpdate = (content) => {
-      editorContent.value = content;
-    };
-
-    const initializeWebSocket = () => {
-      console.log("[App] Initializing global WebSocket...");
-      try {
-        wsManager.connect();
-
-        onMounted(() => {
-          const healthCheck = setInterval(() => {
-            if (!wsManager.isConnectionValid()) {
-              wsManager.connect().catch((err) => {
-                console.warn("[App] Reconnection attempt failed:", err);
-              });
-            }
-          }, 30000);
-
-          onBeforeUnmount(() => clearInterval(healthCheck));
-        });
-      } catch (error) {
-        console.error("[App] WebSocket initialization error:", error);
-        store.addNotification("WebSocket connection failed", "error");
-      }
-    };
-
-    const handleWSMessage = (message) => {
-      try {
-        if (message.action === "connected") {
-          store.setConnection(true);
-        } else if (message.action === "updateLeaderboard") {
-          store.updateLeaderboard(message.payload);
+    const handleContentUpdate = async (content) => {
+      if (content instanceof Promise) {
+        try {
+          editorContent.value = await content;
+        } catch (error) {
+          console.error("Content loading error:", error);
+          editorContent.value = "// Error loading content";
         }
-      } catch (error) {
-        console.error("[App] Message parse error:", error);
+      } else {
+        editorContent.value = content;
       }
     };
 
     const showDefaultSidebar = computed(() => {
       return !["watchInAction", "helpfulResources"].includes(store.currentTab);
-    });
-
-    onMounted(() => {
-      initializeWebSocket();
-      wsManager.addMessageListener(handleWSMessage);
-
-      store.initializeDefaults();
-      editorContent.value = store.getInitialCode();
-
-      console.log("[App] Mounted with tab:", store.currentTab);
-    });
-
-    onBeforeUnmount(() => {
-      wsManager.removeMessageListener(handleWSMessage);
-      eventBus.off(EventTypes.CODE_EXECUTION);
-      eventBus.off(EventTypes.CODE_RESULT);
     });
 
     return {
@@ -218,6 +224,7 @@ export default defineComponent({
       mainComponent,
       getEditorContent,
       showDefaultSidebar,
+      isLoading,
     };
   },
 });

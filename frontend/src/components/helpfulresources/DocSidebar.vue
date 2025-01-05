@@ -1,34 +1,19 @@
 <template>
   <div class="doc-sidebar">
     <div class="sidebar-header">
-      <h3>{{ currentPageTitle }}</h3>
-      <button class="collapse-btn" @click="toggleSidebar">
-        {{ isCollapsed ? "→" : "←" }}
-      </button>
+      <h3>Documentation</h3>
     </div>
-
-    <div class="sidebar-content" :class="{ collapsed: isCollapsed }">
-      <div v-for="section in sections" :key="section.id" class="nav-section">
-        <div class="section-header" @click="toggleSection(section.id)">
+    <div class="sidebar-content">
+      <div class="nav-section">
+        <div
+          v-for="section in documentSections"
+          :key="section.id"
+          class="section-item"
+          :class="{ active: currentSection === section.id }"
+          @click="selectSection(section.id)"
+        >
           <span class="section-icon">{{ section.icon }}</span>
-          <span class="section-title">{{ section.title }}</span>
-          <span
-            class="expand-icon"
-            :class="{ expanded: isExpanded(section.id) }"
-          >
-            ›
-          </span>
-        </div>
-
-        <div v-show="isExpanded(section.id)" class="section-items">
-          <a
-            v-for="item in section.items"
-            :key="item.id"
-            :class="['nav-item', { active: currentItem === item.id }]"
-            @click="selectItem(item)"
-          >
-            {{ item.title }}
-          </a>
+          {{ section.title }}
         </div>
       </div>
     </div>
@@ -36,69 +21,30 @@
 </template>
 
 <script>
-import { ref, watch } from "vue";
-
 export default {
   name: "DocSidebar",
   props: {
-    currentSection: {
-      type: [String, Object],
-      default: null,
-    },
-    sections: {
-      type: Array,
-      default: () => [
-        {
-          id: "default",
-          title: "Documentation",
-          icon: "📚",
-          items: [{ id: "overview", title: "Overview" }],
-        },
-      ],
-    },
+    currentSection: String,
   },
-  emits: ["select-item"],
-
   setup(props, { emit }) {
-    const searchQuery = ref("");
-    const expandedSections = ref(["general"]); // Default expanded section
-    const currentItem = ref(null); // Add this line
-    const isCollapsed = ref(false);
-    const currentPageTitle = ref("Documentation");
+    const documentSections = [
+      { id: "topics", title: "General Topics", icon: "📚" },
+      { id: "glide", title: "Glide API", icon: "⚡" },
+      { id: "commands", title: "Commands", icon: "🎮" },
+      { id: "modules", title: "Modules", icon: "📦" },
+      { id: "news", title: "Latest News", icon: "📰" },
+      { id: "clients", title: "Client Libraries", icon: "💻" },
+      { id: "blog", title: "Weekly Blog", icon: "📝" },
+      { id: "roadmap", title: "Road Map", icon: "🚧" },
+    ];
 
-    const toggleSection = (sectionId) => {
-      const index = expandedSections.value.indexOf(sectionId);
-      if (index === -1) {
-        expandedSections.value.push(sectionId);
-      } else {
-        expandedSections.value.splice(index, 1);
-      }
-    };
-
-    const selectItem = (item) => {
-      if (!item || !item.id) return;
-      currentItem.value = item.id;
-      emit("select-item", item.id);
-    };
-
-    const toggleSidebar = () => {
-      isCollapsed.value = !isCollapsed.value;
-    };
-
-    const isExpanded = (sectionId) => {
-      return expandedSections.value.includes(sectionId);
+    const selectSection = (sectionId) => {
+      emit("select-section", sectionId);
     };
 
     return {
-      searchQuery,
-      expandedSections,
-      toggleSection,
-      selectItem,
-      currentItem, // Add this line
-      isCollapsed,
-      toggleSidebar,
-      isExpanded,
-      currentPageTitle,
+      documentSections,
+      selectSection,
     };
   },
 };
@@ -239,5 +185,29 @@ export default {
   opacity: 0;
   max-height: 0;
   transform: translateX(-10px);
+}
+
+.section-item {
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.section-item:hover {
+  background: var(--surface-light);
+  transform: translateX(5px);
+}
+
+.section-item.active {
+  background: var(--surface-light);
+  color: var(--primary-color);
+  border-right: 3px solid var(--primary-color);
+}
+
+.section-icon {
+  font-size: 1.2em;
 }
 </style>

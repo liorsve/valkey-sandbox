@@ -2,7 +2,7 @@
   <div class="base-editor">
     <vue-monaco-editor
       ref="editor"
-      v-model:value="content"
+      :value="modelValue"
       :language="language"
       theme="vs-dark"
       :options="editorOptions"
@@ -28,7 +28,7 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: "",
+      required: true,
     },
     language: {
       type: String,
@@ -44,7 +44,11 @@ export default defineComponent({
     const editor = ref(null);
     const className = computed(() => "monaco-editor-instance");
     const content = computed({
-      get: () => props.modelValue,
+      get: () => {
+        return typeof props.modelValue === "string"
+          ? props.modelValue
+          : "// Loading...";
+      },
       set: (value) => emit("update:modelValue", value),
     });
 

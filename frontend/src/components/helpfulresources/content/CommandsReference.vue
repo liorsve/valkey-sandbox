@@ -22,33 +22,54 @@
       </div>
     </div>
 
-    <virtual-scroller
-      class="commands-list"
-      :items="filteredCommands"
-      :item-height="150"
-      v-slot="{ item }"
-    >
-      <div class="command-card">
-        <div class="command-header">
-          <h3>{{ item.name }}</h3>
-          <span class="command-category">{{ item.category }}</span>
-        </div>
-        <p class="command-description">{{ item.description }}</p>
-        <div class="command-examples">
-          <pre v-for="(ex, i) in item.examples" :key="i">{{ ex }}</pre>
+    <div class="commands-list" ref="scrollParent">
+      <div
+        :style="{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }"
+      >
+        <div
+          v-for="virtualItem in virtualizer.getVirtualItems()"
+          :key="virtualItem.key"
+          class="command-card"
+          :style="{
+            position: 'absolute',
+            top: 0,
+            transform: `translateY(${virtualItem.start}px)`,
+            width: '100%',
+          }"
+        >
+          <div class="command-header">
+            <h3>{{ filteredCommands[virtualItem.index].name }}</h3>
+            <span class="command-category">
+              {{ filteredCommands[virtualItem.index].category }}
+            </span>
+          </div>
+          <p class="command-description">
+            {{ filteredCommands[virtualItem.index].description }}
+          </p>
+          <div class="command-examples">
+            <pre
+              v-for="(ex, i) in filteredCommands[virtualItem.index].examples"
+              :key="i"
+            >
+              {{ ex }}
+            </pre>
+          </div>
         </div>
       </div>
-    </virtual-scroller>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
-import { VirtualScroller } from "vue-virtual-scroller";
-import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import store from "@/store";
+
 export default {
-  components: { VirtualScroller },
   name: "CommandsReference",
 
   setup() {
@@ -56,22 +77,26 @@ export default {
     const selectedCategory = ref("All");
 
     const commands = ref([]);
-    const loading = ref(true);
+    const loading = ref(false);
 
     onMounted(async () => {
-      try {
-        const data = await store.getCommandReference();
-        commands.value = data.commands.map((cmd) => ({
-          id: cmd.id,
-          name: cmd.name,
-          category: cmd.category,
-          description: cmd.description,
-          examples: cmd.examples,
-        }));
-      } catch (error) {
-        console.error("Failed to load commands:", error);
-      } finally {
-        loading.value = false;
+      if (!commands.value.length) {
+        loading.value = true;
+        try {
+          await store.initializeDocumentation("commands");
+          const commandsData = store.documentationState.commands.data;
+          commands.value = commandsData.map((cmd) => ({
+            id: cmd.id,
+            name: cmd.name,
+            category: cmd.category,
+            description: cmd.description,
+            examples: cmd.examples,
+          }));
+        } catch (error) {
+          console.error("Failed to load commands:", error);
+        } finally {
+          loading.value = false;
+        }
       }
     });
 
@@ -111,12 +136,58 @@ export default {
       return emojis[category] || "📦";
     };
 
+    const commandsList = ref(null);
+    const pageSize = 20;
+    const currentPage = ref(0);
+
+    const visibleCommands = computed(() => {
+      const start = currentPage.value * pageSize;
+      return filteredCommands.value.slice(start, start + pageSize);
+    });
+
+    const handleScroll = () => {
+      if (!commandsList.value) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = commandsList.value;
+      if (scrollTop + clientHeight >= scrollHeight - 100) {
+        currentPage.value++;
+      }
+    };
+
+    onMounted(() => {
+      commandsList.value?.addEventListener("scroll", handleScroll);
+    });
+
+    onUnmounted(() => {
+      commandsList.value?.removeEventListener("scroll", handleScroll);
+    });
+
+    const scrollParent = ref(null);
+
+    const virtualizer = useVirtualizer({
+      count: computed(() => filteredCommands.value.length),
+      getScrollElement: () => scrollParent.value,
+      estimateSize: () => 150,
+      overscan: 5,
+    });
+
+    const selectCategory = (category) => {
+      selectedCategory.value = category;
+      currentPage.value = 0;
+      scrollParent.value?.scrollTo(0, 0);
+    };
+
     return {
       filter,
       selectedCategory,
       categories,
       filteredCommands,
       getCategoryEmoji,
+      visibleCommands,
+      commandsList,
+      scrollParent,
+      virtualizer,
+      selectCategory,
     };
   },
 };
@@ -148,6 +219,10 @@ export default {
 .commands-list {
   height: calc(100vh - 200px);
   overflow-y: auto;
+  padding: 1rem;
+  scroll-behavior: smooth;
+  position: relative;
+  contain: strict;
 }
 
 .filter-input {
@@ -188,10 +263,12 @@ export default {
 }
 
 .command-card {
-  background: var(--surface-darker);
-  border-radius: var(--radius-md);
   padding: 1rem;
   border: 1px solid var(--surface-light);
+  background: var(--surface-darker);
+  border-radius: var(--radius-md);
+  animation: fadeIn 0.3s ease-in-out;
+  margin: 0.5rem 1rem;
 }
 
 .command-name {
@@ -215,5 +292,16 @@ export default {
   border-radius: var(--radius-sm);
   margin: 0.5rem 0;
   overflow-x: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

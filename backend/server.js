@@ -17,9 +17,9 @@ const outputCache = new Map();
 
 app.use(
   cors({
-    origin: ["http://localhost:8080"],
+    origin: ["http://localhost:8080", "http://localhost:3000"],
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["*"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
@@ -109,6 +109,15 @@ const startServer = async () => {
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
   process.exit(1);
+});
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  res.status(500).json({
+    error: "Internal server error",
+    message: err.message,
+  });
 });
 
 // Start the server

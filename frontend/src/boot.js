@@ -8,13 +8,6 @@ export function initializeApp(app) {
   app.provide("eventBus", eventBus);
   app.provide("wsManager", wsManager);
 
-  app.mixin({
-    mounted() {
-      if (this.$root === this && wsManager && !wsManager.ws) {
-        wsManager.connect();
-      }
-    },
-  });
-
+  // Remove the mixin and handle connection in App.vue
   return { eventBus, wsManager };
 }

@@ -1,36 +1,53 @@
-import codeTemplates from "./codeTemplates";
-import challenges from "./challenges";
-
 class DataNavigator {
   constructor() {
-    this.templates = codeTemplates;
-    this.challenges = challenges;
+    this.templatesPromise = null;
+    this.challengesPromise = null;
+  }
+
+  async loadTemplates() {
+    if (!this.templatesPromise) {
+      this.templatesPromise = import("./codeTemplates").then((m) => m.default);
+    }
+    return this.templatesPromise;
+  }
+
+  async loadChallenges() {
+    if (!this.challengesPromise) {
+      this.challengesPromise = import("./challenges").then((m) => m.default);
+    }
+    return this.challengesPromise;
   }
 
   // Template-related methods
-  getTemplate(client, templateName) {
-    return this.templates.getTemplate(client, templateName);
+  async getTemplate(client, templateName) {
+    const templates = await this.loadTemplates();
+    return templates.getTemplate(client, templateName);
   }
 
-  listTemplates(client, language = null) {
-    return this.templates.listTemplates(client, language);
+  async listTemplates(client, language = null) {
+    const templates = await this.loadTemplates();
+    return templates.listTemplates(client, language);
   }
 
-  listAllTemplates() {
-    return this.templates.listAllTemplates();
+  async listAllTemplates() {
+    const templates = await this.loadTemplates();
+    return templates.listAllTemplates();
   }
 
   // Challenge-related methods
-  getChallenge(challengeId, language) {
-    return this.challenges.getChallenge(challengeId, language);
+  async getChallenge(challengeId, language) {
+    const challenges = await this.loadChallenges();
+    return challenges.getChallenge(challengeId, language);
   }
 
-  listChallenges(language) {
-    return this.challenges.listChallenges(language);
+  async listChallenges(language) {
+    const challenges = await this.loadChallenges();
+    return challenges.listChallenges(language);
   }
 
-  listChallengesByDifficulty(language, difficulty) {
-    return this.challenges.listByDifficulty(language, difficulty);
+  async listChallengesByDifficulty(language, difficulty) {
+    const challenges = await this.loadChallenges();
+    return challenges.listByDifficulty(language, difficulty);
   }
 }
 

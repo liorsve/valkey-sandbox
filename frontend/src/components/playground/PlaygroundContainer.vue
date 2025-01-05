@@ -9,6 +9,7 @@
           @update:content="handleEditorContentChange"
         />
       </div>
+      <div v-if="loading" class="loading-overlay">Loading template...</div>
       <div class="terminal-container" :class="{ hidden: !terminalVisible }">
         <AppTerminal ref="terminal" />
       </div>
@@ -48,11 +49,23 @@ export default defineComponent({
     },
   },
   setup(props, { expose }) {
-    const currentContent = ref(
-      props.content || store.getInitialCode() || "// Default initial content."
-    );
+    const currentContent = ref("// Loading...");
+    const loading = ref(true);
     const editorComponent = ref(null);
     const terminal = ref(null);
+
+    // Load content asynchronously
+    onMounted(async () => {
+      try {
+        currentContent.value = await store.getInitialCode();
+        store.setLastEditorContent(currentContent.value);
+        loading.value = false;
+      } catch (error) {
+        console.error("Failed to load initial code:", error);
+        currentContent.value = "// Failed to load template";
+        loading.value = false;
+      }
+    });
 
     const editorLanguage = computed(() => {
       return store.getLanguage(store.currentClient);
@@ -87,17 +100,12 @@ export default defineComponent({
       editorComponent,
     });
 
-    onMounted(() => {
-      if (props.content) {
-        store.setLastEditorContent(props.content);
-      }
-    });
-
     watch(
       () => props.content,
-      (newContent) => {
-        if (newContent !== currentContent.value) {
+      async (newContent) => {
+        if (typeof newContent === "string") {
           currentContent.value = newContent;
+          loading.value = false;
         }
       },
       { immediate: true }
@@ -105,6 +113,7 @@ export default defineComponent({
 
     return {
       currentContent,
+      loading,
       editorLanguage,
       handleEditorContentChange,
       editorComponent,
@@ -157,5 +166,20 @@ export default defineComponent({
 
 .terminal-container.hidden {
   display: none;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  z-index: 10;
 }
 </style>

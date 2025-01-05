@@ -4,11 +4,11 @@ import store from "./store";
 import { install as VueMonacoEditorPlugin } from "@guolao/vue-monaco-editor";
 import "./styles/variables.css";
 import { initializeApp } from "./boot";
+// Remove markdown.css import as it's now lazy loaded
 
 window.Storage = store;
 
 const app = createApp(App);
-
 const { eventBus, wsManager } = initializeApp(app);
 
 app.use(VueMonacoEditorPlugin, {
@@ -21,15 +21,21 @@ const removeLoader = () => {
   const loader = document.getElementById("preloader");
   if (loader) {
     loader.classList.add("fade-out");
-    setTimeout(() => {
-      loader.remove();
-    }, 300);
+    setTimeout(() => loader.remove(), 300);
   }
 };
 
-app.mount("#app");
+const init = async () => {
+  try {
+    app.mount("#app");
+  } catch (error) {
+    console.error("Failed to initialize app:", error);
+  } finally {
+    removeLoader();
+  }
+};
 
-removeLoader();
+init();
 
 window.addEventListener("error", (e) => {
   console.error("Application Error:", e);

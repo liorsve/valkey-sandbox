@@ -67,47 +67,51 @@
 <script>
 import { ref, computed, onMounted, nextTick, markRaw } from "vue";
 import { store } from "@/store";
-import GeneralConcepts from "./content/GeneralConcepts.vue";
-import CommandsReference from "./content/CommandsReference.vue";
-import GlideDocumentation from "./content/GlideDocumentation.vue";
-import LatestNews from "./content/LatestNews.vue";
-import ValkeyClients from "./content/ValkeyClients.vue";
-import ValkeyModules from "./content/ValkeyModules.vue";
-import WeeklyBlog from "./content/WeeklyBlog.vue";
-import Roadmap from "./content/Roadmap.vue";
-import DocSidebar from "./DocSidebar.vue";
-import ValkeyLogo from "@/assets/images/Valkey-logo.svg";
-import GitValkey from "@/assets/images/git-valkey.png";
-import LinkedIn from "@/assets/images/linkedin.jpeg";
-import Twitter from "@/assets/images/twitter.jpg";
-import GlideGit from "@/assets/images/glide-git.jpeg";
+import lazyDocumentation from "@/services/lazyDocumentation";
+
+// Import icons
+import LinkedInIcon from "@/assets/icons/linkedin.svg";
+import GitHubIcon from "@/assets/icons/git-valkey.svg";
+import ValkeyLogoIcon from "@/assets/images/Valkey-logo.svg";
+import TwitterIcon from "@/assets/icons/twitter.svg";
+import GlideGitIcon from "@/assets/icons/glide-git.svg";
+
+// Lazy load content components
+const GeneralConcepts = () => import("./content/GeneralConcepts.vue");
+const CommandsReference = () => import("./content/CommandsReference.vue");
+const GlideDocumentation = () => import("./content/GlideDocumentation.vue");
+const LatestNews = () => import("./content/LatestNews.vue");
+const ValkeyClients = () => import("./content/ValkeyClients.vue");
+const ValkeyModules = () => import("./content/ValkeyModules.vue");
+const WeeklyBlog = () => import("./content/WeeklyBlog.vue");
+const Roadmap = () => import("./content/Roadmap.vue");
+const DocSidebar = () => import("./DocSidebar.vue");
 
 const links = [
   {
     name: "Valkey LinkedIn",
     url: "https://linkedin.com/company/valkey",
-    icon: LinkedIn,
+    icon: LinkedInIcon,
   },
   {
     name: "Valkey GitHub",
     url: "https://github.com/valkey-io/valkey",
-    icon: GitValkey,
+    icon: GitHubIcon,
   },
-
   {
     name: "Valkey Site",
     url: "https://valkey.io",
-    icon: ValkeyLogo,
+    icon: ValkeyLogoIcon,
   },
   {
     name: "Valkey Twitter",
     url: "https://twitter.com/valkey_io",
-    icon: Twitter,
+    icon: TwitterIcon,
   },
   {
     name: "Glide GitHub",
     url: "https://github.com/valkey-io/valkey-glide",
-    icon: GlideGit,
+    icon: GlideGitIcon,
   },
 ];
 
@@ -134,10 +138,14 @@ export default {
     const contentMain = ref(null);
     const loading = ref(true);
 
-    onMounted(() => {
-      setTimeout(() => {
+    onMounted(async () => {
+      try {
+        // Load documentation dependencies
+        await lazyDocumentation.initializeDocumentation();
         loading.value = false;
-      }, 1000);
+      } catch (error) {
+        console.error("Failed to initialize documentation:", error);
+      }
     });
 
     const pages = [
@@ -159,8 +167,7 @@ export default {
         id: "glide",
         emoji: "🛠️",
         title: "Glide Documentation",
-        description:
-          "Integration details for Valkey Glide (#file:GLIDE_DOCS.md).",
+        description: "Integration details for Valkey Glide.",
         component: markRaw(GlideDocumentation),
       },
       {

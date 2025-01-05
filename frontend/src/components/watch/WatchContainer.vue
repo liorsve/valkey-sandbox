@@ -14,10 +14,9 @@
       <div v-else class="visualization-layout">
         <div class="code-section">
           <WatchEditor
-            :content="editorContent"
+            v-model:content="editorContent"
             :language="currentLanguage"
             @ready="handleEditorReady"
-            @update:content="handleCodeUpdate"
           />
           <WatchTerminal @ready="handleTerminalReady" />
         </div>
@@ -51,7 +50,7 @@ import {
 } from "vue";
 import { useWatchInAction } from "@/composables/useWatchInAction";
 import { store } from "@/store";
-import WatchEditor from "./components/WatchEditor.vue";
+import WatchEditor from "./components/WatchEditor.vue"; // Updated import path
 import WatchTerminal from "./components/WatchTerminal.vue";
 import ActionSelect from "./ActionSelect.vue";
 import LeaderboardVisualization from "./visualizations/LeaderboardVisualization.vue";
@@ -71,13 +70,14 @@ export default defineComponent({
   setup() {
     const wsManager = useWebSocket();
     const terminalInstance = ref(null);
+    const cleaning = ref(false);
+    const editorContent = ref("// Loading...");
 
     provide("websocket", wsManager);
     provide("terminal", terminalInstance);
 
     const {
       isConnected,
-      editorContent,
       currentVisualization,
       currentLanguage,
       isEditorReady,
@@ -89,13 +89,25 @@ export default defineComponent({
     } = useWatchInAction();
 
     const cleanup = async () => {
-      if (currentVisualization.value?.__vueParent$?.exposed?.cleanup) {
-        await currentVisualization.value.__vueParent$?.exposed?.cleanup();
+      if (cleaning.value) return;
+      cleaning.value = true;
+
+      try {
+        if (wsManager?.isConnectionValid()) {
+          await wsManager.send({
+            action: "cleanup",
+            data: {
+              force: true,
+              source: "watch-container",
+            },
+          });
+        }
+        store.clearWatchState();
+      } catch (error) {
+        console.error("[WatchContainer] Cleanup error:", error);
+      } finally {
+        cleaning.value = false;
       }
-      if (wsManager.ws?.readyState === WebSocket.OPEN) {
-        await wsManager.send({ action: "cleanup", force: true });
-      }
-      store.clearWatchState();
     };
 
     const handleTabChange = () => {
@@ -116,11 +128,14 @@ export default defineComponent({
       return Boolean(store.watchState?.selectedAction);
     });
 
-    const handleActionSelect = ({ action, client, language }) => {
+    const handleActionSelect = async ({ action, client, language }) => {
       try {
         store.setWatchState(client, action, language);
         currentLanguage.value = language;
-        editorContent.value = store.getTemplateCode(client, action);
+
+        // Wait for template code to resolve
+        const template = await store.getTemplateCode(client, action);
+        editorContent.value = template || "// No template available";
 
         currentVisualization.value =
           action === "Leaderboard"
@@ -128,6 +143,7 @@ export default defineComponent({
             : TaskManagerVisualization;
       } catch (error) {
         console.error("Error handling action select:", error);
+        editorContent.value = "// Error loading template";
         hasError.value = true;
       }
     };
