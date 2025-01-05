@@ -35,6 +35,7 @@
             height: 100%;
             background-color: #1e1e1e;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 9999;
@@ -42,7 +43,7 @@
             visibility: visible;
             transform: translateZ(0);
             will-change: opacity;
-            transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+            transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
         }
 
         .preloader.fade-out {
@@ -55,24 +56,40 @@
             font-size: 35px;
             font-weight: bold;
             color: #ffffff;
-            font-family: 'Courier New', monospace;
+            font-family: 'JetBrains Mono', monospace;
             position: relative;
-            background: linear-gradient(to right, #276ce2 50%, #ffffff 50%);
+            background: linear-gradient(45deg, #276ce2, #2196f3);
             background-size: 200% 100%;
             background-position: right bottom;
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: fillText 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            animation: gradientSlide 2s ease infinite;
             will-change: background-position;
             -webkit-font-smoothing: antialiased;
             text-rendering: optimizeLegibility;
+        }
+
+        .preloader-spinner {
+            margin-top: 20px;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #276ce2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
 
         @keyframes fillText {
             to {
                 background-position: left bottom;
             }
+        }
+
+        @keyframes gradientSlide {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         @-webkit-keyframes typing {
@@ -82,11 +99,17 @@
         @keyframes typing {
             to { transform: scaleX(1); }
         }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div id="preloader" class="preloader">
         <div class="preloader-text">{ Valkey Sandbox }</div>
+        <div class="preloader-spinner"></div>
     </div>
     <div id="app"></div>
     

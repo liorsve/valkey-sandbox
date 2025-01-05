@@ -2,18 +2,41 @@
   <div class="doc-sidebar">
     <div class="sidebar-header">
       <h3>Documentation</h3>
+      <button v-if="showBackButton" class="back-btn" @click="$emit('back')">
+        <span class="back-icon">←</span>
+        Back
+      </button>
     </div>
+
     <div class="sidebar-content">
-      <div class="nav-section">
+      <div class="nav-sections">
+        <!-- Main sections -->
         <div
-          v-for="section in documentSections"
+          v-for="section in mainSections"
           :key="section.id"
           class="section-item"
           :class="{ active: currentSection === section.id }"
-          @click="selectSection(section.id)"
+          @click="handleSectionClick(section)"
         >
           <span class="section-icon">{{ section.icon }}</span>
-          {{ section.title }}
+          <span class="section-title">{{ section.title }}</span>
+        </div>
+
+        <!-- Show subsections only for current section -->
+        <div
+          v-if="currentSection && currentSubsections.length"
+          class="subsections"
+        >
+          <div
+            v-for="subsection in currentSubsections"
+            :key="subsection.id"
+            class="subsection-item"
+            :class="{ active: currentItem === subsection.id }"
+            @click="handleSubsectionClick(subsection)"
+          >
+            <span class="subsection-icon">{{ subsection.icon || "📄" }}</span>
+            {{ subsection.title }}
+          </div>
         </div>
       </div>
     </div>
@@ -25,189 +48,157 @@ export default {
   name: "DocSidebar",
   props: {
     currentSection: String,
+    currentItem: String,
+    sections: {
+      type: Array,
+      default: () => [],
+    },
+    showBackButton: {
+      type: Boolean,
+      default: true,
+    },
   },
-  setup(props, { emit }) {
-    const documentSections = [
-      { id: "topics", title: "General Topics", icon: "📚" },
-      { id: "glide", title: "Glide API", icon: "⚡" },
-      { id: "commands", title: "Commands", icon: "🎮" },
-      { id: "modules", title: "Modules", icon: "📦" },
-      { id: "news", title: "Latest News", icon: "📰" },
-      { id: "clients", title: "Client Libraries", icon: "💻" },
-      { id: "blog", title: "Weekly Blog", icon: "📝" },
-      { id: "roadmap", title: "Road Map", icon: "🚧" },
-    ];
 
-    const selectSection = (sectionId) => {
-      emit("select-section", sectionId);
-    };
+  emits: ["select-section", "select-item", "back"],
 
-    return {
-      documentSections,
-      selectSection,
-    };
+  computed: {
+    mainSections() {
+      return [
+        { id: "general", title: "General Concepts", icon: "📚" },
+        { id: "commands", title: "Commands Reference", icon: "⚙️" },
+        { id: "glide", title: "Glide Documentation", icon: "🛠️" },
+        { id: "news", title: "Latest News", icon: "📰" },
+        { id: "clients", title: "Client Libraries", icon: "💻" },
+        { id: "modules", title: "Modules", icon: "🔌" },
+        { id: "roadmap", title: "Road Map", icon: "🚧" },
+      ];
+    },
+    currentSubsections() {
+      const section = this.sections.find((s) => s.id === this.currentSection);
+      if (!section?.items) {
+        // If no items found in sections prop, try to get from default mappings
+        const defaultSections = {
+          general: [
+            { id: "introduction", title: "Introduction" },
+            { id: "architecture", title: "Architecture" },
+            { id: "clustering", title: "Clustering" },
+          ],
+          commands: [
+            { id: "strings", title: "Strings" },
+            { id: "hashes", title: "Hashes" },
+            { id: "lists", title: "Lists" },
+          ],
+          clients: [
+            { id: "overview", title: "Overview" },
+            { id: "languages", title: "Language Support" },
+          ],
+          modules: [
+            { id: "overview", title: "Overview" },
+            { id: "official", title: "Official Modules" },
+          ],
+          glide: [
+            { id: "intro", title: "Introduction" },
+            { id: "setup", title: "Setup Guide" },
+          ],
+        };
+        return defaultSections[this.currentSection] || [];
+      }
+      return section.items;
+    },
+  },
+
+  methods: {
+    handleSectionClick(section) {
+      this.$emit("select-section", section.id);
+    },
+    handleSubsectionClick(subsection) {
+      this.$emit("select-item", subsection.id);
+    },
   },
 };
 </script>
 
 <style scoped>
 .doc-sidebar {
-  width: var(--sidebar-width);
-  transition: width 0.3s ease;
+  width: 280px;
   background: var(--surface-darker);
-  border-right: 1px solid var(--surface-light);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: var(--surface-dark);
-  border-bottom: 1px solid var(--surface-light);
 }
 
-.collapse-btn {
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
   background: none;
   border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 1.2em;
-}
-
-.sidebar-content {
-  overflow-y: auto;
-  height: calc(100% - 3rem);
-}
-
-.sidebar-content.collapsed {
-  width: 60px;
-}
-
-.section-header {
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: var(--radius-sm);
-  margin: 0.25rem 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid transparent;
-}
-
-.section-header:hover {
-  background: rgba(255, 255, 255, 0.07);
-  transform: translateX(5px);
-  border-color: var(--primary-color);
-}
-
-.section-header-content {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.section-icon {
-  font-size: 1.4em;
-  transition: transform 0.3s ease;
-}
-
-.section-header:hover .section-icon {
-  transform: scale(1.2);
-}
-
-.expand-icon {
-  font-size: 1.2em;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0.7;
-}
-
-.expand-icon.expanded {
-  transform: rotate(90deg);
-}
-
-.section-items {
-  padding: 0.5rem 0;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem 0.75rem 3rem;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: var(--radius-sm);
-  margin: 0.25rem 0.5rem;
-  position: relative;
-  background: transparent;
-}
-
-.item-marker {
-  position: absolute;
-  left: 1.5rem;
-  opacity: 0;
-  transform: translateX(-10px);
   transition: all 0.3s ease;
 }
 
-.nav-item:hover .item-marker {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+.back-btn:hover {
   color: var(--text-primary);
-  transform: translateX(5px);
+  transform: translateX(-2px);
 }
 
-.nav-item.active {
-  background: var(--surface-light);
-  color: var(--primary-color);
-  font-weight: 500;
-  border-right: 3px solid var(--primary-color);
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
-/* Animations */
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.3s ease-out;
-  max-height: 300px;
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  opacity: 0;
-  max-height: 0;
-  transform: translateX(-10px);
-}
-
-.section-item {
-  padding: 0.75rem 1rem;
+.section-item,
+.subsection-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  padding: 0.75rem 1rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
 }
 
-.section-item:hover {
-  background: var(--surface-light);
-  transform: translateX(5px);
+.section-item:hover,
+.subsection-item:hover {
+  background: var(--surface-dark);
+  transform: translateX(4px);
 }
 
-.section-item.active {
+.section-item.active,
+.subsection-item.active {
   background: var(--surface-light);
   color: var(--primary-color);
-  border-right: 3px solid var(--primary-color);
 }
 
-.section-icon {
-  font-size: 1.2em;
+.section-icon,
+.subsection-icon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+}
+
+.subsections {
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+  border-left: 2px solid var(--border-color);
+  padding-left: 1rem;
+}
+
+.subsection-item {
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
 }
 </style>

@@ -285,11 +285,10 @@ export function createWebSocketManager(eventBus) {
 }
 
 export function useWebSocket() {
-  const wsManager = inject("wsManager");
-  if (!wsManager && !wsInstance) {
-    throw new Error("WebSocket manager not provided");
+  if (!wsInstance) {
+    wsInstance = new WebSocketManager();
   }
-  return wsManager || wsInstance;
+  return wsInstance;
 }
 
 export function ensureConnection(wsManager = wsInstance) {
@@ -318,7 +317,6 @@ export function ensureConnection(wsManager = wsInstance) {
   return Promise.resolve(wsManager.ws);
 }
 
-// Export the singleton instance for backward compatibility
 export const wsInstanceSingleton = {
   get ws() {
     return wsInstance?.ws;

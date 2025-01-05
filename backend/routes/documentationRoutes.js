@@ -103,9 +103,20 @@ router.get("/docs/commands/:commandId", async (req, res) => {
 router.get("/docs/topics", async (req, res) => {
   try {
     const topics = await DocumentationHandler.getGeneralConcepts();
+    if (!topics) {
+      return res.status(404).json({
+        error: "No topics found",
+        topics: [],
+      });
+    }
     res.json({ topics });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch topics" });
+    console.error("Failed to fetch topics:", error);
+    res.status(500).json({
+      error: "Failed to fetch topics",
+      message: error.message,
+      topics: [],
+    });
   }
 });
 

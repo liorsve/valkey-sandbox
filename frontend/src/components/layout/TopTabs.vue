@@ -12,7 +12,7 @@
     </div>
 
     <div v-if="showHeaderExtra" class="header-extra">
-      <template v-if="activeTab === 'watchInAction' && hasSelection">
+      <template v-if="activeTab === 'watchInAction'">
         <div class="connection-line"></div>
         <button class="replace-button" @click="handleReplace">
           <span class="button-icon">⟲</span>
@@ -95,12 +95,9 @@ export default {
     };
 
     const handleTabClick = (tabName) => {
-      if (
-        tabName === "watchInAction" &&
-        props.activeTab === "watchInAction" &&
-        hasSelection.value
-      ) {
+      if (tabName === "watchInAction" && props.activeTab === "watchInAction") {
         handleReplace();
+        return;
       }
       emit("change-tab", tabName);
     };

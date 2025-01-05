@@ -1,26 +1,33 @@
 <template>
   <div class="app">
+    <LoadingOverlay
+      :show="loading"
+      :text="loadingController.loadingText.value"
+    />
+
     <TopTabs :activeTab="store.currentTab" @change-tab="handleTabChange" />
-    <main class="app-main">
-      <Sidebar
-        v-if="showDefaultSidebar"
-        :current-tab="store.currentTab"
-        @content-update="handleContentUpdate"
-      />
-      <component
-        :is="currentView"
-        ref="mainComponent"
-        :current-tab="store.currentTab"
-        :content="editorContent"
-        :language="currentLanguage"
-        :terminal-visible="store.terminalVisible"
-        class="main-content"
-        :class="{
-          'full-width': store.currentTab === 'watchInAction',
-          'with-sidebar': showDefaultSidebar,
-        }"
-      />
-    </main>
+    <Transition name="fade-slide" mode="out-in">
+      <main v-show="!loading" class="app-main">
+        <Sidebar
+          v-if="showDefaultSidebar"
+          :current-tab="store.currentTab"
+          @content-update="handleContentUpdate"
+        />
+        <component
+          :is="currentView"
+          ref="mainComponent"
+          :current-tab="store.currentTab"
+          :content="editorContent"
+          :language="currentLanguage"
+          :terminal-visible="store.terminalVisible"
+          class="main-content"
+          :class="{
+            'full-width': store.currentTab === 'watchInAction',
+            'with-sidebar': showDefaultSidebar,
+          }"
+        />
+      </main>
+    </Transition>
   </div>
 </template>
 
@@ -40,6 +47,8 @@ import { EventTypes } from "./composables/useEventBus";
 import TopTabs from "./components/layout/TopTabs.vue";
 import Sidebar from "./components/layout/Sidebar.vue";
 import { defineAsyncComponent } from "vue";
+import loadingController from "@/services/loadingController";
+import LoadingOverlay from "./components/common/LoadingOverlay.vue";
 
 const PlaygroundContainer = defineAsyncComponent(() =>
   import("./components/playground/PlaygroundContainer.vue")
@@ -59,25 +68,31 @@ export default defineComponent({
     PlaygroundContainer,
     WatchContainer,
     HelpfulResources,
+    LoadingOverlay,
   },
   setup() {
     const mainComponent = ref(null);
     const eventBus = inject("eventBus");
     const wsManager = inject("wsManager");
+
+    if (!eventBus || !wsManager) {
+      throw new Error("Required services not provided");
+    }
+
     const editorContent = ref("// Loading...");
     const isLoading = ref(true);
+    const loading = ref(true);
 
     onMounted(async () => {
-      try {
-        // Wait for store initialization
-        await store.initializeDefaults();
+      loadingController.start("Initializing Valkey Sandbox...");
 
-        // Load initial content after store is ready
+      try {
+        await store.initializeDefaults();
         const content = await store.getInitialCode();
         editorContent.value = content;
 
-        // Setup WebSocket after store is initialized
         if (!wsManager.isConnectionValid()) {
+          loadingController.setLoadingText("Establishing connection...");
           wsManager.addMessageListener((message) => {
             if (message.action === "connected") store.setConnection(true);
             if (message.action === "updateLeaderboard")
@@ -91,7 +106,8 @@ export default defineComponent({
         console.error("App initialization error:", error);
         editorContent.value = "// Error initializing application";
       } finally {
-        isLoading.value = false;
+        await loadingController.finish();
+        loading.value = false;
       }
     });
 
@@ -109,6 +125,8 @@ export default defineComponent({
 
     provide("getEditorContent", getEditorContent);
     provide("editorContent", editorContent);
+
+    provide("loadingController", loadingController);
 
     const playgroundComponents = ["playground", "commonUseCases"];
 
@@ -137,14 +155,18 @@ export default defineComponent({
     });
 
     const handleTabChange = async (tab) => {
+      // Start loading immediately before any async operations
+      loadingController.start(`Loading ${tab}...`);
+
       try {
         const prevTab = store.currentTab;
+
+        // Set the new tab immediately to avoid UI flicker
+        store.setTab(tab);
 
         if (prevTab === "watchInAction" && tab !== "watchInAction") {
           await cleanupWatchComponents();
         }
-
-        store.setTab(tab);
 
         if (prevTab !== tab) {
           eventBus.emit(EventTypes.TERMINAL_CLEAR);
@@ -173,6 +195,8 @@ export default defineComponent({
       } catch (error) {
         console.error("[App] Tab change error:", error);
         store.addNotification("Error switching tabs", "error");
+      } finally {
+        await loadingController.finish();
       }
     };
 
@@ -225,6 +249,8 @@ export default defineComponent({
       getEditorContent,
       showDefaultSidebar,
       isLoading,
+      loading,
+      loadingController,
     };
   },
 });
@@ -258,5 +284,45 @@ export default defineComponent({
 
 .main-content.with-sidebar {
   margin-left: var(--sidebar-width);
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease-out;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Add smooth transitions to components */
+.main-content {
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 </style>

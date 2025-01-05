@@ -2,79 +2,360 @@ import { renderMarkdown } from "@/utils/markdownRenderer";
 
 class DocumentationService {
   constructor() {
-    this.API_BASE = "http://localhost:3000/api";
+    this.dummyContent = {
+      topics: this.getDefaultGeneralConcepts(),
+      commands: this.getDefaultCommands(),
+      clients: this.getDefaultClients(),
+      modules: this.getDefaultModules(),
+      languages: this.getSupportedLanguages(),
+    };
   }
 
-  async validateResponse(response, context) {
-    if (!response.ok) {
-      throw new Error(
-        `API Error (${response.status}): Failed to fetch ${context}`
-      );
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error(`Invalid response type for ${context}`);
-    }
-
-    const text = await response.text();
-    if (!text) {
-      throw new Error(`Empty response for ${context}`);
-    }
-
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      console.error(`JSON parse error for ${context}:`, text);
-      throw new Error(`Invalid JSON response for ${context}`);
-    }
+  // Add ecosystem lookup method
+  getEcosystem(lang) {
+    const ecosystems = {
+      "Node.js": "npm",
+      Python: "pip",
+      Go: "go",
+      Java: "maven",
+      Ruby: "gem",
+      Rust: "cargo",
+      PHP: "composer",
+      "C#": "nuget",
+    };
+    return ecosystems[lang] || "unknown";
   }
 
-  async fetchContent(path) {
-    try {
-      const response = await fetch(`${this.API_BASE}/docs${path}`);
-      if (!response.ok) throw new Error(`Failed to fetch ${path}`);
+  // Add installation lookup method
+  getGlideInstall(lang) {
+    const installations = {
+      "Node.js": "npm install @valkey/valkey-glide",
+      Python: "pip install valkey-glide",
+      Go: "go get github.com/valkey-io/valkey-glide-go",
+      Java: "<dependency>\n  <groupId>io.valkey</groupId>\n  <artifactId>valkey-glide</artifactId>\n</dependency>",
+      Ruby: "gem install valkey-glide",
+      Rust: "cargo add valkey-glide",
+      PHP: "composer require valkey/valkey-glide",
+      "C#": "dotnet add package Valkey.Glide",
+    };
+    return installations[lang] || "Installation instructions coming soon";
+  }
 
-      const { content } = await response.json();
-      return renderMarkdown(content);
+  // Keep Glide docs fetching
+  async getRenderedGlideDocs() {
+    try {
+      const response = await fetch("/docs/GLIDE_DOCS.md");
+      if (!response.ok) throw new Error("Failed to load Glide docs");
+      const text = await response.text();
+      return text ? renderMarkdown(text) : this.getDefaultGlideDocs();
     } catch (error) {
-      console.error("Documentation fetch error:", error);
-      throw error;
+      console.warn("Failed to load Glide docs, using default:", error);
+      return this.getDefaultGlideDocs();
     }
   }
 
-  async searchDocs(query) {
-    if (!query || query.length < 2) return [];
-
-    try {
-      const response = await fetch(
-        `${this.API_BASE}/docs/search?query=${encodeURIComponent(query)}`
-      );
-      if (!response.ok) throw new Error("Search failed");
-
-      const { results } = await response.json();
-      return results;
-    } catch (error) {
-      console.error("Search error:", error);
-      return [];
-    }
-  }
-
+  // Simplified methods returning dummy data
   async getGeneralConcepts() {
-    try {
-      const response = await fetch(`${this.API_BASE}/docs/topics`);
-      console.log("Topics response:", response); // Debug logging
-      const data = await this.validateResponse(response, "topics");
+    return this.dummyContent.topics;
+  }
 
-      if (!data.topics || !Array.isArray(data.topics)) {
-        return this.getDefaultGeneralConcepts();
-      }
+  async getCommands() {
+    return this.dummyContent.commands;
+  }
 
-      return data.topics;
-    } catch (error) {
-      console.error("Topics fetch error:", error);
-      throw error;
-    }
+  async getModules() {
+    return this.dummyContent.modules;
+  }
+
+  async getClientLanguages() {
+    return this.dummyContent.languages;
+  }
+
+  getSupportedLanguages() {
+    return [
+      {
+        id: "c",
+        name: "C",
+        icon: "⚙️",
+        status: "stable",
+        clients: ["valkey-c", "libvalkey", "valkey-embedded"],
+      },
+      {
+        id: "python",
+        name: "Python",
+        icon: "🐍",
+        status: "stable",
+        clients: ["valkey-py", "asyncvalkey", "valkey-cluster-py"],
+      },
+      {
+        id: "nodejs",
+        name: "Node.js",
+        icon: "🟢",
+        status: "stable",
+        clients: ["valkey-glide", "valkey-node", "valkey-async-node"],
+      },
+      {
+        id: "go",
+        name: "Go",
+        icon: "🔵",
+        status: "stable",
+        clients: ["valkey-go", "govalkey", "valkey-cluster-go"],
+      },
+      {
+        id: "scala",
+        name: "Scala",
+        icon: "🔴",
+        status: "beta",
+        clients: ["valkey-scala", "reactive-valkey"],
+      },
+      {
+        id: "rust",
+        name: "Rust",
+        icon: "🦀",
+        status: "beta",
+        clients: ["valkey-rs", "rustvalkey", "valkey-oxide"],
+      },
+      {
+        id: "zig",
+        name: "Zig",
+        icon: "⚡",
+        status: "development",
+        clients: ["valkey-zig", "zigvalkey"],
+      },
+      {
+        id: "php",
+        name: "PHP",
+        icon: "🐘",
+        status: "stable",
+        clients: ["valkey-php", "phpvalkey", "valkey-async-php"],
+      },
+      {
+        id: "java",
+        name: "Java",
+        icon: "☕",
+        status: "stable",
+        clients: ["valkey-java", "spring-valkey", "valkey-reactive"],
+      },
+      {
+        id: "ruby",
+        name: "Ruby",
+        icon: "💎",
+        status: "beta",
+        clients: ["valkey-rb", "rubyvalkey", "valkey-rails"],
+      },
+      {
+        id: "ocaml",
+        name: "OCaml",
+        icon: "🐫",
+        status: "development",
+        clients: ["valkey-ml", "ocamlvalkey"],
+      },
+      {
+        id: "nim",
+        name: "Nim",
+        icon: "👑",
+        status: "development",
+        clients: ["valkey-nim", "nimvalkey"],
+      },
+      {
+        id: "lua",
+        name: "Lua",
+        icon: "🌙",
+        status: "beta",
+        clients: ["valkey-lua", "lualkey"],
+      },
+      {
+        id: "julia",
+        name: "Julia",
+        icon: "🔮",
+        status: "development",
+        clients: ["valkey-julia", "juliavalkey"],
+      },
+      {
+        id: "kotlin",
+        name: "Kotlin",
+        icon: "🎯",
+        status: "beta",
+        clients: ["valkey-kt", "kotlinvalkey", "valkey-coroutines"],
+      },
+      {
+        id: "elixir",
+        name: "Elixir",
+        icon: "💧",
+        status: "development",
+        clients: ["valkey-ex", "exvalkey", "valkey-phoenix"],
+      },
+      {
+        id: "cpp",
+        name: "C++",
+        icon: "⚡",
+        status: "stable",
+        clients: ["valkey-cpp", "libvalkey-cpp", "valkey-modern"],
+      },
+      {
+        id: "dart",
+        name: "Dart",
+        icon: "🎯",
+        status: "development",
+        clients: ["valkey-dart", "dartvalkey", "valkey-flutter"],
+      },
+      {
+        id: "csharp",
+        name: "C#",
+        icon: "🔷",
+        status: "stable",
+        clients: ["valkey-sharp", "dotnet-valkey", "valkey-async-sharp"],
+      },
+    ];
+  }
+
+  getDefaultModules() {
+    return [
+      {
+        id: "bloom",
+        title: "Bloom Filter",
+        content:
+          "# Bloom Filter Module\nProbabilistic data structure for membership testing...",
+      },
+      {
+        id: "neural",
+        title: "Neural Search",
+        content:
+          "# Neural Search Module\nVector similarity search capabilities...",
+      },
+    ];
+  }
+
+  getDefaultClients() {
+    // Common template for all official clients
+    const officialClientTemplate = (name, lang, type = "standard") => ({
+      name: `${name}`,
+      isOfficial: true,
+      version: "1.0.0",
+      status: "stable",
+      ecosystem: this.getEcosystem(lang),
+      description:
+        type === "glide"
+          ? `Official Rust-powered client for ${lang} with high-performance bindings`
+          : `Official ${lang} client implementation`,
+      features:
+        type === "glide"
+          ? [
+              "Rust core performance",
+              "Native async support",
+              "Type safety",
+              "Connection pooling",
+              "Cluster-aware",
+            ]
+          : [
+              "Easy to use",
+              "Full command support",
+              "Connection pooling",
+              "Cluster support",
+            ],
+      install: type === "glide" ? this.getGlideInstall(lang) : null,
+    });
+
+    // Language-specific client mappings
+    const languageClients = {
+      nodejs: [
+        {
+          id: "valkey-glide-node",
+          ...officialClientTemplate("Valkey Glide", "Node.js", "glide"),
+          install: "npm install @valkey/valkey-glide",
+        },
+        {
+          id: "valkey-node",
+          ...officialClientTemplate("Valkey Node", "Node.js"),
+          install: "npm install valkey-node",
+        },
+        {
+          id: "valkey-cluster-node",
+          name: "Valkey Cluster Node",
+          description: "Community client with advanced clustering features",
+          install: "npm install valkey-cluster",
+        },
+      ],
+      python: [
+        {
+          id: "valkey-glide-python",
+          ...officialClientTemplate("Valkey Glide", "Python", "glide"),
+          install: "pip install valkey-glide",
+        },
+        {
+          id: "valkey-py",
+          ...officialClientTemplate("Valkey Python", "Python"),
+          install: "pip install valkey-py",
+        },
+        {
+          id: "asyncvalkey",
+          name: "AsyncValkey",
+          description: "Async-first Python client",
+          install: "pip install asyncvalkey",
+        },
+      ],
+      // Similar pattern for other languages with Glide support
+      go: [
+        {
+          id: "valkey-glide-go",
+          ...officialClientTemplate("Valkey Glide", "Go", "glide"),
+          install: "go get github.com/valkey-io/valkey-glide-go",
+        },
+        {
+          id: "valkey-go",
+          ...officialClientTemplate("Valkey Go", "Go"),
+          install: "go get github.com/valkey-io/valkey-go",
+        },
+      ],
+      java: [
+        {
+          id: "valkey-glide-java",
+          ...officialClientTemplate("Valkey Glide", "Java", "glide"),
+          install: "Maven: io.valkey:valkey-glide:1.0.0",
+        },
+        {
+          id: "valkey-java",
+          ...officialClientTemplate("Valkey Java", "Java"),
+          install: "Maven: io.valkey:valkey-java:1.0.0",
+        },
+      ],
+      // Languages without Glide support yet
+      rust: [
+        {
+          id: "valkey-rs",
+          ...officialClientTemplate("Valkey Rust", "Rust"),
+          install: "cargo add valkey",
+        },
+      ],
+      php: [
+        {
+          id: "valkey-php",
+          ...officialClientTemplate("Valkey PHP", "PHP"),
+          install: "composer require valkey/valkey",
+        },
+      ],
+      // ... other languages
+    };
+
+    return {
+      languages: Object.keys(languageClients),
+      clientsByLanguage: languageClients,
+    };
+  }
+
+  // Helper methods for client navigation
+  async getClientsByLanguage(language) {
+    const { clientsByLanguage, clientDetails } = this.getDefaultClients();
+    const clients = clientsByLanguage[language] || [];
+    return clients.map((clientId) => ({
+      id: clientId,
+      ...clientDetails[clientId],
+    }));
+  }
+
+  async getClientDetails(clientId) {
+    const { clientDetails } = this.getDefaultClients();
+    return clientDetails[clientId] || null;
   }
 
   getDefaultGeneralConcepts() {
@@ -104,139 +385,321 @@ Valkey is a modern distributed key-value store system designed for high performa
 - Distributed Storage Engine
 - Replication Manager
 - Client Protocol Handler
-- Command Processor`,
+        - Command Processor`,
       },
     ];
-  }
-
-  async getClientDocs() {
-    const files = await this.fetchDirectory("/clients");
-    return Promise.all(
-      files.map(async (file) => {
-        const rawContent = await this.fetchContent(`/clients/${file.name}`);
-        return {
-          id: file.name.replace(".md", ""),
-          title: file.name.replace(".md", ""),
-          content: renderMarkdown(rawContent),
-        };
-      })
-    );
-  }
-
-  async getModuleDocs() {
-    const rawContent = await this.fetchContent(
-      "/modules/community/github.com/README.md"
-    );
-    return renderMarkdown(rawContent);
-  }
-
-  async getRenderedGlideDocs() {
-    try {
-      const response = await fetch("/docs/GLIDE_DOCS.md");
-      if (!response.ok) throw new Error("Failed to load Glide docs");
-
-      const text = await response.text();
-      return text ? renderMarkdown(text) : this.getDefaultGlideDocs();
-    } catch (error) {
-      console.warn("Failed to load Glide docs, using default:", error);
-      return this.getDefaultGlideDocs();
-    }
-  }
-
-  getDefaultGlideDocs() {
-    return renderMarkdown(`# Valkey Glide Documentation
-
-## Overview
-
-Valkey Glide is the official client library interface for Valkey.
-
-## Features
-
-- Simple API
-- Type Safety
-- Connection Pooling
-- Automatic Reconnection
-- Transaction Support`);
-  }
-
-  async getModules() {
-    const response = await fetch(`${this.API_BASE}/docs/modules`);
-    const { modules } = await response.json();
-    return modules;
-  }
-
-  async getModuleContent(moduleId) {
-    const response = await fetch(`${this.API_BASE}/docs/modules/${moduleId}`);
-    const { content } = await response.json();
-    return content;
-  }
-
-  async getClients() {
-    const response = await fetch(`${this.API_BASE}/docs/clients`);
-    const { clients } = await response.json();
-    return clients;
-  }
-
-  async getCommands() {
-    try {
-      const response = await fetch(`${this.API_BASE}/docs/commands`);
-      console.log("Commands response:", response);
-      const data = await this.validateResponse(response, "commands");
-      return data.commands;
-    } catch (error) {
-      console.error("Commands fetch error:", error);
-      throw error;
-    }
   }
 
   getDefaultCommands() {
-    return [
-      {
-        name: "GET",
-        category: "Strings",
-        description: "Get the value of a key",
-        syntax: "GET key",
-        examples: ["GET mykey"],
+    const commandCategories = {
+      "Access Control": {
+        icon: "🔒",
+        commands: [
+          "acl-cat",
+          "acl-deluser",
+          "acl-dryrun",
+          "acl-genpass",
+          "acl-getuser",
+          "acl-help",
+          "acl-list",
+          "acl-load",
+          "acl-log",
+          "acl-save",
+          "acl-setuser",
+          "acl-users",
+          "acl-whoami",
+        ],
       },
-      {
-        name: "SET",
-        category: "Strings",
-        description: "Set the string value of a key",
-        syntax: "SET key value [EX seconds] [NX|XX]",
-        examples: ["SET mykey value"],
+      "String Operations": {
+        icon: "📝",
+        commands: [
+          "append",
+          "get",
+          "getbit",
+          "getdel",
+          "getex",
+          "getrange",
+          "getset",
+          "set",
+          "setbit",
+          "setex",
+          "setnx",
+          "setrange",
+          "strlen",
+          "substr",
+        ],
       },
-    ];
-  }
+      "Hash Operations": {
+        icon: "🔨",
+        commands: [
+          "hdel",
+          "hexists",
+          "hget",
+          "hgetall",
+          "hincrby",
+          "hincrbyfloat",
+          "hkeys",
+          "hlen",
+          "hmget",
+          "hmset",
+          "hrandfield",
+          "hscan",
+          "hset",
+          "hsetnx",
+          "hstrlen",
+          "hvals",
+        ],
+      },
+      "List Operations": {
+        icon: "📋",
+        commands: [
+          "blmove",
+          "blmpop",
+          "blpop",
+          "brpop",
+          "brpoplpush",
+          "lindex",
+          "linsert",
+          "llen",
+          "lmove",
+          "lmpop",
+          "lpop",
+          "lpos",
+          "lpush",
+          "lpushx",
+          "lrange",
+          "lrem",
+          "lset",
+          "ltrim",
+        ],
+      },
+      "Set Operations": {
+        icon: "🎯",
+        commands: [
+          "sadd",
+          "scard",
+          "sdiff",
+          "sdiffstore",
+          "sinter",
+          "sintercard",
+          "sinterstore",
+          "sismember",
+          "smembers",
+          "smismember",
+          "smove",
+          "spop",
+          "srandmember",
+          "srem",
+          "sscan",
+          "sunion",
+          "sunionstore",
+        ],
+      },
+      "Sorted Set Operations": {
+        icon: "📊",
+        commands: [
+          "zadd",
+          "zcard",
+          "zcount",
+          "zdiff",
+          "zdiffstore",
+          "zincrby",
+          "zinter",
+          "zintercard",
+          "zinterstore",
+          "zlexcount",
+          "zmpop",
+          "zmscore",
+          "zpopmax",
+          "zpopmin",
+          "zrandmember",
+          "zrange",
+          "zrangebylex",
+          "zrangebyscore",
+          "zrangestore",
+          "zrank",
+          "zrem",
+          "zremrangebylex",
+          "zremrangebyrank",
+          "zremrangebyscore",
+          "zrevrange",
+          "zrevrangebylex",
+          "zrevrangebyscore",
+          "zrevrank",
+          "zscan",
+          "zscore",
+          "zunion",
+          "zunionstore",
+        ],
+      },
+      "Cluster Management": {
+        icon: "🌐",
+        commands: [
+          "cluster-addslots",
+          "cluster-addslotsrange",
+          "cluster-bumpepoch",
+          "cluster-count-failure-reports",
+          "cluster-countkeysinslot",
+          "cluster-delslots",
+          "cluster-delslotsrange",
+          "cluster-failover",
+          "cluster-flushslots",
+          "cluster-forget",
+          "cluster-getkeysinslot",
+          "cluster-help",
+          "cluster-info",
+          "cluster-keyslot",
+          "cluster-links",
+          "cluster-meet",
+          "cluster-myid",
+          "cluster-myshardid",
+          "cluster-nodes",
+          "cluster-replicas",
+          "cluster-replicate",
+          "cluster-reset",
+          "cluster-saveconfig",
+          "cluster-set-config-epoch",
+          "cluster-setslot",
+          "cluster-shards",
+          "cluster-slaves",
+        ],
+      },
+      "Connection Management": {
+        icon: "🔌",
+        commands: [
+          "auth",
+          "client-caching",
+          "client-getname",
+          "client-getredir",
+          "client-id",
+          "client-info",
+          "client-kill",
+          "client-list",
+          "client-no-evict",
+          "client-no-touch",
+          "client-pause",
+          "client-setinfo",
+          "client-setname",
+          "client-tracking",
+          "client-unblock",
+          "client-unpause",
+          "echo",
+          "ping",
+          "quit",
+          "select",
+        ],
+      },
+      "Server Management": {
+        icon: "⚙️",
+        commands: [
+          "bgrewriteaof",
+          "bgsave",
+          "command-count",
+          "command-docs",
+          "command-getkeys",
+          "command-help",
+          "command-info",
+          "command-list",
+          "config-get",
+          "config-resetstat",
+          "config-rewrite",
+          "config-set",
+          "dbsize",
+          "flushall",
+          "flushdb",
+          "info",
+          "lastsave",
+          "memory-doctor",
+          "memory-help",
+          "memory-malloc-stats",
+          "memory-purge",
+          "memory-stats",
+          "memory-usage",
+          "save",
+          "shutdown",
+          "slaveof",
+          "slowlog-get",
+          "slowlog-len",
+          "slowlog-reset",
+          "time",
+        ],
+      },
+      Transactions: {
+        icon: "🔄",
+        commands: ["discard", "exec", "multi", "unwatch", "watch"],
+      },
+      Scripting: {
+        icon: "📜",
+        commands: [
+          "eval",
+          "eval_ro",
+          "evalsha",
+          "evalsha_ro",
+          "script-debug",
+          "script-exists",
+          "script-flush",
+          "script-kill",
+          "script-load",
+        ],
+      },
+      "Pub/Sub": {
+        icon: "📢",
+        commands: [
+          "publish",
+          "psubscribe",
+          "pubsub-channels",
+          "pubsub-numpat",
+          "pubsub-numsub",
+          "pubsub-shardchannels",
+          "pubsub-shardnumsub",
+          "punsubscribe",
+          "subscribe",
+          "unsubscribe",
+        ],
+      },
+    };
 
-  async getCommandContent(commandId) {
-    const response = await fetch(`${this.API_BASE}/docs/commands/${commandId}`);
-    const { content } = await response.json();
-    return content;
-  }
-
-  async getClientLanguages() {
-    try {
-      const response = await fetch(`${this.API_BASE}/docs/clients/languages`);
-      const data = await this.validateResponse(response, "languages");
-      return data.languages || [];
-    } catch (error) {
-      console.error("Failed to fetch languages:", error);
-      return ["javascript", "python"];
-    }
-  }
-
-  async getLanguageClients(language) {
-    const response = await fetch(`${this.API_BASE}/docs/clients/${language}`);
-    const { clients } = await response.json();
-    return clients;
-  }
-
-  async getClientContent(language, clientId) {
-    const response = await fetch(
-      `${this.API_BASE}/docs/clients/${language}/${clientId}`
+    // Create a flat array of command objects with their categories
+    return Object.entries(commandCategories).flatMap(([category, info]) =>
+      info.commands.map((cmd) => ({
+        name: cmd,
+        category,
+        categoryIcon: info.icon,
+        description: this.getCommandDescription(cmd),
+        syntax: this.getCommandSyntax(cmd),
+        examples: this.getCommandExamples(cmd),
+      }))
     );
-    const { content } = await response.json();
-    return content;
+  }
+
+  getCommandDescription(cmd) {
+    // We'll implement detailed descriptions for each command
+    const descriptions = {
+      get: "Retrieve the value of a key",
+      set: "Set the string value of a key",
+      // ... more commands
+    };
+    return descriptions[cmd] || `Documentation for ${cmd} command`;
+  }
+
+  getCommandSyntax(cmd) {
+    // We'll implement proper syntax for each command
+    const syntax = {
+      get: "GET key",
+      set: "SET key value [EX seconds] [PX milliseconds] [NX|XX]",
+      // ... more commands
+    };
+    return syntax[cmd] || `${cmd.toUpperCase()} [arguments]`;
+  }
+
+  getCommandExamples(cmd) {
+    // We'll implement realistic examples for each command
+    const examples = {
+      get: ["GET mykey", "GET user:1:name"],
+      set: ["SET mykey value", 'SET user:1:name "John Doe" EX 3600'],
+      // ... more commands
+    };
+    return examples[cmd] || [`${cmd.toUpperCase()} example:key`];
   }
 }
 

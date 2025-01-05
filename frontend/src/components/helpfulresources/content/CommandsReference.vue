@@ -3,14 +3,15 @@
     <div class="commands-header">
       <div class="search-box">
         <input
-          v-model="filter"
+          v-model="searchQuery"
           placeholder="Search commands..."
           class="search-input"
+          @input="handleSearch"
         />
         <span class="search-icon">🔍</span>
       </div>
 
-      <div class="categories-scroll">
+      <div class="categories-scroll" v-if="!selectedCommand">
         <button
           v-for="cat in categories"
           :key="cat"
@@ -22,7 +23,13 @@
       </div>
     </div>
 
-    <div class="commands-list" ref="scrollParent">
+    <div v-if="selectedCommand" class="command-details">
+      <CommandDetails
+        :command="selectedCommand"
+        @back="selectedCommand = null"
+      />
+    </div>
+    <div v-else class="commands-list" ref="scrollParent">
       <div
         :style="{
           height: `${virtualizer.getTotalSize()}px`,
@@ -40,6 +47,7 @@
             transform: `translateY(${virtualItem.start}px)`,
             width: '100%',
           }"
+          @click="selectCommand(filteredCommands[virtualItem.index])"
         >
           <div class="command-header">
             <h3>{{ filteredCommands[virtualItem.index].name }}</h3>
@@ -50,14 +58,6 @@
           <p class="command-description">
             {{ filteredCommands[virtualItem.index].description }}
           </p>
-          <div class="command-examples">
-            <pre
-              v-for="(ex, i) in filteredCommands[virtualItem.index].examples"
-              :key="i"
-            >
-              {{ ex }}
-            </pre>
-          </div>
         </div>
       </div>
     </div>
@@ -68,15 +68,21 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import store from "@/store";
+import CommandDetails from "./commands/CommandDetails.vue";
+import { getCommandExample } from "@/services/commandExamples";
 
 export default {
   name: "CommandsReference",
+  components: {
+    CommandDetails,
+  },
 
   setup() {
-    const filter = ref("");
+    const searchQuery = ref("");
     const selectedCategory = ref("All");
-
+    const selectedCommand = ref(null);
     const commands = ref([]);
+    const searchTimeout = ref(null);
     const loading = ref(false);
 
     onMounted(async () => {
@@ -107,16 +113,18 @@ export default {
 
     const filteredCommands = computed(() => {
       return commands.value.filter((cmd) => {
-        const matchesFilter =
-          !filter.value ||
-          cmd.name.toLowerCase().includes(filter.value.toLowerCase()) ||
-          cmd.description.toLowerCase().includes(filter.value.toLowerCase());
+        const matchesSearch = searchQuery.value
+          ? cmd.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+            cmd.description
+              .toLowerCase()
+              .includes(searchQuery.value.toLowerCase())
+          : true;
 
         const matchesCategory =
           selectedCategory.value === "All" ||
           cmd.category === selectedCategory.value;
 
-        return matchesFilter && matchesCategory;
+        return matchesSearch && matchesCategory;
       });
     });
 
@@ -173,13 +181,32 @@ export default {
 
     const selectCategory = (category) => {
       selectedCategory.value = category;
-      currentPage.value = 0;
-      scrollParent.value?.scrollTo(0, 0);
+      if (scrollParent.value) {
+        scrollParent.value.scrollTop = 0;
+      }
+    };
+
+    const handleSearch = () => {
+      if (searchTimeout.value) {
+        clearTimeout(searchTimeout.value);
+      }
+      searchTimeout.value = setTimeout(() => {
+        // Correct way to scroll virtualizer to top
+        if (scrollParent.value) {
+          scrollParent.value.scrollTop = 0;
+        }
+      }, 300);
+    };
+
+    const selectCommand = (command) => {
+      const details = getCommandExample(command.name.toLowerCase());
+      selectedCommand.value = { ...command, ...details };
     };
 
     return {
-      filter,
+      searchQuery,
       selectedCategory,
+      selectedCommand,
       categories,
       filteredCommands,
       getCategoryEmoji,
@@ -188,6 +215,8 @@ export default {
       scrollParent,
       virtualizer,
       selectCategory,
+      handleSearch,
+      selectCommand,
     };
   },
 };
@@ -269,6 +298,13 @@ export default {
   border-radius: var(--radius-md);
   animation: fadeIn 0.3s ease-in-out;
   margin: 0.5rem 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.command-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--primary-color);
 }
 
 .command-name {
@@ -303,5 +339,28 @@ export default {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.search-box {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-light);
+  background: var(--surface-darker);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
 }
 </style>

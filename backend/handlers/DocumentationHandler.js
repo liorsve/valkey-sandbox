@@ -81,22 +81,147 @@ class DocumentationHandler {
   }
 
   async getGeneralConcepts() {
-    await this.ensureInitialized();
     try {
+      await this.ensureInitialized();
+
       const topics = await GlideJson.objkeys(this.client, "content:topics");
+      if (!topics || !topics.length) {
+        console.warn("No topics found, returning defaults");
+        return this.getDefaultGeneralConcepts();
+      }
+
       const allTopics = await Promise.all(
-        topics.map(async (topic) => ({
-          id: topic,
-          content: await GlideJson.get(this.client, "content:topics", {
-            path: `$.${topic}`,
-          }),
-        }))
+        topics.map(async (topic) => {
+          try {
+            const content = await GlideJson.get(this.client, "content:topics", {
+              path: `$.${topic}`,
+            });
+            return { id: topic, content };
+          } catch (err) {
+            console.error(`Failed to fetch topic ${topic}:`, err);
+            return null;
+          }
+        })
       );
-      return allTopics;
+
+      const validTopics = allTopics.filter(Boolean);
+      return validTopics.length
+        ? validTopics
+        : this.getDefaultGeneralConcepts();
     } catch (error) {
       console.error("Failed to fetch topics:", error);
-      throw error;
+      return this.getDefaultGeneralConcepts();
     }
+  }
+
+  getDefaultGeneralConcepts() {
+    return [
+      {
+        id: "introduction",
+        title: "Introduction to Valkey",
+        content: `# Welcome to Valkey
+
+## Overview
+Valkey is a modern distributed key-value store designed for high performance and scalability.
+
+### Key Features
+- Distributed Architecture
+- High Availability
+- Horizontal Scaling
+- Rich Data Structures
+- Multi-Language Client Support
+- Enterprise-Grade Security
+
+## Quick Start
+Get started with Valkey in minutes using our quick installation guide.`,
+      },
+      {
+        id: "data-types",
+        title: "Data Types",
+        content: `# Valkey Data Types
+
+## Core Data Structures
+- Strings: Basic key-value storage
+- Lists: Ordered collections
+- Sets: Unique element collections
+- Hashes: Field-value pairs
+- Sorted Sets: Scored element collections
+- Bitmaps: Bit-level operations
+- HyperLogLog: Probabilistic counting
+- Streams: Log-like data structures
+
+## Use Cases
+Learn how to effectively use each data type for your specific needs.`,
+      },
+      {
+        id: "cluster",
+        title: "Clustering",
+        content: `# Valkey Clustering
+
+## High Availability
+- Automatic failover
+- Master-replica replication
+- Cluster sharding
+- Data persistence
+
+## Management
+- Node management
+- Scaling operations
+- Monitoring
+- Performance tuning`,
+      },
+      {
+        id: "security",
+        title: "Security",
+        content: `# Security Features
+
+## Core Security
+- Access Control Lists (ACL)
+- SSL/TLS Encryption
+- Authentication
+- Authorization
+
+## Best Practices
+- Security configurations
+- Network security
+- Data protection
+- Compliance considerations`,
+      },
+      {
+        id: "clients",
+        title: "Client Libraries",
+        content: `# Valkey Client Libraries
+
+## Official Clients
+- Node.js
+- Python
+- Java
+- Go (Coming Soon)
+
+## Features
+- Connection pooling
+- Auto-reconnection
+- Transaction support
+- Cluster awareness`,
+      },
+      {
+        id: "performance",
+        title: "Performance",
+        content: `# Performance Optimization
+
+## Key Areas
+- Memory optimization
+- CPU utilization
+- Network latency
+- Command pipelining
+
+## Monitoring
+- Latency monitoring
+- Memory analysis
+- Performance metrics
+- Debugging tools`,
+      },
+    ];
   }
 
   async getCommands() {

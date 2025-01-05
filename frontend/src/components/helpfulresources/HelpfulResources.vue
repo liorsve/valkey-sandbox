@@ -1,15 +1,14 @@
 <template>
   <div class="helpful-resources">
-    <!-- Add loading states to template -->
-    <div v-if="loading" class="content-loading">
-      <div class="loading-placeholder loading-item"></div>
-      <div class="loading-line loading-item"></div>
-      <div class="loading-line loading-item short"></div>
-      <div class="loading-line loading-item medium"></div>
-    </div>
+    <LoadingOverlay
+      :show="loading"
+      text="Loading documentation..."
+      :show-logo="false"
+      :enable-blur="false"
+    />
 
     <!-- Show carousel only when no content is selected -->
-    <div v-else-if="!selectedContent" class="resource-carousel">
+    <div v-show="!loading && !selectedContent" class="resource-carousel">
       <button class="arrow-btn left" @click="scrollLeft">‹</button>
       <div class="carousel-viewport">
         <div
@@ -34,16 +33,19 @@
     </div>
 
     <!-- Content area shows when a page is selected -->
-    <div v-else class="content-area">
+    <div v-show="!loading && selectedContent" class="content-area">
       <DocSidebar
         :current-section="selectedSection"
         :sections="contentNavigation"
-        @select-item="scrollToSection"
+        @select-section="handleSectionSelect"
+        @select-item="handleItemSelect"
+        @back="handleBack"
       />
       <div class="content-main" ref="contentMain">
         <component
+          v-if="selectedContent?.component"
           :is="selectedContent.component"
-          v-bind="selectedContent.props"
+          v-bind="selectedContent.props || {}"
         />
       </div>
     </div>
@@ -65,9 +67,18 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, nextTick, markRaw } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  markRaw,
+  defineAsyncComponent,
+} from "vue";
 import { store } from "@/store";
 import lazyDocumentation from "@/services/lazyDocumentation";
+import LoadingOverlay from "../common/LoadingOverlay.vue";
+import loadingController from "@/services/loadingController";
 
 // Import icons
 import LinkedInIcon from "@/assets/icons/linkedin.svg";
@@ -76,16 +87,28 @@ import ValkeyLogoIcon from "@/assets/images/Valkey-logo.svg";
 import TwitterIcon from "@/assets/icons/twitter.svg";
 import GlideGitIcon from "@/assets/icons/glide-git.svg";
 
-// Lazy load content components
-const GeneralConcepts = () => import("./content/GeneralConcepts.vue");
-const CommandsReference = () => import("./content/CommandsReference.vue");
-const GlideDocumentation = () => import("./content/GlideDocumentation.vue");
-const LatestNews = () => import("./content/LatestNews.vue");
-const ValkeyClients = () => import("./content/ValkeyClients.vue");
-const ValkeyModules = () => import("./content/ValkeyModules.vue");
-const WeeklyBlog = () => import("./content/WeeklyBlog.vue");
-const Roadmap = () => import("./content/Roadmap.vue");
-const DocSidebar = () => import("./DocSidebar.vue");
+// Define async components with markRaw
+const DocComponents = {
+  GeneralConcepts: markRaw(
+    defineAsyncComponent(() => import("./content/GeneralConcepts.vue"))
+  ),
+  CommandsReference: markRaw(
+    defineAsyncComponent(() => import("./content/CommandsReference.vue"))
+  ),
+  GlideDocumentation: markRaw(
+    defineAsyncComponent(() => import("./content/GlideDocumentation.vue"))
+  ),
+  LatestNews: markRaw(
+    defineAsyncComponent(() => import("./content/LatestNews.vue"))
+  ),
+  ValkeyClients: markRaw(
+    defineAsyncComponent(() => import("./content/ValkeyClients.vue"))
+  ),
+  ValkeyModules: markRaw(
+    defineAsyncComponent(() => import("./content/ValkeyModules.vue"))
+  ),
+  Roadmap: markRaw(defineAsyncComponent(() => import("./content/Roadmap.vue"))),
+};
 
 const links = [
   {
@@ -118,15 +141,9 @@ const links = [
 export default {
   name: "HelpfulResources",
   components: {
-    GeneralConcepts,
-    CommandsReference,
-    GlideDocumentation,
-    LatestNews,
-    ValkeyClients,
-    ValkeyModules,
-    WeeklyBlog,
-    Roadmap,
-    DocSidebar,
+    LoadingOverlay,
+    DocSidebar: markRaw(defineAsyncComponent(() => import("./DocSidebar.vue"))),
+    ...DocComponents,
   },
 
   setup() {
@@ -138,74 +155,77 @@ export default {
     const contentMain = ref(null);
     const loading = ref(true);
 
-    onMounted(async () => {
-      try {
-        // Load documentation dependencies
-        await lazyDocumentation.initializeDocumentation();
-        loading.value = false;
-      } catch (error) {
-        console.error("Failed to initialize documentation:", error);
-      }
-    });
-
     const pages = [
       {
         id: "general",
         emoji: "📚",
         title: "General Concepts",
         description: "Learn the foundations of Valkey from topics & basics.",
-        component: markRaw(GeneralConcepts),
+        component: DocComponents.GeneralConcepts,
       },
       {
         id: "commands",
         emoji: "⚙️",
         title: "Commands Reference",
         description: "Full Valkey commands with usage examples & details.",
-        component: markRaw(CommandsReference),
+        component: DocComponents.CommandsReference,
       },
       {
         id: "glide",
         emoji: "🛠️",
         title: "Glide Documentation",
         description: "Integration details for Valkey Glide.",
-        component: markRaw(GlideDocumentation),
+        component: DocComponents.GlideDocumentation,
       },
       {
         id: "news",
         emoji: "📰",
         title: "Latest News",
         description: "Stay updated on announcements & blog posts.",
-        component: markRaw(LatestNews),
+        component: DocComponents.LatestNews,
       },
       {
         id: "clients",
         emoji: "💻",
         title: "Valkey Clients",
         description: "Explore language-specific client libraries.",
-        component: markRaw(ValkeyClients),
+        component: DocComponents.ValkeyClients,
       },
       {
         id: "modules",
         emoji: "🔌",
         title: "Valkey Modules",
         description: "Add-on modules & advanced capabilities.",
-        component: markRaw(ValkeyModules),
-      },
-      {
-        id: "blog",
-        emoji: "📝",
-        title: "Weekly Blog",
-        description: "Placeholder for weekly deep dives & insights.",
-        component: markRaw(WeeklyBlog),
+        component: DocComponents.ValkeyModules,
       },
       {
         id: "roadmap",
         emoji: "🚧",
         title: "Valkey Road Map",
         description: "Upcoming features & system improvements.",
-        component: markRaw(Roadmap),
+        component: DocComponents.Roadmap,
       },
     ];
+
+    onMounted(async () => {
+      try {
+        await initializeDocumentation();
+      } finally {
+        loading.value = false;
+        // Use the imported loadingController
+        loadingController.finishComponentTransition("helpfulResources");
+      }
+    });
+
+    const initializeDocumentation = async () => {
+      try {
+        await lazyDocumentation.initializeDocumentation();
+      } catch (error) {
+        console.error("Failed to initialize documentation:", error);
+      } finally {
+        loading.value = false;
+      }
+    };
 
     const contentNavigation = computed(() => {
       return selectedContent.value?.sections || [];
@@ -231,45 +251,54 @@ export default {
       });
     };
 
-    const getContentSections = (pageId) => {
-      switch (pageId) {
-        case "general":
-          return [
-            {
-              id: "general",
-              title: "General Concepts",
-              icon: "📚",
-              items: [
-                { id: "introduction", title: "Introduction" },
-                { id: "architecture", title: "Architecture" },
-                { id: "clustering", title: "Clustering" },
-              ],
-            },
-          ];
-        case "commands":
-          return [
-            {
-              id: "commands",
-              title: "Commands",
-              icon: "⚡",
-              items: [
-                { id: "strings", title: "Strings" },
-                { id: "hashes", title: "Hashes" },
-                { id: "lists", title: "Lists" },
-              ],
-            },
-          ];
-        default:
-          return [];
+    const selectPage = (page) => {
+      if (!page?.component) {
+        console.error("Invalid page selection:", page);
+        return;
       }
+
+      // Reset section when changing pages
+      selectedSection.value = null;
+
+      // Set the content with appropriate sections based on page
+      selectedContent.value = {
+        component: page.component,
+        props: { pageId: page.id },
+        sections: getSectionsForPage(page.id),
+      };
     };
 
-    const selectPage = (page) => {
-      selectedContent.value = {
-        component: markRaw(page.component),
-        props: { pageId: page.id },
-        sections: getContentSections(page.id),
+    const getSectionsForPage = (pageId) => {
+      const sectionMappings = {
+        commands: [
+          { id: "strings", title: "String Operations", icon: "📝" },
+          { id: "hashes", title: "Hash Operations", icon: "🔨" },
+          { id: "lists", title: "List Operations", icon: "📋" },
+          { id: "sets", title: "Set Operations", icon: "🎯" },
+          { id: "sorted-sets", title: "Sorted Set Operations", icon: "📊" },
+          { id: "pubsub", title: "Pub/Sub", icon: "📢" },
+          { id: "transactions", title: "Transactions", icon: "🔄" },
+          { id: "scripting", title: "Scripting", icon: "📜" },
+        ],
+        general: [
+          { id: "introduction", title: "Introduction", icon: "📚" },
+          { id: "architecture", title: "Architecture", icon: "🏗️" },
+          { id: "clustering", title: "Clustering", icon: "🌐" },
+          { id: "security", title: "Security", icon: "🔒" },
+        ],
+        clients: [
+          { id: "overview", title: "Overview", icon: "📋" },
+          { id: "languages", title: "Languages", icon: "💻" },
+          { id: "best-practices", title: "Best Practices", icon: "✨" },
+        ],
+        modules: [
+          { id: "overview", title: "Overview", icon: "📦" },
+          { id: "official", title: "Official Modules", icon: "✅" },
+          { id: "community", title: "Community Modules", icon: "🌟" },
+        ],
       };
+
+      return sectionMappings[pageId] || [];
     };
 
     const scrollToSection = (sectionId) => {
@@ -282,6 +311,45 @@ export default {
           element.scrollIntoView({ behavior: "smooth" });
         }
       });
+    };
+
+    const handleSectionSelect = (sectionId) => {
+      selectedSection.value = sectionId;
+      // Map section IDs to components
+      const componentMap = {
+        general: DocComponents.GeneralConcepts,
+        commands: DocComponents.CommandsReference,
+        glide: DocComponents.GlideDocumentation,
+        news: DocComponents.LatestNews,
+        clients: DocComponents.ValkeyClients,
+        modules: DocComponents.ValkeyModules,
+        roadmap: DocComponents.Roadmap,
+      };
+
+      if (componentMap[sectionId]) {
+        selectedContent.value = {
+          component: componentMap[sectionId],
+          props: { pageId: sectionId },
+          sections: getSectionsForPage(sectionId),
+        };
+      }
+    };
+
+    const handleItemSelect = (itemId) => {
+      // Handle subsection selection
+      if (selectedContent.value?.component) {
+        nextTick(() => {
+          const element = document.getElementById(itemId);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+          }
+        });
+      }
+    };
+
+    const handleBack = () => {
+      selectedContent.value = null;
+      selectedSection.value = null;
     };
 
     const visiblePages = computed(() => {
@@ -312,12 +380,16 @@ export default {
           activeIndex.value <= 0 ? pages.length - 1 : activeIndex.value - 1;
       },
       scrollRight() {
-        activeIndex.value =
-          activeIndex.value >= pages.length - 1 ? 0 : activeIndex.value + 1;
+        activeIndex.value >= pages.length - 1 ? 0 : activeIndex.value + 1;
       },
       links,
       visiblePages,
       loading,
+      loadingController,
+      getSectionsForPage,
+      handleSectionSelect,
+      handleItemSelect,
+      handleBack,
     };
   },
 };
@@ -566,7 +638,7 @@ export default {
 
 .content-area {
   display: flex;
-  flex: 1;
+  height: 100%;
   overflow: hidden;
   background: var(--surface-darker);
 }
@@ -610,55 +682,6 @@ export default {
   100% {
     transform: scale(1);
   }
-}
-
-/* Loading State Animation */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.loading-item {
-  background: linear-gradient(
-    90deg,
-    var(--surface-dark) 25%,
-    var(--surface-light) 50%,
-    var(--surface-dark) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
-  border-radius: var(--radius-md);
-}
-
-.loading-placeholder {
-  height: 360px;
-  width: 500px;
-  margin: 2rem auto;
-}
-
-/* Content Loading State */
-.content-loading {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 2rem;
-}
-
-.loading-line {
-  height: 1.5rem;
-  width: 100%;
-  border-radius: var(--radius-sm);
-}
-
-.loading-line.short {
-  width: 60%;
-}
-.loading-line.medium {
-  width: 80%;
 }
 
 /* Pulse Animation for Interactive Elements */
