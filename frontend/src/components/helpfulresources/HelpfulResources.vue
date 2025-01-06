@@ -368,7 +368,8 @@ export default {
           activeIndex.value <= 0 ? pages.length - 1 : activeIndex.value - 1;
       },
       scrollRight() {
-        activeIndex.value >= pages.length - 1 ? 0 : activeIndex.value + 1;
+        activeIndex.value =
+          activeIndex.value >= pages.length - 1 ? 0 : activeIndex.value + 1;
       },
       links,
       visiblePages,
