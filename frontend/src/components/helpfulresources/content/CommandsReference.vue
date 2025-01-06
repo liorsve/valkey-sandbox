@@ -145,9 +145,7 @@ export default {
       if (searchTimeout.value) {
         clearTimeout(searchTimeout.value);
       }
-      searchTimeout.value = setTimeout(() => {
-        // Search handling
-      }, 300);
+      searchTimeout.value = setTimeout(() => {}, 300);
     };
 
     const selectCommand = (command) => {

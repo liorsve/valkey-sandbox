@@ -41,12 +41,10 @@ export default {
         const writeToTerminal = ( output ) => {
             if ( !output || !terminalInstance.value ) return;
 
-            // Handle different output types
             const lines = ( typeof output === 'string' ? output : JSON.stringify( output, null, 2 ) )
                 .split( '\n' )
                 .filter( line => line.trim() );
 
-            // Write each line to terminal
             lines.forEach( line => {
                 terminalInstance.value.writeln( ` ${ line.trim() }` );
             } );

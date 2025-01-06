@@ -10,7 +10,6 @@
 
     <div class="sidebar-content">
       <div class="nav-sections">
-        <!-- Main sections -->
         <div
           v-for="section in mainSections"
           :key="section.id"
@@ -22,7 +21,6 @@
           <span class="section-title">{{ section.title }}</span>
         </div>
 
-        <!-- Show subsections only for current section -->
         <div
           v-if="currentSection && currentSubsections.length"
           class="subsections"
@@ -76,7 +74,6 @@ export default {
     currentSubsections() {
       const section = this.sections.find((s) => s.id === this.currentSection);
       if (!section?.items) {
-        // If no items found in sections prop, try to get from default mappings
         const defaultSections = {
           general: [
             { id: "introduction", title: "Introduction" },

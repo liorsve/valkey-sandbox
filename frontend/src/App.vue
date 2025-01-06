@@ -111,7 +111,6 @@ export default defineComponent({
       }
     });
 
-    // Clean up on unmount
     onBeforeUnmount(() => {
       wsManager.stopHealthCheck();
       wsManager.removeMessageListener("global");
@@ -155,13 +154,11 @@ export default defineComponent({
     });
 
     const handleTabChange = async (tab) => {
-      // Start loading immediately before any async operations
       loadingController.start(`Loading ${tab}...`);
 
       try {
         const prevTab = store.currentTab;
 
-        // Set the new tab immediately to avoid UI flicker
         store.setTab(tab);
 
         if (prevTab === "watchInAction" && tab !== "watchInAction") {
@@ -264,7 +261,6 @@ export default defineComponent({
   background: #121212;
   color: #ffffff;
   overflow: hidden;
-  /* Prevent scrolling on main container */
 }
 
 .app-main {
@@ -286,7 +282,6 @@ export default defineComponent({
   margin-left: var(--sidebar-width);
 }
 
-/* Transitions */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -321,7 +316,6 @@ export default defineComponent({
   }
 }
 
-/* Add smooth transitions to components */
 .main-content {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }

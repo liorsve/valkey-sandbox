@@ -28,7 +28,6 @@ class WebSocketManager {
     try {
       if (!event?.data) return;
 
-      // Handle special system messages
       if (event.data === "connected") {
         this.notifyListeners({
           action: "connected",
@@ -38,7 +37,6 @@ class WebSocketManager {
         return;
       }
 
-      // Parse and normalize message
       let parsedData;
       try {
         parsedData =
@@ -48,14 +46,12 @@ class WebSocketManager {
         return;
       }
 
-      // Create normalized message structure
       const message = {
         action: parsedData.action || parsedData.type || "unknown",
         payload: null,
         timestamp: Date.now(),
       };
 
-      // Handle nested data structures
       if (parsedData.data) {
         message.payload =
           typeof parsedData.data === "object"
@@ -65,7 +61,6 @@ class WebSocketManager {
         message.payload = parsedData.payload;
       }
 
-      // Handle output in data or root
       if (parsedData.data?.output || parsedData.output) {
         message.payload = {
           ...(message.payload || {}),
@@ -73,7 +68,6 @@ class WebSocketManager {
         };
       }
 
-      // Only notify if we have a valid action
       if (message.action && message.action !== "unknown") {
         this.notifyListeners(message);
       }
@@ -88,14 +82,13 @@ class WebSocketManager {
       return;
     }
 
-    // Route all terminal/output related actions to sidebar
     const componentRoutes = {
       taskUpdate: "taskManager",
       gameCommand: "taskManager",
       leaderboardUpdate: "leaderboard",
-      output: "sidebar", // Route to sidebar instead of playground
-      terminalOutput: "sidebar", // Route to sidebar instead of playground
-      executionResult: "sidebar", // Route to sidebar instead of playground
+      output: "sidebar",
+      terminalOutput: "sidebar",
+      executionResult: "sidebar",
       connected: "global",
     };
 
@@ -173,7 +166,6 @@ class WebSocketManager {
   addMessageListener(listener, component = "global") {
     if (typeof listener !== "function") return;
 
-    // Remove existing listener for the component if it exists
     this.removeMessageListener(component);
 
     const listenerObj = {
@@ -192,14 +184,12 @@ class WebSocketManager {
     const before = this.listeners.size;
 
     if (typeof listenerIdOrComponent === "string") {
-      // Remove by component name
       this.listeners = new Set(
         Array.from(this.listeners).filter(
           (l) => l.component !== listenerIdOrComponent
         )
       );
     } else {
-      // Remove by listener ID
       this.listeners = new Set(
         Array.from(this.listeners).filter((l) => l.id !== listenerIdOrComponent)
       );
@@ -219,7 +209,6 @@ class WebSocketManager {
       return Promise.reject(new Error("WebSocket connection not ready"));
     }
 
-    // Prevent duplicate cleanup messages
     if (data.action === "cleanup" && this._cleanupInProgress) {
       console.debug("[WS] Cleanup already in progress, skipping");
       return Promise.resolve();
@@ -254,7 +243,6 @@ class WebSocketManager {
     }
   }
 
-  // Add health check method
   startHealthCheck(interval = 30000) {
     if (this._healthCheckInterval) return;
 

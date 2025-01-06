@@ -20,7 +20,6 @@ class LoadingController {
     const elapsed = Date.now() - this._loadStartTime;
     const remaining = Math.max(0, this._minimumLoadTime - elapsed);
 
-    // Ensure minimum loading time for smooth UX
     await new Promise((resolve) => setTimeout(resolve, remaining));
 
     this.isLoading.value = false;

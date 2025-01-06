@@ -126,7 +126,6 @@ export default {
   color: var(--text-primary);
 }
 
-/* Enhance headings */
 :deep(.markdown-body h1),
 :deep(.markdown-body h2),
 :deep(.markdown-body h3) {
@@ -136,7 +135,6 @@ export default {
   margin: 2rem 0 1rem;
 }
 
-/* Enhance links */
 :deep(.markdown-body .links-section) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -179,7 +177,6 @@ export default {
   box-shadow: 0 4px 12px rgba(var(--primary-color-rgb), 0.2) !important;
 }
 
-/* Content boxes */
 :deep(.markdown-body .content-box) {
   background: var(--surface-dark);
   border: 1px solid var(--surface-light);
@@ -188,7 +185,6 @@ export default {
   margin: 1.5rem 0;
 }
 
-/* Code highlighting for TypeScript */
 :deep(.markdown-body .language-typescript),
 :deep(.markdown-body .language-ts) {
   color: #9cdcfe;
@@ -210,10 +206,8 @@ export default {
   color: #6a9955;
 }
 
-/* Add highlight.js TypeScript theme */
 @import "highlight.js/styles/github-dark.css";
 
-/* Enhanced content styling */
 :deep(.markdown-body) {
   font-size: 1.1rem;
   line-height: 1.8;
@@ -233,7 +227,6 @@ export default {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
-/* Enhanced code block styling */
 :deep(.code-block) {
   position: relative !important;
   margin: 2rem 0 !important;

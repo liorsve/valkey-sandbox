@@ -196,11 +196,9 @@ export default {
 
       if (gameStarted.value === false) {
         gameStarted.value = true;
-        // Remove unused event emission
         console.debug("[Leaderboard] Game started");
       }
 
-      // Handle both array format and {state, operations} format
       const playerData = Array.isArray(data)
         ? data
         : data.state
@@ -254,7 +252,6 @@ export default {
       try {
         console.log("[LeaderboardVisualization] WebSocket message:", event);
 
-        // Handle normalized messages from WebSocketManager
         const message = event?.payload
           ? event
           : {
@@ -315,10 +312,8 @@ export default {
     const initializeWebSocketListener = (ws) => {
       if (!ws) return;
 
-      // Cleanup any existing listener first
       cleanupWebSocketListener();
 
-      // Register new component-specific listener
       wsListenerId = wsManager.addMessageListener(
         handleWebSocketMessage,
         "leaderboard"
@@ -334,7 +329,6 @@ export default {
       }
     };
 
-    // Watch for WebSocket changes
     watch(
       () => props.ws,
       (newWs) => {
@@ -343,7 +337,6 @@ export default {
       { immediate: true }
     );
 
-    // Ensure cleanup on unmount
     onBeforeUnmount(() => {
       cleanupWebSocketListener();
     });
@@ -386,7 +379,6 @@ export default {
       cleanup();
     });
 
-    // Initialize scores
     players.value.forEach((player) => {
       playerScores.value[player.id] = player.score;
     });
@@ -893,7 +885,6 @@ export default {
   cursor: not-allowed;
   background-color: #666;
   min-width: 200px;
-  /* Ensure consistent width for different text lengths */
 }
 
 .list-move,

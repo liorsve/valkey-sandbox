@@ -7,30 +7,24 @@ import { createWebSocketManager } from "./composables/useWebSocket";
 import VueVirtualScroller from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 
-// Import styles statically to ensure they're available immediately
 import "./styles/variables.css";
 
 const app = createApp(App);
 
-// Add virtual scroller before mount
 app.use(VueVirtualScroller);
 
-// Create dependencies before app mount
 const eventBus = createEventBus();
 const wsManager = createWebSocketManager(eventBus);
 
-// Provide global services
 app.provide("eventBus", eventBus);
 app.provide("wsManager", wsManager);
 
-// Configure Monaco Editor
 app.use(VueMonacoEditorPlugin, {
   paths: {
     vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs",
   },
 });
 
-// Make store available globally (for debugging)
 window.Storage = store;
 
 const removeLoader = () => {
@@ -41,7 +35,6 @@ const removeLoader = () => {
   }
 };
 
-// Initialize application with proper error handling
 (() => {
   try {
     app.mount("#app");
@@ -52,7 +45,6 @@ const removeLoader = () => {
   }
 })();
 
-// Handle initialization errors
 window.addEventListener("error", (e) => {
   console.error("Application Error:", e);
   removeLoader();

@@ -24,7 +24,6 @@ class LazyDocumentationLoader {
   async loadStylesheet() {
     if (!this.stylesheetLoaded) {
       try {
-        // Use dynamic import with explicit path
         await import("@/components/helpfulresources/styles/markdown.css");
         this.stylesheetLoaded = true;
       } catch (error) {

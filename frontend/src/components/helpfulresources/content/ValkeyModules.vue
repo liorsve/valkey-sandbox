@@ -74,7 +74,6 @@ export default {
         docs: "https://docs.valkey.io/modules/search",
         github: "https://github.com/valkey-io/valkey-search",
       },
-      // More modules would be defined here
     ];
 
     return {

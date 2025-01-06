@@ -104,7 +104,6 @@ export default {
 
     const messageHandler = (event) => {
       try {
-        // Handle normalized messages from WebSocketManager
         const message = event?.payload
           ? event
           : {
@@ -151,7 +150,6 @@ export default {
       { id: 7, action: "Change Random Color" },
     ]);
 
-    // Add state management
     const gameState = ref({
       isProcessing: false,
       currentTask: null,
@@ -167,7 +165,6 @@ export default {
     const buttonState = ref("set");
     const showEmptyQueuePopup = ref(false);
 
-    // Define all handlers first
     const terminalWrite = (message) => {
       if (props.terminal?.writeln) {
         props.terminal.writeln(message);
@@ -356,7 +353,6 @@ export default {
     const executeTaskAnimation = async (el, taskAction) => {
       await new Promise((r) => setTimeout(r, 300));
 
-      // Remove the baseTransform variable and use transform-origin instead
       switch (taskAction) {
         case "Flip Right":
           el.style.transform = `rotateY(180deg)`;

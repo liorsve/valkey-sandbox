@@ -331,7 +331,6 @@ export default {
   border-right: 1px solid var(--border-color);
 }
 
-/* Updated select styles */
 .sidebar__selects {
   padding: 20px var(--spacing-md);
   display: flex;
@@ -369,7 +368,6 @@ export default {
   transform: translateY(-1px);
 }
 
-/* Updated content padding to account for new select position */
 .sidebar__content {
   padding: var(--spacing-xl) var(--spacing-lg) 0;
   display: flex;

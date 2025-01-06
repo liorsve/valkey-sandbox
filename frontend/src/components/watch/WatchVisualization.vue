@@ -52,7 +52,6 @@ export default defineComponent({
   setup() {
     const terminalInstance = ref(null);
 
-    // Move provide inside setup at the top
     provide("terminal", terminalInstance);
 
     const handleTerminalReady = (terminal) => {
@@ -64,7 +63,6 @@ export default defineComponent({
     const selectedAction = ref(null);
     const editorContent = ref("");
 
-    // Provide WebSocket instance properly
     provide("websocket", wsInstance);
 
     const activeVisualization = computed(() =>
@@ -82,7 +80,6 @@ export default defineComponent({
       const template = store.getTemplateCode(action.client, action.action);
       editorContent.value = template || "";
 
-      // Notify terminal of selection
       if (terminalInstance.value) {
         terminalInstance.value.writeln(
           `\x1b[1;32m>>> Selected ${action.action} with ${action.client}\x1b[0m`

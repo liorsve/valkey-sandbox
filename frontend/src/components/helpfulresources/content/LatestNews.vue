@@ -40,7 +40,6 @@ export default {
         link: "#",
         tags: ["Client", "Developer Tools"],
       },
-      // Add more placeholder news items
     ]);
 
     const formatDate = (dateStr) => {

@@ -18,7 +18,6 @@ class DataNavigator {
     return this.challengesPromise;
   }
 
-  // Template-related methods
   async getTemplate(client, templateName) {
     const templates = await this.loadTemplates();
     return templates.getTemplate(client, templateName);
@@ -34,7 +33,6 @@ class DataNavigator {
     return templates.listAllTemplates();
   }
 
-  // Challenge-related methods
   async getChallenge(challengeId, language) {
     const challenges = await this.loadChallenges();
     return challenges.getChallenge(challengeId, language);

@@ -89,7 +89,7 @@
   align-items: center !important;
   justify-content: flex-start !important;
   gap: 0.75rem !important;
-  min-width: 0 !important; /* Prevent overflow */
+  min-width: 0 !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -207,7 +207,6 @@
   background: var(--surface-darker);
 }
 
-/* Remove list grid styling */
 .markdown-body ul {
   padding-left: 2rem;
   list-style: disc;
@@ -219,18 +218,15 @@
   border: none;
 }
 
-/* Hide emoji markers */
 .markdown-body h2:first-child img,
 .markdown-body h3:first-child img {
   display: none;
 }
 
-/* Remove visited link color */
 .markdown-body a:visited {
   color: var(--primary-color);
 }
 
-/* Hide section markers */
 .markdown-body h2 [data-section-marker],
 .markdown-body h3 [data-section-marker] {
   display: none;
@@ -251,10 +247,9 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Improved links layout */
 .markdown-body .links-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* Three columns */
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin: 1.5rem 0;
   padding: 0;
@@ -304,7 +299,6 @@
   color: #9cdcfe !important;
 }
 
-/* TypeScript syntax highlighting */
 .hljs-keyword { color: #c586c0 !important; }
 .hljs-string { color: #ce9178 !important; }
 .hljs-function { color: #dcdcaa !important; }
@@ -319,7 +313,6 @@
 .hljs-property { color: #9cdcfe !important; }
 .hljs-params { color: #9cdcfe !important; }
 
-/* Add some nice styling touches */
 .markdown-body p {
   font-size: 1.1rem;
   line-height: 1.8;
@@ -337,7 +330,6 @@
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
-/* Syntax highlighting with !important */
 .hljs-keyword { color: #c586c0 !important; font-style: italic !important; }
 .hljs-string { color: #ce9178 !important; }
 .hljs-function { color: #dcdcaa !important; font-weight: 600 !important; }
@@ -350,7 +342,6 @@
 .hljs-property { color: #9cdcfe !important; }
 .hljs-builtin { color: #4ec9b0 !important; }
 
-/* Code block styling */
 .markdown-body .code-block {
   position: relative !important;
   margin: 2rem 0 !important;
@@ -379,7 +370,6 @@
   text-transform: uppercase !important;
 }
 
-/* Fix shiki highlighting */
 .markdown-body :deep(.shiki) {
   background: transparent !important;
   padding: 0 !important;
@@ -407,14 +397,12 @@
   padding-right: 1rem !important;
 }
 
-/* Enhanced emoji styling */
 .markdown-body .emoji {
   font-size: 1.2em;
   vertical-align: middle;
   margin: 0 0.2em;
 }
 
-/* Improved headings with emoji support */
 .markdown-body .markdown-heading {
   display: flex;
   align-items: center;
@@ -425,7 +413,6 @@
   font-size: 1.5em;
 }
 
-/* Level-specific heading styles */
 .markdown-body .level-1 {
   font-size: 2.5rem;
   border-bottom: 2px solid var(--primary-color);
@@ -443,7 +430,6 @@
   color: var(--text-primary);
 }
 
-/* Heading anchor links */
 .markdown-body .heading-anchor {
   margin-left: 0.5rem;
   opacity: 0;
@@ -456,7 +442,6 @@
   opacity: 1;
 }
 
-/* Enhanced code blocks */
 .markdown-body .code-block {
   position: relative;
   margin: 2rem 0;
@@ -482,7 +467,6 @@
   text-transform: uppercase;
 }
 
-/* Enhanced link styling */
 .markdown-body .enhanced-link {
   display: inline-flex;
   align-items: center;
@@ -502,7 +486,6 @@
   box-shadow: var(--fun-shadow);
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .markdown-body .level-1 {
     font-size: 2rem;
@@ -517,7 +500,6 @@
   }
 }
 
-/* Function Documentation Specific Styles */
 .heading-emoji {
   display: inline-block;
   margin-right: 0.5rem;
@@ -565,7 +547,6 @@
   border-top: 1px solid var(--surface-light);
 }
 
-/* Method section styling */
 .markdown-body h3[id^="gear-"] {
   margin-top: 3rem;
   padding: 1rem;
@@ -574,13 +555,11 @@
   border-left: 4px solid var(--primary-color);
 }
 
-/* Parameter tables */
 .markdown-body h4 + table {
   margin-top: 1rem;
   font-size: 0.9em;
 }
 
-/* Examples sections */
 .markdown-body h4:last-of-type + pre {
   margin-top: 1rem;
   background: var(--surface-darker);

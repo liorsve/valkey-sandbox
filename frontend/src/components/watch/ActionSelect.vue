@@ -66,7 +66,6 @@ export default {
     const initializing = ref(true);
     const { on, off } = useEventBus();
 
-    // Register lifecycle hooks before any async operations
     onMounted(() => {
       const tabElement = document.querySelector('[data-tab="watch-in-action"]');
 
@@ -82,7 +81,6 @@ export default {
         }
       });
 
-      // Initialize with delay
       setTimeout(() => {
         initializing.value = false;
       }, 800);
@@ -301,7 +299,6 @@ p {
   animation: spin 1s linear infinite;
 }
 
-/* Action Grid Styles */
 .select-container {
   padding: 2rem;
   max-width: 1200px;
@@ -377,7 +374,6 @@ p {
   line-height: 1.5;
 }
 
-/* Transitions */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -397,7 +393,6 @@ p {
   }
 }
 
-/* Card highlight animation */
 .card-highlight {
   animation: pulse 2s infinite;
 }

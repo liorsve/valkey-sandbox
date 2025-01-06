@@ -335,7 +335,7 @@ export default {
   position: fixed !important;
   top: 0;
   left: 0;
-  width: calc(var(--sidebar-width) - 32px); /* Further reduced width */
+  width: calc(var(--sidebar-width) - 32px);
   height: var(--top-tabs-height);
   z-index: 1000;
   padding: 0;

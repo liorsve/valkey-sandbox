@@ -11,7 +11,6 @@ class DocumentationService {
     };
   }
 
-  // Add ecosystem lookup method
   getEcosystem(lang) {
     const ecosystems = {
       "Node.js": "npm",
@@ -26,7 +25,6 @@ class DocumentationService {
     return ecosystems[lang] || "unknown";
   }
 
-  // Add installation lookup method
   getGlideInstall(lang) {
     const installations = {
       "Node.js": "npm install @valkey/valkey-glide",
@@ -41,7 +39,6 @@ class DocumentationService {
     return installations[lang] || "Installation instructions coming soon";
   }
 
-  // Keep Glide docs fetching
   async getRenderedGlideDocs() {
     try {
       const response = await fetch("/docs/GLIDE_DOCS.md");
@@ -54,7 +51,6 @@ class DocumentationService {
     }
   }
 
-  // Simplified methods returning dummy data
   async getGeneralConcepts() {
     return this.dummyContent.topics;
   }
@@ -227,7 +223,6 @@ class DocumentationService {
   }
 
   getDefaultClients() {
-    // Common template for all official clients
     const officialClientTemplate = (name, lang, type = "standard") => ({
       name: `${name}`,
       isOfficial: true,
@@ -256,7 +251,6 @@ class DocumentationService {
       install: type === "glide" ? this.getGlideInstall(lang) : null,
     });
 
-    // Language-specific client mappings
     const languageClients = {
       nodejs: [
         {
@@ -294,7 +288,6 @@ class DocumentationService {
           install: "pip install asyncvalkey",
         },
       ],
-      // Similar pattern for other languages with Glide support
       go: [
         {
           id: "valkey-glide-go",
@@ -319,7 +312,6 @@ class DocumentationService {
           install: "Maven: io.valkey:valkey-java:1.0.0",
         },
       ],
-      // Languages without Glide support yet
       rust: [
         {
           id: "valkey-rs",
@@ -334,7 +326,6 @@ class DocumentationService {
           install: "composer require valkey/valkey",
         },
       ],
-      // ... other languages
     };
 
     return {
@@ -343,7 +334,6 @@ class DocumentationService {
     };
   }
 
-  // Helper methods for client navigation
   async getClientsByLanguage(language) {
     const { clientsByLanguage, clientDetails } = this.getDefaultClients();
     const clients = clientsByLanguage[language] || [];
@@ -659,7 +649,6 @@ Valkey is a modern distributed key-value store system designed for high performa
       },
     };
 
-    // Create a flat array of command objects with their categories
     return Object.entries(commandCategories).flatMap(([category, info]) =>
       info.commands.map((cmd) => ({
         name: cmd,
@@ -673,31 +662,25 @@ Valkey is a modern distributed key-value store system designed for high performa
   }
 
   getCommandDescription(cmd) {
-    // We'll implement detailed descriptions for each command
     const descriptions = {
       get: "Retrieve the value of a key",
       set: "Set the string value of a key",
-      // ... more commands
     };
     return descriptions[cmd] || `Documentation for ${cmd} command`;
   }
 
   getCommandSyntax(cmd) {
-    // We'll implement proper syntax for each command
     const syntax = {
       get: "GET key",
       set: "SET key value [EX seconds] [PX milliseconds] [NX|XX]",
-      // ... more commands
     };
     return syntax[cmd] || `${cmd.toUpperCase()} [arguments]`;
   }
 
   getCommandExamples(cmd) {
-    // We'll implement realistic examples for each command
     const examples = {
       get: ["GET mykey", "GET user:1:name"],
       set: ["SET mykey value", 'SET user:1:name "John Doe" EX 3600'],
-      // ... more commands
     };
     return examples[cmd] || [`${cmd.toUpperCase()} example:key`];
   }

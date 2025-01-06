@@ -145,21 +145,21 @@ export const store = reactive({
 
   async getTemplateCode(clientId, templateName) {
     if (!clientId || !templateName) {
-      return "// Missing client or template name";
+      retu;
     }
 
     try {
       const template = await dataNavigator.getTemplate(clientId, templateName);
-      return template?.code || "// No template content available";
+      return template?.code;
     } catch (error) {
       console.error("[Store] Template loading error:", error);
-      return "// Error loading template";
+      retu;
     }
   },
 
   async getInitialCode() {
     try {
-      let code = "// Loading...";
+      let code;
 
       if (
         this.currentTab === "watchInAction" &&
@@ -181,10 +181,10 @@ export const store = reactive({
         );
       }
 
-      return code || "// No template available";
+      return code;
     } catch (error) {
       console.error("[Store] Error loading code:", error);
-      return "// Error loading template";
+      retu;
     }
   },
 
@@ -246,10 +246,9 @@ export const store = reactive({
 
   saveState(immediate = false) {
     if (!this._initialized && !immediate) {
-      return false; // Skip saving during initialization
+      return false;
     }
 
-    // Debounce state saves
     if (this._saveTimeout) {
       clearTimeout(this._saveTimeout);
     }
@@ -274,7 +273,7 @@ export const store = reactive({
         console.error("[Store] Failed to save state:", error);
         return false;
       }
-    }, 1000); // Delay saves by 1 second
+    }, 1000);
   },
 
   setWatchState(client, action, language) {
@@ -332,7 +331,6 @@ export const store = reactive({
     if (this._initialized) return;
 
     try {
-      // Batch all initial state changes
       const hashTab = getTabFromHash();
       const initialState = {
         currentTab:
@@ -345,19 +343,15 @@ export const store = reactive({
           savedState.currentUseCase || DEFAULT_STATE.currentUseCase,
       };
 
-      // Apply initial state
       Object.assign(this, initialState);
 
-      // Setup watchers
       this.initializeWatchers();
 
-      // Load any required templates or initial data
       if (this.currentTab === "commonUseCases") {
         await this.getTemplateCode(this.currentClient, this.currentUseCase);
       }
 
       this._initialized = true;
-      // Save initial state in background
       this.saveState();
     } catch (error) {
       console.error("[Store] Initialization error:", error);

@@ -55,8 +55,8 @@ import {
 } from "vue";
 import { useWatchInAction } from "@/composables/useWatchInAction";
 import { store } from "@/store";
-import loadingController from "@/services/loadingController"; // Add this import
-import WatchEditor from "./components/WatchEditor.vue"; // Updated import path
+import loadingController from "@/services/loadingController";
+import WatchEditor from "./components/WatchEditor.vue";
 import WatchTerminal from "./components/WatchTerminal.vue";
 import ActionSelect from "./ActionSelect.vue";
 import LeaderboardVisualization from "./visualizations/LeaderboardVisualization.vue";
@@ -80,13 +80,11 @@ export default defineComponent({
     const editorContent = ref("// Loading...");
     const { on, off } = useEventBus();
 
-    // Register cleanup before any async operations
     onBeforeUnmount(() => {
       off("tab-changed");
       cleanup();
     });
 
-    // Initialize event listeners
     const initializeEventListeners = () => {
       on("tab-changed", handleTabChange);
 
@@ -124,7 +122,6 @@ export default defineComponent({
 
         initializeEventListeners();
 
-        // Signal that the component is ready
         await nextTick();
         loadingController.finishComponentTransition("watchInAction");
       } catch (error) {
@@ -202,7 +199,6 @@ export default defineComponent({
         store.setWatchState(client, action, language);
         currentLanguage.value = language;
 
-        // Add loading delay for smoother transition
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         const template = await store.getTemplateCode(client, action);
@@ -262,7 +258,7 @@ export default defineComponent({
       handleReload: () => window.location.reload(),
       hasSelection,
       handleReplace,
-      loadingController, // Add to returns if needed in template
+      loadingController,
       handleBack,
     };
   },
@@ -346,7 +342,6 @@ export default defineComponent({
   cursor: pointer;
 }
 
-/* Add new transition styles */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

@@ -7,7 +7,6 @@
       :enable-blur="false"
     />
 
-    <!-- Show carousel only when no content is selected -->
     <div v-show="!loading && !selectedContent" class="resource-carousel">
       <button class="arrow-btn left" @click="scrollLeft">‹</button>
       <div class="carousel-viewport">
@@ -32,7 +31,6 @@
       <button class="arrow-btn right" @click="scrollRight">›</button>
     </div>
 
-    <!-- Content area shows when a page is selected -->
     <div v-show="!loading && selectedContent" class="content-area">
       <DocSidebar
         :current-section="selectedSection"
@@ -50,7 +48,6 @@
       </div>
     </div>
 
-    <!-- Bottom links are always visible -->
     <div class="bottom-links">
       <a
         v-for="link in links"
@@ -80,14 +77,12 @@ import lazyDocumentation from "@/services/lazyDocumentation";
 import LoadingOverlay from "../common/LoadingOverlay.vue";
 import loadingController from "@/services/loadingController";
 
-// Import icons
 import LinkedInIcon from "@/assets/icons/linkedin.svg";
 import GitHubIcon from "@/assets/icons/git-valkey.svg";
 import ValkeyLogoIcon from "@/assets/images/Valkey-logo.svg";
 import TwitterIcon from "@/assets/icons/twitter.svg";
 import GlideGitIcon from "@/assets/icons/glide-git.svg";
 
-// Define async components with markRaw
 const DocComponents = {
   GeneralConcepts: markRaw(
     defineAsyncComponent(() => import("./content/GeneralConcepts.vue"))
@@ -212,7 +207,6 @@ export default {
         await initializeDocumentation();
       } finally {
         loading.value = false;
-        // Use the imported loadingController
         loadingController.finishComponentTransition("helpfulResources");
       }
     });
@@ -236,7 +230,6 @@ export default {
         searchResults.value = [];
         return;
       }
-      // Search through documentation content
       searchResults.value = await store.searchDocumentation(searchQuery.value);
     };
 
@@ -245,7 +238,6 @@ export default {
       selectedSection.value = result.sectionId;
       searchQuery.value = "";
       searchResults.value = [];
-      // Wait for content to render then scroll
       nextTick(() => {
         scrollToSection(result.sectionId);
       });
@@ -257,10 +249,8 @@ export default {
         return;
       }
 
-      // Reset section when changing pages
       selectedSection.value = null;
 
-      // Set the content with appropriate sections based on page
       selectedContent.value = {
         component: page.component,
         props: { pageId: page.id },
@@ -315,7 +305,6 @@ export default {
 
     const handleSectionSelect = (sectionId) => {
       selectedSection.value = sectionId;
-      // Map section IDs to components
       const componentMap = {
         general: DocComponents.GeneralConcepts,
         commands: DocComponents.CommandsReference,
@@ -336,7 +325,6 @@ export default {
     };
 
     const handleItemSelect = (itemId) => {
-      // Handle subsection selection
       if (selectedContent.value?.component) {
         nextTick(() => {
           const element = document.getElementById(itemId);
@@ -432,7 +420,7 @@ export default {
   flex: 0 0 auto;
   width: 500px;
   height: 360px;
-  margin: 0 -50px; /* Create overlap effect */
+  margin: 0 -50px;
   transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   transform-style: preserve-3d;
@@ -654,7 +642,7 @@ export default {
   flex: 1;
   padding: 2rem;
   overflow-y: auto;
-  max-width: calc(100% - 280px); /* Account for sidebar */
+  max-width: calc(100% - 280px);
 }
 
 .nav-item {
@@ -684,7 +672,6 @@ export default {
   }
 }
 
-/* Pulse Animation for Interactive Elements */
 @keyframes softPulse {
   0%,
   100% {

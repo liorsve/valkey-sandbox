@@ -56,7 +56,6 @@ export default {
   computed: {
     sortedClients() {
       return [...this.clients].sort((a, b) => {
-        // Sort Glide clients first, then by status
         if (a.name.includes("Glide") && !b.name.includes("Glide")) return -1;
         if (!a.name.includes("Glide") && b.name.includes("Glide")) return 1;
         return b.status === "stable" ? 1 : -1;
