@@ -4,11 +4,16 @@ import store from "./store";
 import { install as VueMonacoEditorPlugin } from "@guolao/vue-monaco-editor";
 import { createEventBus } from "./composables/useEventBus";
 import { createWebSocketManager } from "./composables/useWebSocket";
+import VueVirtualScroller from "vue-virtual-scroller";
+import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 
 // Import styles statically to ensure they're available immediately
 import "./styles/variables.css";
 
 const app = createApp(App);
+
+// Add virtual scroller before mount
+app.use(VueVirtualScroller);
 
 // Create dependencies before app mount
 const eventBus = createEventBus();

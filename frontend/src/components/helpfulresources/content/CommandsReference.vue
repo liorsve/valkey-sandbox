@@ -11,15 +11,25 @@
         <span class="search-icon">🔍</span>
       </div>
 
-      <div class="categories-scroll" v-if="!selectedCommand">
-        <button
+      <div
+        v-if="!selectedCommand"
+        :class="[
+          'categories-grid',
+          { 'single-category': selectedCategory !== 'All' },
+        ]"
+      >
+        <div
           v-for="cat in categories"
           :key="cat"
-          :class="['category-btn', { active: selectedCategory === cat }]"
+          :class="['category-card', { active: selectedCategory === cat }]"
           @click="selectCategory(cat)"
         >
-          {{ getCategoryEmoji(cat) }} {{ cat }}
-        </button>
+          <div class="category-icon">{{ getCategoryEmoji(cat) }}</div>
+          <div class="category-name">{{ cat }}</div>
+          <div class="command-count" v-if="cat !== 'All'">
+            {{ getCommandCount(cat) }}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -29,52 +39,27 @@
         @back="selectedCommand = null"
       />
     </div>
-    <div v-else class="commands-list" ref="scrollParent">
-      <div
-        :style="{
-          height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
-        }"
-      >
-        <div
-          v-for="virtualItem in virtualizer.getVirtualItems()"
-          :key="virtualItem.key"
-          class="command-card"
-          :style="{
-            position: 'absolute',
-            top: 0,
-            transform: `translateY(${virtualItem.start}px)`,
-            width: '100%',
-          }"
-          @click="selectCommand(filteredCommands[virtualItem.index])"
-        >
-          <div class="command-header">
-            <h3>{{ filteredCommands[virtualItem.index].name }}</h3>
-            <span class="command-category">
-              {{ filteredCommands[virtualItem.index].category }}
-            </span>
-          </div>
-          <p class="command-description">
-            {{ filteredCommands[virtualItem.index].description }}
-          </p>
-        </div>
-      </div>
+    <div v-else>
+      <CommandsList
+        :commands="filteredCommands"
+        @select-command="selectCommand"
+      />
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useVirtualizer } from "@tanstack/vue-virtual";
+import { ref, computed, onMounted } from "vue";
 import store from "@/store";
 import CommandDetails from "./commands/CommandDetails.vue";
+import CommandsList from "./commands/CommandsList.vue";
 import { getCommandExample } from "@/services/commandExamples";
 
 export default {
   name: "CommandsReference",
   components: {
     CommandDetails,
+    CommandsList,
   },
 
   setup() {
@@ -92,8 +77,7 @@ export default {
           await store.initializeDocumentation("commands");
           const commandsData = store.documentationState.commands.data;
           commands.value = commandsData.map((cmd) => ({
-            id: cmd.id,
-            name: cmd.name,
+            name: cmd.name, // Using name as unique identifier
             category: cmd.category,
             description: cmd.description,
             examples: cmd.examples,
@@ -130,60 +114,31 @@ export default {
 
     const getCategoryEmoji = (category) => {
       const emojis = {
-        Strings: "📝",
-        Lists: "📋",
-        Sets: "🎯",
-        Hashes: "🔑",
-        "Sorted Sets": "📊",
+        "String Operations": "📝",
+        "List Operations": "📋",
+        "Set Operations": "🎯",
+        "Hash Operations": "🔑",
+        "Sorted Set Operations": "📊",
         "Pub/Sub": "📡",
-        Transactions: "🔄",
+        Transactions: "💫",
         Scripting: "📜",
-        Connection: "🔌",
-        Server: "⚙️",
+        "Connection Management": "🔌",
+        "Server Management": "⚙️",
+        "Cluster Management": "🌐",
+        "Stream Operations": "🌊",
+        Geospatial: "🗺️",
+        HyperLogLog: "📊",
+        All: "🎮",
       };
       return emojis[category] || "📦";
     };
 
-    const commandsList = ref(null);
-    const pageSize = 20;
-    const currentPage = ref(0);
-
-    const visibleCommands = computed(() => {
-      const start = currentPage.value * pageSize;
-      return filteredCommands.value.slice(start, start + pageSize);
-    });
-
-    const handleScroll = () => {
-      if (!commandsList.value) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = commandsList.value;
-      if (scrollTop + clientHeight >= scrollHeight - 100) {
-        currentPage.value++;
-      }
+    const getCommandCount = (category) => {
+      return commands.value.filter((cmd) => cmd.category === category).length;
     };
-
-    onMounted(() => {
-      commandsList.value?.addEventListener("scroll", handleScroll);
-    });
-
-    onUnmounted(() => {
-      commandsList.value?.removeEventListener("scroll", handleScroll);
-    });
-
-    const scrollParent = ref(null);
-
-    const virtualizer = useVirtualizer({
-      count: computed(() => filteredCommands.value.length),
-      getScrollElement: () => scrollParent.value,
-      estimateSize: () => 150,
-      overscan: 5,
-    });
 
     const selectCategory = (category) => {
       selectedCategory.value = category;
-      if (scrollParent.value) {
-        scrollParent.value.scrollTop = 0;
-      }
     };
 
     const handleSearch = () => {
@@ -191,10 +146,7 @@ export default {
         clearTimeout(searchTimeout.value);
       }
       searchTimeout.value = setTimeout(() => {
-        // Correct way to scroll virtualizer to top
-        if (scrollParent.value) {
-          scrollParent.value.scrollTop = 0;
-        }
+        // Search handling
       }, 300);
     };
 
@@ -210,13 +162,10 @@ export default {
       categories,
       filteredCommands,
       getCategoryEmoji,
-      visibleCommands,
-      commandsList,
-      scrollParent,
-      virtualizer,
       selectCategory,
       handleSearch,
       selectCommand,
+      getCommandCount,
     };
   },
 };
@@ -238,20 +187,89 @@ export default {
   border-bottom: 1px solid var(--surface-light);
 }
 
-.categories-scroll {
-  overflow-x: auto;
-  white-space: nowrap;
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
   padding: 1rem 0;
-  scrollbar-width: thin;
+  max-height: 400px;
+  overflow-y: auto;
+  transition: all 0.3s ease;
 }
 
-.commands-list {
-  height: calc(100vh - 200px);
-  overflow-y: auto;
+.categories-grid.single-category {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  max-height: 100px;
+}
+
+.category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 1rem;
-  scroll-behavior: smooth;
+  background: var(--surface-dark);
+  border: 1px solid var(--surface-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.3s ease;
   position: relative;
-  contain: strict;
+  overflow: hidden;
+}
+
+.category-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.category-card:hover::before {
+  opacity: 1;
+}
+
+.category-card.active {
+  background: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.category-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.category-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.command-count {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--surface-darker);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.category-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary-color);
+}
+
+.category-card.active .category-name,
+.category-card.active .category-icon {
+  color: var(--text-accent);
 }
 
 .filter-input {
@@ -289,22 +307,6 @@ export default {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
   padding: 1rem;
-}
-
-.command-card {
-  padding: 1rem;
-  border: 1px solid var(--surface-light);
-  background: var(--surface-darker);
-  border-radius: var(--radius-md);
-  animation: fadeIn 0.3s ease-in-out;
-  margin: 0.5rem 1rem;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.command-card:hover {
-  transform: translateY(-2px) !important;
-  border-color: var(--primary-color);
 }
 
 .command-name {
