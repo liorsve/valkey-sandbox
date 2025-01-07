@@ -1,8 +1,8 @@
 # 🚀 Valkey Sandbox
 
-> 🤓 Where distributed systems meet rubber ducks and memes!
+> 🤓 Where state-of-the-art key-value storage meet rubber ducks!
 
-Welcome to the Valkey playground - where serious distributed computing meets the joy of coding! Grab your favorite caffeinated beverage ☕, put on your debugging hat 🎩, and let's dive into some key-value store fun!
+Welcome to the Valkey Sandbox - your interactive playground for exploring distributed computing meets the joy of coding! Grab your favorite caffeinated beverage ☕, put on your debugging hat 🎩, and let's dive into some key-value store fun!
 
 Valkey Sandbox is your gateway to effortlessly exploring Valkey's power with various Valkey clients.  
 No setup, no orchestration—just sit, start, and experience a fully functional app in seconds.  
@@ -16,7 +16,7 @@ Dive in, choose what to build, and discover how GLIDE simplifies Valkey workflow
 - **Real-time Terminal Output**: View output from your code executions instantly.
 - **Multiple Execution Modes**: Switch between Standalone and Cluster modes effortlessly.
 - **Built-in Code Templates**: Start quickly with ready example implementations such as:
-  - Search Engine
+  - Queue Management
   - Session Cache
   - Recommendation System
   - And more.
@@ -26,8 +26,7 @@ Dive in, choose what to build, and discover how GLIDE simplifies Valkey workflow
   - **Leaderboard**: Dynamic leaderboard showcasing real-time data updates, player rankings, and score changes.
   - **Task Manager**: Visualize and manage task queues, learn about task scheduling, and observe task execution in real-time.
 - **Resources**: Access a wealth of valuable materials, including documentation, tutorials, blogs, FAQs, deployment guides, sessions, and more to deepen your understanding of Valkey and Glide.
-- **Community**: Engage with the Valkey team, Glide team and fellow developers. Join our community channels, participate in discussions, and stay connected through our social media platforms.
-- **Challenge Yourself**: Enhance your skills with weekly challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
+- **Challenge Yourself**: Try some coding challenges to discover new features, and unleash the full potential of Valkey and valkey clients.
 
 ## 🦆 Why Valkey Sandbox?
 
@@ -43,29 +42,10 @@ Experience Valkey's capabilities through interactive gamified features that not 
 - **Leaderboard**: Observe Valkey handling real-time data updates and ranking computations powered by live code execution.
 - **Task Manager**: Visualize and interact with task scheduling and execution using Valkey's queue management, seeing firsthand how the underlying code operates.
 
-## 🎯 Challenge Yourself
+## 🎯 Challenge Yourself - In Progress
+Coding challenges are a fun way to explore new features and unleash the full potential of Valkey and Glide.
 
-Enhance your skills with weekly challenges, coding quizzes, and a variety of problems designed to test and improve your proficiency while having fun.
-
-- **Coding Challenges**: Solve practical programming problems using Glide with Valkey. Challenges range from easy to hard, and you can write and test your code directly in the browser using Python, JavaScript, or Java.
-- **Quizzes**: Test your knowledge with multiple-choice questions. Get instant feedback and links to relevant resources.
-- **Weekly Special Challenge**: Tackle a new, complex challenge every week. Submit your solution in your preferred language and receive feedback at the end of the week, along with the correct answer.
-
-This feature allows you to:
-
-- **Run Tests**: Instantly test your code submissions and see the results.
-- **Select Programming Language**: Choose between Python, JavaScript, and Java for coding challenges.
-- **Accumulate Scores**:
-  - **Quizzes**: 1 point per correct answer.
-  - **Easy Coding Challenges**: 3 points.
-  - **Medium Coding Challenges**: 5 points.
-  - **Hard Coding Challenges**: 8 points.
-  - **Weekly Challenges**: 30 points.
-- **Weekly Streaks**: Earn a 10% bonus on weekly challenges for each consecutive week you participate.
-
-With a competitive scoring system and engaging challenges, you can improve your Valkey and Glide skills while having fun.
-
-## 🛠️ Prerequisites
+## 🛠️ Prerequisites for running locally
 
 - **Docker and Docker Compose**
 - **Node.js** (v14 or higher)
