@@ -1,44 +1,350 @@
-# Developer Guide
+# 🛠️ Valkey Sandbox Developer Guide
 
-## 🚀 Current Implementation Status
+> Where distributed computing meets rubber ducks 🦆
+
+## 🎯 Current Status
 
 ### Core Components
-- ✅ Frontend (Vue.js 3)
-- ✅ Backend (Node.js)
-- ✅ WebSocket Communication
-- ✅ Code Execution System
-- 🟡 Testing Framework (In Progress)
-- 🟡 Documentation System (In Progress)
+- ✅ Frontend (Vue.js 3 with WebSocket)
+- ✅ Backend (Node.js with Express)
+- ✅ Code Execution System (Docker-based)
+- ✅ Real-time Updates (WebSocket)
+- 🟡 Testing Framework (Help wanted!)
+- 🟡 Documentation System (Work in progress)
 
 ### Language Support
 - ✅ Node.js (Valkey-glide, iovalkey)
-- ✅ Python (Valkey-glide, Valkey-py)
-- 🟡 Java (Valkey-glide, Valkey-java) - can't run it yet.
-- 🟡 Go (Valkey-go) - can't run it yet.
+- ✅ Python (Valkey-glide, valkey-py)
+- 🟨 Java (Compilation support coming soon)
+- 🟨 Go (Runtime integration planned)
 
 ### Features
-- ✅ Code Editor Integration
-- ✅ Real-time Execution
-- ✅ Basic Error Handling
-- ✅ Template System
-- ✅ Watch-in-Action - Task manager, Leaderboard
-- 🟡 Documentation & Resources - Currently using place holders or minimal example.
-- 🟡 Challenge System (In Progress)
-
+- ✅ Monaco Code Editor
+- ✅ Real-time Code Execution
+- ✅ Task Manager Demo
+- ✅ Leaderboard Demo
+- ✅ Code Templates (Python, Node.js, Java)
+- 🟡 Challenge System (Under construction)
+- 🟡 Documentation Browser (Needs love)
 
 ## 🏗️ Architecture
 
+```
+[Frontend 8080] ←→ [Backend 3000] ←→ [Valkey Services]
+      ↓               ↓                ↑
+Vue.js + Monaco   Node.js + Express    |
+WebSocket Client  WebSocket Server     |
+                      ↓               |
+                Docker Executors ─────┘
+                (Python/Node.js)
+```
+
+## 🚀 Quick Start
+
+1. Clone & Setup:
+```bash
+git clone https://github.com/avifenesh/valkey-sandbox.git
+cd valkey-sandbox
+./setup.sh --dev  # For development
+# or
+./setup.sh        # For production
+```
+
+2. Access:
+- Frontend: http://localhost:8080
+- Backend: http://localhost:3000
+- Valkey Standalone: localhost:6379
+- Valkey Cluster: localhost:7000-7005
+
+## 💻 Code Execution
+
+### System Overview
+- Docker-based isolated environments with resource limits
+- Multi-language support (Python/Node.js)
+- Real-time output streaming
+- Security pattern analysis
+
+### Language Examples
+
+#### Python with Valkey-glide
+```python
+from valkey_glide import GlideClient
+
+# Connect to Valkey
+client = GlideClient(host='valkey-standalone', port=6379)
+
+# Basic operations
+await client.set('key', 'value')
+result = await client.get('key')
+print(f"Retrieved: {result}")
+
+# Example response
+{
+  'output': 'Retrieved: value\n',
+  'error': None,
+  'execution_time': 0.001,
+  'memory_used': 8192
+}
+```
+
+#### Node.js with Valkey-glide
+```javascript
+import { GlideClient } from '@valkey/valkey-glide';
+
+// Connect to Valkey
+const client = await GlideClient.createClient({
+  host: 'valkey-standalone',
+  port: 6379
+});
+
+// Basic operations
+await client.set('key', 'value');
+const result = await client.get('key');
+console.log('Retrieved:', result);
+
+// Example response
+{
+  output: "Retrieved: value\n",
+  error: null,
+  executionTime: 0.001,
+  memoryUsed: 15925248
+}
+```
+
+## 📡 Communication & Security
+
+### WebSocket Protocol
+```javascript
+// Execute code
+{
+  action: 'runCode',
+  data: {
+    language: 'python|javascript',
+    code: string,
+    mode: 'standalone|cluster'
+  }
+}
+
+// Task management
+{
+  action: 'startTasks',
+  data: { tasks: Task[] }
+}
+```
+
+### Security Features
+```javascript
+// Resource limits
+{
+  memory: "128mb",
+  cpu: "5s",
+  fileSize: "1mb",
+  processes: 5
+}
+
+// Forbidden patterns
+const forbidden = [
+  "process.env",
+  'require("child_process")',
+  'import("child_process")',
+  "eval",
+  "Function",
+];
+```
+
+## 🚀 Frontend Performance
+
+### 1. Core Features
+- Lazy loading & code splitting
+- WebSocket optimizations
+- Virtual scrolling
+- Service worker caching
+- Memory caching
+- State management
+
+### 2. Implementation Examples
+```javascript
+// Lazy loading with code splitting
+const routes = [
+  {
+    path: '/playground',
+    component: () => import('@/views/Playground.vue')
+  }
+];
+
+// WebSocket message batching
+const wsManager = {
+  queuedMessages: [],
+  retryDelay: 5000,
+  maxRetries: 5,
+  
+  sendBatch() {
+    if (this.queuedMessages.length) {
+      this.ws.send(JSON.stringify(this.queuedMessages));
+      this.queuedMessages = [];
+    }
+  }
+};
+```
+
+## 🎨 Vue Components Architecture
+
 ### Core Components
 
+#### Watch-in-Action Components
+```vue
+// Key visualization components for real-time demos
+components/
+├── watch/
+│   ├── WatchContainer.vue       # Main container for watch-in-action demos
+│   ├── ActionSelect.vue         # Demo selection interface
+│   ├── visualizations/
+│   │   ├── LeaderboardVisualization.vue    # Real-time sorted sets demo
+│   │   └── TaskManagerVisualization.vue     # Distributed locks & queues demo
+│   └── components/
+       ├── WatchEditor.vue       # Specialized code editor for demos
+       └── WatchTerminal.vue     # Real-time output terminal
 ```
-[Frontend (Vue.js)] → [Backend (Node.js)] → [Code Executors]
-                                        → [Valkey Services]
 
-- Frontend (8080): Vue.js interface with real-time visualizations
-- Backend (3000): Node.js API & WebSocket server
-- Executors: Sandboxed Python (3002) and Node.js (3001) environments
-- Valkey: Standalone (6379) and Cluster (7000-7005) instances
+#### Editor Components
+```vue
+// Base editor components with Monaco integration
+components/
+├── base/
+│   ├── BaseEditor.vue          # Monaco editor wrapper
+│   └── BaseTerminal.vue        # Xterm.js terminal wrapper
+└── Editor.vue                  # Main editor component with language support
 ```
+
+#### Layout Components
+```vue
+// Core layout and navigation components
+components/layout/
+├── Sidebar.vue                # Main navigation sidebar
+├── TopTabs.vue               # Tab-based navigation
+└── LoadingOverlay.vue        # Loading states & transitions
+```
+
+### Key Features
+
+1. **Real-time Visualization**
+   ```javascript
+   // WatchContainer.vue
+   const wsManager = useWebSocket();
+   const terminalInstance = ref(null);
+
+   // Handles real-time updates
+   const messageHandler = (event) => {
+     switch (event.action) {
+       case "taskUpdate":
+         handleTaskUpdate(event.payload);
+         break;
+       case "leaderboardUpdate":
+         handleLeaderboardUpdate(event.payload);
+         break;
+     }
+   };
+   ```
+
+2. **Code Editor Integration**
+   ```javascript
+   // BaseEditor.vue
+   const editorOptions = {
+     fontFamily: "JetBrains Mono",
+     fontSize: 14,
+     minimap: { enabled: false },
+     automaticLayout: true,
+     scrollBeyondLastLine: false
+   };
+   ```
+
+3. **WebSocket Communication**
+   ```javascript
+   // Example from WatchVisualization
+   const handleActionSelect = async ({ action, client }) => {
+     wsManager.send({
+       action: "init",
+       component: action,
+       client: client
+     });
+     // Handle response in messageHandler
+   };
+   ```
+
+4. **State Management**
+   ```javascript
+   // Store integration example
+   const state = reactive({
+     currentClient: savedState.currentClient,
+     executionMode: savedState.executionMode,
+     currentTab: getTabFromHash(),
+     watchState: null
+   });
+   ```
+
+### Component Communication
+
+1. **Event Bus Pattern**
+   ```javascript
+   const eventBus = {
+     on: (event, callback) => { /* ... */ },
+     emit: (event, data) => { /* ... */ },
+     off: (event, callback) => { /* ... */ }
+   };
+   ```
+
+2. **Props & Events**
+   ```vue
+   <!-- Parent-child communication -->
+   <WatchVisualization
+     :ws="wsInstance"
+     :isConnected="isConnected"
+     @terminal-write="handleTerminalWrite"
+   />
+   ```
+
+3. **Dependency Injection**
+   ```javascript
+   // Provide at app level
+   provide('wsManager', wsManager);
+   provide('eventBus', eventBus);
+
+   // Inject in components
+   const wsManager = inject('wsManager');
+   const eventBus = inject('eventBus');
+   ```
+
+### Performance Optimizations
+
+1. **Lazy Loading**
+   ```javascript
+   const DocComponents = {
+     GeneralConcepts: defineAsyncComponent(() => 
+       import('./content/GeneralConcepts.vue')
+     ),
+     CommandsReference: defineAsyncComponent(() => 
+       import('./content/CommandsReference.vue')
+     )
+   };
+   ```
+
+2. **Virtual Scrolling**
+   ```vue
+   <virtual-scroller
+     :items="commandList"
+     :item-height="40"
+     v-slot="{ item }"
+   >
+     <command-item :command="item" />
+   </virtual-scroller>
+   ```
+
+3. **Debounced Updates**
+   ```javascript
+   const debouncedUpdate = debounce((value) => {
+     store.saveState(value);
+   }, 300);
+   ```
 
 ## 🔧 Development Setup
 
@@ -51,6 +357,8 @@ The `setup.sh` script provides additional options:
 ./setup.sh         # Production mode
 ./setup.sh --cleanup  # Clean up all running processes
 ./setup.sh --log  # Enable logging
+./setup.sh --rebuild  # Rebuild Docker images
+./setup.sh --reinstall  # Reinstall dependencies
 ```
 
 Features:
@@ -107,13 +415,14 @@ Modify `docker-compose.yml` for development:
 3. Features
 
    - Valkey cluster management UI
-   - Performance benchmarking tools
+   - Challenge system
    - Template marketplace
 
 4. Security
-   - Authentication system
+   - Authentication system?
    - Rate limiting
    - Sandbox environment isolation
+   - Code analysis
 
 ### Current Limitations
 
@@ -150,223 +459,6 @@ Modify `docker-compose.yml` for development:
 
 - Standalone mode: Direct connection
 - Cluster mode: Managed through proxy
-
-## 💻 Code Execution
-
-### JavaScript Executor
-
-The Node.js executor provides a secure environment with:
-
-- Resource Limits:
-  ```javascript
-  {
-    memory: "128mb",
-    cpu: "5s",
-    fileSize: "1mb",
-    processes: 5
-  }
-  ```
-
-#### Usage Example
-
-```javascript
-// Direct usage
-import { executeCode } from "./executor.js";
-
-const code = `
-function fibonacci(n) {
-  let [a, b] = [0, 1];
-  for(let i = 0; i < n; i++) {
-    [a, b] = [b, a + b];
-  }
-  return a;
-}
-console.log(fibonacci(10));
-`;
-
-const result = await executeCode(code);
-/* Output:
-{
-  output: "55\nTime: 0.001s\nMemory: 15.2MB",
-  error: null,
-  executionTime: 0.001,
-  memoryUsed: 15925248
-}
-*/
-```
-
-#### WebSocket Integration
-
-```javascript
-// Send code execution request
-ws.send(
-  JSON.stringify({
-    action: "runCode",
-    data: {
-      language: "javascript",
-      code: 'console.log("Hello")',
-      mode: "standalone",
-    },
-  })
-);
-
-// Handle response
-ws.onmessage = (event) => {
-  const response = JSON.parse(event.data);
-  if (response.action === "output") {
-    console.log(response.data);
-  }
-};
-```
-
-### Python Executor
-
-The Python executor provides a secure environment for running Python code with:
-
-- Resource limits:
-  - Memory: 128MB
-  - CPU time: 5 seconds
-  - File size: 1MB
-  - Process limit: 5 processes
-
-#### Usage Example
-
-```python
-# Direct usage
-from executor import execute_code
-
-code = """
-def fibonacci(n):
-    a, b = 0, 1
-    for _ in range(n):
-        a, b = b, a + b
-    return a
-
-print(fibonacci(10))
-"""
-
-result = execute_code(code)
-print(result)
-# Output: {
-#   'output': '55\nTime: 0.001s\nMemory: 8192KB',
-#   'error': None,
-#   'execution_time': 0.001,
-#   'memory_used': 8192
-# }
-```
-
-## 🔐 Security Features
-
-### Code Execution Safety
-
-1. Sandboxed Environments
-
-   - Isolated Docker containers
-   - Resource limitations
-   - Network restrictions
-
-2. Code Analysis
-
-   ```javascript
-   // Forbidden patterns
-   const forbidden = [
-     "process.env",
-     'require("child_process")',
-     'import("child_process")',
-     "eval",
-     "Function",
-   ];
-   ```
-
-3. Resource Monitoring
-   - Real-time memory tracking
-   - CPU usage limits
-   - Execution timeouts
-
-## 🛠️ Development
-
-### Quick Start
-
-```bash
-# Development mode
-./setup.sh --dev
-
-# Production mode
-./setup.sh
-
-# Scale for multiple users
-./setup-per-user.sh user123
-```
-
-### Environment Variables
-
-```bash
-# Required
-VALKEY_STANDALONE_HOST=valkey-standalone
-VALKEY_STANDALONE_PORT=6379
-VALKEY_CLUSTER_HOST=valkey-cluster
-
-# Optional
-LOGGING_ENABLED=false
-START_SCRIPT=start:prod
-```
-
-### WebSocket Protocol
-
-1. **Code Execution**
-
-   ```javascript
-   // Request
-   {
-     action: 'runCode',
-     data: {
-       language: 'python|javascript',
-       code: string,
-       mode: 'standalone|cluster'
-     }
-   }
-
-   // Response
-   {
-     action: 'output',
-     data: {
-       output: string,
-       error: string|null,
-       executionTime: number,
-       memoryUsed: number
-     }
-   }
-   ```
-
-2. **Task Management**
-
-   ```javascript
-   // Start tasks
-   {
-     action: 'startTasks',
-     data: { tasks: Task[] }
-   }
-
-   // Task completion
-   {
-     action: 'taskCompleted',
-     data: { taskId: string }
-   }
-   ```
-
-## 📊 Visualizations
-
-### 1. Task Manager
-
-- Distributed lock demonstration
-- Queue management visualization
-- Real-time task execution
-
-### 2. Leaderboard
-
-- Sorted set operations
-- Real-time score updates
-- Rank change animations
 
 ## 🔍 Debugging
 
