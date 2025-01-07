@@ -46,7 +46,7 @@ export default defineComponent({
             terminal,
             terminalOptions,
             onTerminalReady,
-            cleanupHandlers  // Expose with proper name
+            cleanupHandlers
         };
     },
     

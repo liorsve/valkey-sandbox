@@ -23,10 +23,17 @@ export function createEventBus() {
   };
 }
 
-export function useEventBus() {
-  const eventBus = inject("eventBus");
+export const useEventBus = () => {
+  const eventBus = inject("eventBus", null);
+
   if (!eventBus) {
-    throw new Error("EventBus not provided");
+    console.warn("EventBus not injected, creating local event emitter");
+    return {
+      on: () => {},
+      off: () => {},
+      emit: () => {},
+    };
   }
+
   return eventBus;
-}
+};

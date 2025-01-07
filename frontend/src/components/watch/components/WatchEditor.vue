@@ -1,65 +1,82 @@
 <template>
-    <div class="watch-editor">
-        <BaseEditor :content="content || ''" :language="language" :readonly="false" @ready="onReady"
-            @update:content="handleContentUpdate" />
-    </div>
+  <div class="watch-editor">
+    <BaseEditor
+      v-model="editorContent"
+      :language="language"
+      :readonly="false"
+      @ready="onReady"
+      @change="handleContentUpdate"
+    />
+  </div>
 </template>
 
 <script>
-import { defineComponent, watch } from 'vue';
-import BaseEditor from '@/components/Editor.vue';
-import { useEventBus, EventTypes } from '@/composables/useEventBus';
+import { defineComponent, watch, computed } from "vue";
+import BaseEditor from "@/components/base/BaseEditor.vue";
+import { useEventBus, EventTypes } from "@/composables/useEventBus";
 
-export default defineComponent( {
-    name: 'WatchEditor',
-    components: { BaseEditor },
-    props: {
-        content: {
-            type: String,
-            default: ''
-        },
-        language: {
-            type: String,
-            default: 'javascript'
-        }
+export default defineComponent({
+  name: "WatchEditor",
+  components: { BaseEditor },
+  props: {
+    content: {
+      type: String,
+      default: "",
     },
-    emits: [ 'ready', 'update:content' ],
+    language: {
+      type: String,
+      default: "javascript",
+    },
+  },
+  emits: ["ready", "update:content"],
 
-    setup( props, { emit } ) {
-        const { emit: emitEvent } = useEventBus();
+  setup(props, { emit }) {
+    const { emit: emitEvent } = useEventBus();
 
-        const handleContentUpdate = ( newContent ) => {
-            emit( 'update:content', newContent );
-        };
+    const editorContent = computed({
+      get: () => props.content || "",
+      set: (value) => emit("update:content", value),
+    });
 
-        const onReady = () => {
-            emit( 'ready' );
-            emitEvent( EventTypes.EDITOR_READY );
-        };
+    const handleContentUpdate = (newContent) => {
+      emit("update:content", newContent);
+    };
 
-        watch( () => props.content, ( newContent ) => {
-            if ( newContent ) {
-                emitEvent( EventTypes.EDITOR_CONTENT_UPDATED, newContent );
-            }
-        } );
+    const onReady = () => {
+      emit("ready");
+      emitEvent(EventTypes.EDITOR_READY);
+    };
 
-        watch( () => props.language, ( newLanguage ) => {
-            emitEvent( EventTypes.EDITOR_LANGUAGE_CHANGED, newLanguage );
-        } );
+    watch(
+      () => props.content,
+      (newContent) => {
+        if (newContent) {
+          emitEvent(EventTypes.EDITOR_CONTENT_UPDATED, newContent);
+        }
+      }
+    );
 
-        return {
-            onReady,
-            handleContentUpdate
-        };
-    }
-} );
+    watch(
+      () => props.language,
+      (newLanguage) => {
+        emitEvent(EventTypes.EDITOR_LANGUAGE_CHANGED, newLanguage);
+      }
+    );
+
+    return {
+      editorContent,
+      onReady,
+      handleContentUpdate,
+    };
+  },
+});
 </script>
 
 <style scoped>
 .watch-editor {
-    height: 100%;
-    border-radius: var(--radius-md);
-    background-color: var(--surface-darker);
-    overflow: hidden;
+  height: 100%;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-darker);
+  overflow: hidden;
 }
 </style>

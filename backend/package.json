@@ -8,13 +8,11 @@
     },
     "dependencies": {
         "@valkey/valkey-glide": "1.2.1",
-        "express": "^5.0.1",
-        "ws": "^8.18.0",
-        "iovalkey": "^0.2.1",
-        "body-parser": "1.20.3",
-        "morgan": "^1.10.0",
+        "axios": "^1.7.9",
         "cors": "^2.8.5",
-        "axios": "^1.7.9"
+        "dotenv": "16.4.7",
+        "express": "4.21.2",
+        "ws": "^8.18.0"
     },
     "devDependencies": {
         "nodemon": "^3.1.9"

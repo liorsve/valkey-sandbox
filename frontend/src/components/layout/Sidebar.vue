@@ -3,7 +3,11 @@
     <div class="sidebar__selects">
       <div class="select-container">
         <select v-model="selectedClient" class="sidebar__select">
-          <option v-for="client in availableClients" :key="client.id" :value="client.id">
+          <option
+            v-for="client in availableClients"
+            :key="client.id"
+            :value="client.id"
+          >
             {{ client.name }}
           </option>
         </select>
@@ -22,192 +26,237 @@
       <div class="sidebar__sections">
         <div v-if="currentTab === 'commonUseCases'" class="use-cases">
           <div class="use-cases__grid">
-            <button v-for="useCase in useCases" :key="useCase.id"
-              :class="['use-case-button', { active: selectedUseCase === useCase.id }]"
-              @click="handleUseCaseChange(useCase.id)">
+            <button
+              v-for="useCase in useCases"
+              :key="useCase.id"
+              :class="[
+                'use-case-button',
+                { active: selectedUseCase === useCase.id },
+              ]"
+              @click="handleUseCaseChange(useCase.id)"
+            >
               <div class="use-case-content">
                 <span class="use-case-title">{{ useCase.name }}</span>
                 <span class="use-case-indicator"></span>
               </div>
-              <div class="use-case-glow" :class="{ active: selectedUseCase === useCase.id }"></div>
+              <div
+                class="use-case-glow"
+                :class="{ active: selectedUseCase === useCase.id }"
+              ></div>
             </button>
           </div>
         </div>
       </div>
 
       <div class="sidebar__actions">
-        <button class="sidebar__action-button sidebar__action-button--primary" @click="handleAction('run')">
+        <button
+          class="sidebar__action-button sidebar__action-button--primary"
+          @click="handleAction('run')"
+        >
           Run Code
         </button>
-        <button class="sidebar__action-button sidebar__action-button--secondary" @click="handleAction('clear')">
+        <button
+          class="sidebar__action-button sidebar__action-button--secondary"
+          @click="handleAction('clear')"
+        >
           Clear Output
         </button>
       </div>
     </div>
     <div class="sidebar__bottom-logo">
-      <img src="@/assets/images/logo.png" alt="sandbox-logo" />
+      <img
+        src="@/assets/images/logo.png"
+        alt="sandbox-logo"
+        fetchpriority="high"
+        loading="eager"
+      />
     </div>
   </aside>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, inject, onBeforeUnmount } from 'vue';
-import { store } from '../../store';
-import { useEventBus, EventTypes } from '../../composables/useEventBus';
-import { useWebSocket } from '../../composables/useWebSocket';
+import { ref, computed, watch, onMounted, inject, onBeforeUnmount } from "vue";
+import { store } from "../../store";
+import { useEventBus, EventTypes } from "../../composables/useEventBus";
+import { useWebSocket } from "../../composables/useWebSocket";
 
 export default {
-  name: 'AppSidebar',
+  name: "AppSidebar",
   props: {
     currentTab: {
       type: String,
       required: true,
     },
   },
-  emits: [ 'content-update' ],
-  setup( props, { emit } ) {
-    const getEditorContent = inject( 'getEditorContent' );
+  emits: ["content-update"],
+  setup(props, { emit }) {
+    const getEditorContent = inject("getEditorContent");
     const eventBus = useEventBus();
     const wsManager = useWebSocket();
 
-    const selectedClient = ref( store.currentClient || store.getDefaultClient() );
-    const selectedMode = ref( store.executionMode || store.getDefaultMode() );
-    const selectedUseCase = ref( store.currentUseCase );
+    const selectedClient = ref(store.currentClient || store.getDefaultClient());
+    const selectedMode = ref(store.executionMode || store.getDefaultMode());
+    const selectedUseCase = ref(store.currentUseCase);
 
-    const clients = computed( () => store.getAllClients() );
-    const modes = computed( () => store.getAllModes() );
-    const useCases = computed( () => store.getAllUseCases() );
+    const clients = computed(() => store.getAllClients());
+    const modes = computed(() => store.getAllModes());
+    const useCases = computed(() => store.getAllUseCases());
 
-    const availableClients = computed( () => {
-      if ( props.currentTab === 'commonUseCases' || props.currentTab === 'challenges' ) {
+    const availableClients = computed(() => {
+      if (
+        props.currentTab === "commonUseCases" ||
+        props.currentTab === "challenges"
+      ) {
         return store.getGlideClients();
       }
       return store.getAllClients();
-    } );
+    });
 
-    const updateContent = ( clientId, templateName ) => {
+    const updateContent = (clientId, templateName) => {
       try {
-        if ( !clientId || !templateName ) {
-          throw new Error( 'Client ID or Template Name is undefined.' );
+        if (!clientId || !templateName) {
+          throw new Error("Client ID or Template Name is undefined.");
         }
-        const content = store.getTemplateCode( clientId, templateName );
-        emit( 'content-update', content );
-      } catch ( error ) {
-        console.error( 'Error updating content:', error );
-        emit( 'content-update', "// Error loading template." );
+        const content = store.getTemplateCode(clientId, templateName);
+        emit("content-update", content);
+      } catch (error) {
+        console.error("Error updating content:", error);
+        emit("content-update", "// Error loading template.");
       }
     };
 
-    const handleUseCaseChange = ( newUseCase ) => {
-      store.setUseCase( newUseCase );
+    const handleUseCaseChange = (newUseCase) => {
+      store.setUseCase(newUseCase);
       selectedUseCase.value = newUseCase;
-      updateContent( store.currentClient, newUseCase );
+      updateContent(store.currentClient, newUseCase);
     };
 
-    const handleAction = ( action ) => {
+    const handleAction = (action) => {
       try {
-        switch ( action ) {
-          case 'run': {
-            eventBus.emit( EventTypes.TERMINAL_CLEAR );
-            if ( store.getLanguage( selectedClient.value ) === 'java' || store.getLanguage( selectedClient.value ) === 'go' ) {
-              eventBus.emit( EventTypes.TERMINAL_OUTPUT, "⚠️  This language is not supported yet" );
+        switch (action) {
+          case "run": {
+            eventBus.emit(EventTypes.TERMINAL_CLEAR);
+            if (
+              store.getLanguage(selectedClient.value) === "java" ||
+              store.getLanguage(selectedClient.value) === "go"
+            ) {
+              eventBus.emit(
+                EventTypes.TERMINAL_OUTPUT,
+                "⚠️  This language is not supported yet"
+              );
               return;
             }
             const codeToRun = getEditorContent();
-            if ( !codeToRun ) {
-              store.addNotification( 'No code to run', 'error' );
+            if (!codeToRun) {
+              store.addNotification("No code to run", "error");
               return;
             }
 
-            if ( !wsManager.isConnectionValid() ) {
-              store.addNotification( 'WebSocket connection not ready', 'error' );
+            if (!wsManager.isConnectionValid()) {
+              store.addNotification("WebSocket connection not ready", "error");
               return;
             }
 
             const message = {
-              action: 'runCode',
+              action: "runCode",
               data: {
                 code: codeToRun,
-                language: store.getLanguage( selectedClient.value ),
-                mode: props.currentTab === 'playground' ? selectedMode.value : 'Cluster',
-                useCase: props.currentTab === 'commonUseCases' ? selectedUseCase.value : null,
+                language: store.getLanguage(selectedClient.value),
+                mode:
+                  props.currentTab === "playground"
+                    ? selectedMode.value
+                    : "Cluster",
+                useCase:
+                  props.currentTab === "commonUseCases"
+                    ? selectedUseCase.value
+                    : null,
               },
             };
 
-            wsManager.send( message );
-            console.log( '[Sidebar] Sending CODE_EXECUTION event...' );
-            eventBus.emit( EventTypes.CODE_EXECUTION, { status: 'started' } );
+            wsManager.send(message);
+            console.log("[Sidebar] Sending CODE_EXECUTION event...");
+            eventBus.emit(EventTypes.CODE_EXECUTION, { status: "started" });
             break;
           }
-          case 'clear':
-            eventBus.emit( EventTypes.TERMINAL_CLEAR );
+          case "clear":
+            eventBus.emit(EventTypes.TERMINAL_CLEAR);
             break;
         }
-      } catch ( error ) {
-        console.error( '[Action] Error:', error );
-        store.addNotification( error.message, 'error' );
-        eventBus.emit( EventTypes.ERROR, error.message );
+      } catch (error) {
+        console.error("[Action] Error:", error);
+        store.addNotification(error.message, "error");
+        eventBus.emit(EventTypes.ERROR, error.message);
       }
     };
 
     const handleWebSocketMessage = (normalizedMessage) => {
       try {
-          const { action, payload } = normalizedMessage;
-          if (!action) return;
-  
-          let successMessage, errorMessage;
-  
-          switch (action) {
-              case 'terminalOutput':
-                  eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload);
-                  break;
-  
-              case 'executionResult':
-                  successMessage = payload?.success ? `✅ Execution Successful: ${payload.message}` : null;
-                  errorMessage = !payload?.success ? `❌ Execution Failed: ${payload.error}` : null;
-                  eventBus.emit(
-                      EventTypes.TERMINAL_OUTPUT,
-                      successMessage || errorMessage
-                  );
-                  break;
-  
-              case 'output':
-                  if (payload?.output) {
-                      eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload.output);
-                  }
-                  break;
-  
-              case 'connected':
-                  console.debug('[Sidebar] Connected with ID:', payload?.id);
-                  break;
-  
-              default:
-                  console.debug('[Sidebar] Unhandled message action:', action);
-          }
+        const { action, payload } = normalizedMessage;
+        if (!action) return;
+
+        let successMessage, errorMessage;
+
+        switch (action) {
+          case "terminalOutput":
+            eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload);
+            break;
+
+          case "executionResult":
+            successMessage = payload?.success
+              ? `✅ Execution Successful: ${payload.message}`
+              : null;
+            errorMessage = !payload?.success
+              ? `❌ Execution Failed: ${payload.error}`
+              : null;
+            eventBus.emit(
+              EventTypes.TERMINAL_OUTPUT,
+              successMessage || errorMessage
+            );
+            break;
+
+          case "output":
+            if (payload?.output) {
+              eventBus.emit(EventTypes.TERMINAL_OUTPUT, payload.output);
+            }
+            break;
+
+          case "connected":
+            console.debug("[Sidebar] Connected with ID:", payload?.id);
+            break;
+
+          default:
+            console.debug("[Sidebar] Unhandled message action:", action);
+        }
       } catch (error) {
-          console.error('[Sidebar] Error handling WebSocket message:', error);
+        console.error("[Sidebar] Error handling WebSocket message:", error);
       }
-  };
+    };
 
     const wsListenerId = ref(null);
 
-    onMounted( () => {
-      wsListenerId.value = wsManager.addMessageListener( handleWebSocketMessage, 'sidebar' );
-      if ( !selectedClient.value ) {
+    onMounted(() => {
+      wsListenerId.value = wsManager.addMessageListener(
+        handleWebSocketMessage,
+        "sidebar"
+      );
+      if (!selectedClient.value) {
         selectedClient.value = store.getDefaultClient();
-        store.setClient( selectedClient.value );
+        store.setClient(selectedClient.value);
       }
-      if ( !selectedMode.value ) {
+      if (!selectedMode.value) {
         selectedMode.value = store.getDefaultMode();
-        store.setMode( selectedMode.value );
+        store.setMode(selectedMode.value);
       }
-      if ( !selectedUseCase.value && props.currentTab === 'commonUseCases' ) {
-        selectedUseCase.value = 'Session Cache';
-        handleUseCaseChange( 'Session Cache' );
+      if (!selectedUseCase.value && props.currentTab === "commonUseCases") {
+        selectedUseCase.value = "Session Cache";
+        handleUseCaseChange("Session Cache");
       }
-      const template = props.currentTab === 'playground' ? selectedMode.value : selectedUseCase.value;
-      updateContent( store.currentClient, template );
-      
+      const template =
+        props.currentTab === "playground"
+          ? selectedMode.value
+          : selectedUseCase.value;
+      updateContent(store.currentClient, template);
+
       onBeforeUnmount(() => {
         if (wsListenerId.value) {
           wsManager.removeMessageListener(wsListenerId.value);
@@ -218,36 +267,39 @@ export default {
       });
     });
 
-    watch( () => props.currentTab, ( newTab ) => {
-      if ( newTab === 'commonUseCases' ) {
-        if ( !selectedClient.value.includes( 'glide' ) ) {
-          selectedClient.value = 'glide-node';
-          store.setClient( selectedClient.value );
+    watch(
+      () => props.currentTab,
+      (newTab) => {
+        if (newTab === "commonUseCases") {
+          if (!selectedClient.value.includes("glide")) {
+            selectedClient.value = "glide-node";
+            store.setClient(selectedClient.value);
+          }
+          if (!selectedUseCase.value) {
+            selectedUseCase.value = "Session Cache";
+            handleUseCaseChange("Session Cache");
+          } else {
+            updateContent(store.currentClient, store.currentUseCase);
+          }
+        } else if (newTab === "playground") {
+          updateContent(store.currentClient, store.executionMode);
         }
-        if ( !selectedUseCase.value ) {
-          selectedUseCase.value = 'Session Cache';
-          handleUseCaseChange( 'Session Cache' );
-        } else {
-          updateContent( store.currentClient, store.currentUseCase );
-        }
-      } else if ( newTab === 'playground' ) {
-        updateContent( store.currentClient, store.executionMode );
       }
-    } );
+    );
 
-    watch( selectedClient, ( newClient ) => {
-      store.setClient( newClient );
-      if ( props.currentTab === 'playground' ) {
-        updateContent( newClient, selectedMode.value );
+    watch(selectedClient, (newClient) => {
+      store.setClient(newClient);
+      if (props.currentTab === "playground") {
+        updateContent(newClient, selectedMode.value);
       } else {
-        updateContent( newClient, selectedUseCase.value );
+        updateContent(newClient, selectedUseCase.value);
       }
-    } );
+    });
 
-    watch( selectedMode, ( newMode ) => {
-      store.setMode( newMode );
-      updateContent( store.currentClient, newMode );
-    } );
+    watch(selectedMode, (newMode) => {
+      store.setMode(newMode);
+      updateContent(store.currentClient, newMode);
+    });
 
     return {
       selectedMode,
@@ -279,7 +331,6 @@ export default {
   border-right: 1px solid var(--border-color);
 }
 
-/* Updated select styles */
 .sidebar__selects {
   padding: 20px var(--spacing-md);
   display: flex;
@@ -317,7 +368,6 @@ export default {
   transform: translateY(-1px);
 }
 
-/* Updated content padding to account for new select position */
 .sidebar__content {
   padding: var(--spacing-xl) var(--spacing-lg) 0;
   display: flex;
@@ -522,7 +572,7 @@ export default {
 }
 
 .use-case-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;

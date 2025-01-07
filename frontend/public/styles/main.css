@@ -1,3 +1,6 @@
+/* Note: Documentation specific styles are lazy loaded */
+/* See: /src/components/helpfulresources/styles/markdown.css */
+
 :root {
   /* Colors */
   --primary-color: #276ce2;

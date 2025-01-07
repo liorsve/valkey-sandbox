@@ -1,40 +1,44 @@
 <template>
   <div class="watch-container">
-    <div v-if="hasError" class="error-state">
-      <p>
-        {{
-          hasError ? "Failed to load the selected template." : "Initializing..."
-        }}
-      </p>
-      <button v-if="hasError" @click="handleReload">Reload</button>
-    </div>
-    <template v-else>
-      <ActionSelect v-if="!hasSelection" @select="handleActionSelect" />
-
-      <div v-else class="visualization-layout">
-        <div class="code-section">
-          <WatchEditor
-            :content="editorContent"
-            :language="currentLanguage"
-            @ready="handleEditorReady"
-            @update:content="handleCodeUpdate"
-          />
-          <WatchTerminal @ready="handleTerminalReady" />
-        </div>
-
-        <div class="visualization-section">
-          <component
-            v-if="currentVisualization"
-            :is="currentVisualization"
-            :ws="ws"
-            :isConnected="isConnected"
-            :terminal="terminalInstance"
-            @terminal-write="handleTerminalWrite"
-            class="visualization-section"
-          />
-        </div>
+    <div class="watch-header"></div>
+    <Transition name="fade" mode="out-in">
+      <div v-if="hasError" class="error-state">
+        <p>
+          {{
+            hasError
+              ? "Failed to load the selected template."
+              : "Initializing..."
+          }}
+        </p>
+        <button v-if="hasError" @click="handleReload">Reload</button>
       </div>
-    </template>
+      <template v-else>
+        <ActionSelect v-if="!hasSelection" @select="handleActionSelect" />
+
+        <div v-else class="visualization-layout">
+          <div class="code-section">
+            <WatchEditor
+              v-model:content="editorContent"
+              :language="currentLanguage"
+              @ready="handleEditorReady"
+            />
+            <WatchTerminal @ready="handleTerminalReady" />
+          </div>
+
+          <div class="visualization-section">
+            <component
+              v-if="currentVisualization"
+              :is="currentVisualization"
+              :ws="ws"
+              :isConnected="isConnected"
+              :terminal="terminalInstance"
+              @terminal-write="handleTerminalWrite"
+              class="visualization-section"
+            />
+          </div>
+        </div>
+      </template>
+    </Transition>
   </div>
 </template>
 
@@ -51,6 +55,7 @@ import {
 } from "vue";
 import { useWatchInAction } from "@/composables/useWatchInAction";
 import { store } from "@/store";
+import loadingController from "@/services/loadingController";
 import WatchEditor from "./components/WatchEditor.vue";
 import WatchTerminal from "./components/WatchTerminal.vue";
 import ActionSelect from "./ActionSelect.vue";
@@ -71,93 +76,16 @@ export default defineComponent({
   setup() {
     const wsManager = useWebSocket();
     const terminalInstance = ref(null);
-
-    provide("websocket", wsManager);
-    provide("terminal", terminalInstance);
-
-    const {
-      isConnected,
-      editorContent,
-      currentVisualization,
-      currentLanguage,
-      isEditorReady,
-      hasError,
-      handleTerminalWrite,
-      handleEditorReady,
-      handleCodeUpdate,
-      handleReplace,
-    } = useWatchInAction();
-
-    const cleanup = async () => {
-      if (currentVisualization.value?.__vueParent$?.exposed?.cleanup) {
-        await currentVisualization.value.__vueParent$?.exposed?.cleanup();
-      }
-      if (wsManager.ws?.readyState === WebSocket.OPEN) {
-        await wsManager.send({ action: "cleanup", force: true });
-      }
-      store.clearWatchState();
-    };
-
-    const handleTabChange = () => {
-      cleanup();
-    };
-
-    const handleTerminalReady = (term) => {
-      terminalInstance.value = term;
-      term.writeln("\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m");
-      term.writeln(" Ready to watch your actions in real-time...");
-    };
-
-    const selectedAction = computed(() => store.watchState?.selectedAction);
-    const selectedTemplate = computed(() => store.currentUseCase);
-    const selectedClient = computed(() => store.currentClient);
-
-    const hasSelection = computed(() => {
-      return Boolean(store.watchState?.selectedAction);
-    });
-
-    const handleActionSelect = ({ action, client, language }) => {
-      try {
-        store.setWatchState(client, action, language);
-        currentLanguage.value = language;
-        editorContent.value = store.getTemplateCode(client, action);
-
-        currentVisualization.value =
-          action === "Leaderboard"
-            ? LeaderboardVisualization
-            : TaskManagerVisualization;
-      } catch (error) {
-        console.error("Error handling action select:", error);
-        hasError.value = true;
-      }
-    };
-
-    const currentVisualizationComponent = computed(() => {
-      const template = selectedTemplate.value;
-      if (!template) return null;
-
-      switch (template) {
-        case "Leaderboard":
-          return "LeaderboardVisualization";
-        case "Task Manager":
-          return "TaskManagerVisualization";
-        default:
-          return null;
-      }
-    });
-
+    const cleaning = ref(false);
+    const editorContent = ref("// Loading...");
     const { on, off } = useEventBus();
 
-    onMounted(() => {
-      if (!editorContent.value) {
-        editorContent.value = store.getInitialCode();
-      }
-      isEditorReady.value = true;
+    onBeforeUnmount(() => {
+      off("tab-changed");
+      cleanup();
+    });
 
-      window.requestAnimationFrame(() => {
-        window.dispatchEvent(new Event("resize"));
-      });
-
+    const initializeEventListeners = () => {
       on("tab-changed", handleTabChange);
 
       const tabElement = document.querySelector('[data-tab="watch-in-action"]');
@@ -179,28 +107,135 @@ export default defineComponent({
           }
         }
       );
+    };
 
-      onBeforeUnmount(async () => {
-        off("tab-changed");
-        await cleanup();
-      });
-
-      useEventBus().on("tab-changed", (newTab) => {
-        if (newTab === "watchInAction" && store.watchState?.selectedAction) {
-          cleanup();
+    const initialize = async () => {
+      try {
+        if (!editorContent.value) {
+          editorContent.value = store.getInitialCode();
         }
-      });
+        isEditorReady.value = true;
 
-      onBeforeUnmount(() => {
-        useEventBus().off("tab-changed");
-        cleanup();
-      });
+        window.requestAnimationFrame(() => {
+          window.dispatchEvent(new Event("resize"));
+        });
+
+        initializeEventListeners();
+
+        await nextTick();
+        loadingController.finishComponentTransition("watchInAction");
+      } catch (error) {
+        console.error("[WatchContainer] Mount error:", error);
+        loadingController.finishComponentTransition("watchInAction");
+      }
+    };
+
+    onMounted(async () => {
+      loadingController.start("Loading Watch Container...");
+      try {
+        await initialize();
+      } finally {
+        loadingController.finish();
+      }
     });
 
-    onBeforeUnmount(() => {
-      off("tab-changed");
+    provide("websocket", wsManager);
+    provide("terminal", terminalInstance);
+
+    const {
+      isConnected,
+      currentVisualization,
+      currentLanguage,
+      isEditorReady,
+      hasError,
+      handleTerminalWrite,
+      handleEditorReady,
+      handleCodeUpdate,
+      handleReplace,
+    } = useWatchInAction();
+
+    const cleanup = async () => {
+      if (cleaning.value) return;
+      cleaning.value = true;
+
+      try {
+        if (wsManager?.isConnectionValid()) {
+          await wsManager.send({
+            action: "cleanup",
+            data: {
+              force: true,
+              source: "watch-container",
+            },
+          });
+        }
+        store.clearWatchState();
+      } catch (error) {
+        console.error("[WatchContainer] Cleanup error:", error);
+      } finally {
+        cleaning.value = false;
+      }
+    };
+
+    const handleTabChange = () => {
       cleanup();
+    };
+
+    const handleTerminalReady = (term) => {
+      terminalInstance.value = term;
+      term.writeln("\x1b[1;34m=== Watch in Action Terminal ===\x1b[0m");
+      term.writeln(" Ready to watch your actions in real-time...");
+    };
+
+    const selectedAction = computed(() => store.watchState?.selectedAction);
+    const selectedTemplate = computed(() => store.currentUseCase);
+    const selectedClient = computed(() => store.currentClient);
+
+    const hasSelection = computed(() => {
+      return Boolean(store.watchState?.selectedAction);
     });
+
+    const handleActionSelect = async ({ action, client, language }) => {
+      try {
+        store.setWatchState(client, action, language);
+        currentLanguage.value = language;
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const template = await store.getTemplateCode(client, action);
+        editorContent.value = template || "// No template available";
+
+        currentVisualization.value =
+          action === "Leaderboard"
+            ? LeaderboardVisualization
+            : TaskManagerVisualization;
+      } catch (error) {
+        console.error("Error handling action select:", error);
+        editorContent.value = "// Error loading template";
+        hasError.value = true;
+      }
+    };
+
+    const currentVisualizationComponent = computed(() => {
+      const template = selectedTemplate.value;
+      if (!template) return null;
+
+      switch (template) {
+        case "Leaderboard":
+          return "LeaderboardVisualization";
+        case "Task Manager":
+          return "TaskManagerVisualization";
+        default:
+          return null;
+      }
+    });
+
+    const handleBack = () => {
+      currentVisualization.value = null;
+      if (wsManager.ws) {
+        wsManager.ws.close();
+        wsManager.ws = null;
+      }
+    };
 
     return {
       store,
@@ -223,6 +258,8 @@ export default defineComponent({
       handleReload: () => window.location.reload(),
       hasSelection,
       handleReplace,
+      loadingController,
+      handleBack,
     };
   },
 });
@@ -303,5 +340,48 @@ export default defineComponent({
   border-radius: 4px;
   color: white;
   cursor: pointer;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.visualization-layout {
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.watch-header {
+  margin-bottom: 20px;
+}
+
+.back-button {
+  padding: 10px 20px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.back-button:hover {
+  background-color: #444;
 }
 </style>

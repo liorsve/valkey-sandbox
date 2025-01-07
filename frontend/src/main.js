@@ -2,14 +2,22 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import store from "./store";
 import { install as VueMonacoEditorPlugin } from "@guolao/vue-monaco-editor";
-import "./styles/variables.css";
-import { initializeApp } from "./boot";
+import { createEventBus } from "./composables/useEventBus";
+import { createWebSocketManager } from "./composables/useWebSocket";
+import VueVirtualScroller from "vue-virtual-scroller";
+import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 
-window.Storage = store;
+import "./styles/variables.css";
 
 const app = createApp(App);
 
-const { eventBus, wsManager } = initializeApp(app);
+app.use(VueVirtualScroller);
+
+const eventBus = createEventBus();
+const wsManager = createWebSocketManager(eventBus);
+
+app.provide("eventBus", eventBus);
+app.provide("wsManager", wsManager);
 
 app.use(VueMonacoEditorPlugin, {
   paths: {
@@ -17,19 +25,25 @@ app.use(VueMonacoEditorPlugin, {
   },
 });
 
+window.Storage = store;
+
 const removeLoader = () => {
   const loader = document.getElementById("preloader");
   if (loader) {
     loader.classList.add("fade-out");
-    setTimeout(() => {
-      loader.remove();
-    }, 300);
+    setTimeout(() => loader.remove(), 300);
   }
 };
 
-app.mount("#app");
-
-removeLoader();
+(() => {
+  try {
+    app.mount("#app");
+  } catch (error) {
+    console.error("Failed to initialize app:", error);
+  } finally {
+    removeLoader();
+  }
+})();
 
 window.addEventListener("error", (e) => {
   console.error("Application Error:", e);

@@ -18,6 +18,9 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    fs: {
+      strict: false,
+    },
   },
   css: {
     postcss: {
@@ -25,7 +28,8 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["vue"],
+    include: ["vue", "@guolao/vue-monaco-editor"],
+    exclude: ["@vueuse/core"],
   },
   preview: {
     port: 8080,
@@ -42,5 +46,39 @@ export default defineConfig({
     assetsDir: "assets",
     outDir: "dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["vue"],
+          editor: ["@guolao/vue-monaco-editor"],
+          common: ["marked", "dompurify"],
+          ws: ["reconnecting-websocket"],
+          core: ["vue-virtual", "@tanstack/vue-virtual"],
+          "docs-core": ["markdown-it", "dompurify"],
+          "docs-plugins": [
+            "markdown-it-abbr",
+            "markdown-it-anchor",
+            "markdown-it-emoji",
+            "markdown-it-footnote",
+            "markdown-it-highlight",
+            "markdown-it-sub",
+            "markdown-it-sup",
+            "markdown-it-task-lists",
+            "markdown-it-toc-done-right",
+          ],
+          "docs-styles": ["components/helpfulresources/styles/markdown.css"],
+          "docs-utils": [
+            "utils/markdownRenderer",
+            "services/documentationService",
+          ],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+    minify: "esbuild",
+    target: "esnext",
+    cssCodeSplit: true,
+    reportCompressedSize: false,
   },
+  assetsInclude: ["**/*.md"],
 });

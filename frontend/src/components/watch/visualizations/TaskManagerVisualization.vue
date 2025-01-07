@@ -104,7 +104,6 @@ export default {
 
     const messageHandler = (event) => {
       try {
-        // Handle normalized messages from WebSocketManager
         const message = event?.payload
           ? event
           : {
@@ -151,7 +150,6 @@ export default {
       { id: 7, action: "Change Random Color" },
     ]);
 
-    // Add state management
     const gameState = ref({
       isProcessing: false,
       currentTask: null,
@@ -167,7 +165,6 @@ export default {
     const buttonState = ref("set");
     const showEmptyQueuePopup = ref(false);
 
-    // Define all handlers first
     const terminalWrite = (message) => {
       if (props.terminal?.writeln) {
         props.terminal.writeln(message);
@@ -178,7 +175,6 @@ export default {
       }
     };
 
-    // Then define the setup function
     const setupWebSocket = (ws) => {
       if (!ws) return;
 
@@ -192,7 +188,6 @@ export default {
       );
     };
 
-    // Then setup watchers
     watch(
       () => props.ws,
       (newWs) => {
@@ -300,7 +295,6 @@ export default {
     const handleGameCommand = (command) => {
       if (!command || typeof command !== "object") return;
 
-      // Fix the object destructuring
       console.log("[TaskManager] Game command:", command);
       if (command.operations?.length) {
         command.operations.forEach((op) => terminalWrite(` 🔷 ${op}`));
@@ -357,28 +351,26 @@ export default {
     };
 
     const executeTaskAnimation = async (el, taskAction) => {
-      el.classList.add("move-to-center");
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 300));
 
-      const baseTransform = "translateX(-50%) translateY(-50%)";
       switch (taskAction) {
         case "Flip Right":
-          el.style.transform = `${baseTransform} rotateY(180deg)`;
+          el.style.transform = `rotateY(180deg)`;
           break;
         case "Flip Left":
-          el.style.transform = `${baseTransform} rotateY(-180deg)`;
+          el.style.transform = `rotateY(-180deg)`;
           break;
         case "Flip Up":
-          el.style.transform = `${baseTransform} rotateX(-180deg)`;
+          el.style.transform = `rotateX(-180deg)`;
           break;
         case "Flip Down":
-          el.style.transform = `${baseTransform} rotateX(180deg)`;
+          el.style.transform = `rotateX(180deg)`;
           break;
         case "Grow":
-          el.style.transform = `${baseTransform} scale(1.5)`;
+          el.style.transform = `scale(1.5)`;
           break;
         case "Shrink":
-          el.style.transform = `${baseTransform} scale(0.5)`;
+          el.style.transform = `scale(0.5)`;
           break;
         case "Change Random Color": {
           const color = getRandomColor();
@@ -394,9 +386,9 @@ export default {
         el.style.filter =
           "drop-shadow(0 0 15px var(--accent-highlight)) brightness(1.3)";
       } else {
-        el.style.transform = baseTransform;
+        el.style.transform = "none";
       }
-      el.classList.remove("move-to-center");
+      await new Promise((r) => setTimeout(r, 300));
     };
 
     const animateTask = async (taskAction) => {
@@ -731,11 +723,8 @@ button:hover {
   width: 100%;
   height: 100%;
   transition: all 0.6s ease-in-out;
+  transform-origin: center;
   filter: drop-shadow(0 0 15px var(--accent-highlight)) brightness(1.3);
-}
-
-.move-to-center {
-  top: 50% !important;
 }
 
 .lock-icon,

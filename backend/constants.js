@@ -45,6 +45,13 @@ export const CLUSTER_ENDPOINTS = {
   },
 };
 
+export const STANDALONE_ENDPOINTS = {
+  development: {
+    host: process.env.VALKEY_STANDALONE_HOST || "valkey-standalone",
+    port: parseInt(process.env.VALKEY_STANDALONE_PORT || "6379"),
+  },
+};
+
 // Default game data
 export const DEFAULT_PLAYERS = [
   { id: 1, name: "Superman", score: 0, photo: "/images/superman.jpg" },

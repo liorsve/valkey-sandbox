@@ -10,6 +10,8 @@ class WebSocketManager {
     this.retryDelay = 5000;
     this.lastUrl = null;
     this.eventBus = eventBus;
+    this._healthCheckInterval = null;
+    this._cleanupInProgress = false;
   }
 
   buildWebSocketUrl() {
@@ -26,7 +28,6 @@ class WebSocketManager {
     try {
       if (!event?.data) return;
 
-      // Handle special system messages
       if (event.data === "connected") {
         this.notifyListeners({
           action: "connected",
@@ -36,7 +37,6 @@ class WebSocketManager {
         return;
       }
 
-      // Parse and normalize message
       let parsedData;
       try {
         parsedData =
@@ -46,14 +46,12 @@ class WebSocketManager {
         return;
       }
 
-      // Create normalized message structure
       const message = {
         action: parsedData.action || parsedData.type || "unknown",
         payload: null,
         timestamp: Date.now(),
       };
 
-      // Handle nested data structures
       if (parsedData.data) {
         message.payload =
           typeof parsedData.data === "object"
@@ -63,7 +61,6 @@ class WebSocketManager {
         message.payload = parsedData.payload;
       }
 
-      // Handle output in data or root
       if (parsedData.data?.output || parsedData.output) {
         message.payload = {
           ...(message.payload || {}),
@@ -71,7 +68,6 @@ class WebSocketManager {
         };
       }
 
-      // Only notify if we have a valid action
       if (message.action && message.action !== "unknown") {
         this.notifyListeners(message);
       }
@@ -86,14 +82,13 @@ class WebSocketManager {
       return;
     }
 
-    // Route all terminal/output related actions to sidebar
     const componentRoutes = {
       taskUpdate: "taskManager",
       gameCommand: "taskManager",
       leaderboardUpdate: "leaderboard",
-      output: "sidebar", // Route to sidebar instead of playground
-      terminalOutput: "sidebar", // Route to sidebar instead of playground
-      executionResult: "sidebar", // Route to sidebar instead of playground
+      output: "sidebar",
+      terminalOutput: "sidebar",
+      executionResult: "sidebar",
       connected: "global",
     };
 
@@ -118,41 +113,38 @@ class WebSocketManager {
   }
 
   connect() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
-
-    try {
-      const wsUrl = this.buildWebSocketUrl();
-      console.log("[WS] Connecting to:", wsUrl);
-
-      this.ws = new WebSocket(wsUrl);
-      this.lastUrl = wsUrl;
-
-      this.ws.onopen = () => {
-        this.retryCount = 0;
-        console.log("[WS] Connection established");
-        this.eventBus.emit(EventTypes.WS_OPEN);
-      };
-
-      this.ws.onmessage = (event) => this.handleMessage(event);
-
-      this.ws.onclose = (event) => {
-        console.log("[WS] Connection closed", event.code, event.reason);
-        this.eventBus.emit(EventTypes.WS_CLOSE, event);
-        if (!event.wasClean) {
-          this.handleReconnect();
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("[WS] Connection error:", error);
-        this.eventBus.emit(EventTypes.WS_ERROR, error);
-        this.ws.close();
-      };
-    } catch (error) {
-      console.error("[WS] Setup error:", error);
-      this.eventBus.emit(EventTypes.WS_ERROR, error);
-      this.handleReconnect();
+    if (
+      this.isConnectionValid() ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
+      return Promise.resolve(this.ws);
     }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = this.buildWebSocketUrl();
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+          this.retryCount = 0;
+          this.eventBus.emit(EventTypes.WS_OPEN);
+          resolve(this.ws);
+        };
+
+        this.ws.onerror = (error) => {
+          this.eventBus.emit(EventTypes.WS_ERROR, error);
+          reject(error);
+        };
+
+        this.ws.onmessage = (event) => this.handleMessage(event);
+        this.ws.onclose = (event) => {
+          this.eventBus.emit(EventTypes.WS_CLOSE, event);
+          if (!event.wasClean) this.handleReconnect();
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   handleReconnect() {
@@ -172,22 +164,9 @@ class WebSocketManager {
   }
 
   addMessageListener(listener, component = "global") {
-    if (typeof listener !== "function") {
-      console.warn("[WS] Invalid listener type:", typeof listener);
-      return;
-    }
+    if (typeof listener !== "function") return;
 
-    if (component !== "global") {
-      const existing = Array.from(this.listeners).find(
-        (l) => l.component === component
-      );
-      if (existing) {
-        console.debug(
-          `[WS] Removing existing listener for component: ${component}`
-        );
-        this.removeMessageListener(component);
-      }
-    }
+    this.removeMessageListener(component);
 
     const listenerObj = {
       callback: listener,
@@ -196,7 +175,6 @@ class WebSocketManager {
     };
 
     this.listeners.add(listenerObj);
-    console.debug(`[WS] Added listener for component: ${component}`);
     return listenerObj.id;
   }
 
@@ -206,14 +184,12 @@ class WebSocketManager {
     const before = this.listeners.size;
 
     if (typeof listenerIdOrComponent === "string") {
-      // Remove by component name
       this.listeners = new Set(
         Array.from(this.listeners).filter(
           (l) => l.component !== listenerIdOrComponent
         )
       );
     } else {
-      // Remove by listener ID
       this.listeners = new Set(
         Array.from(this.listeners).filter((l) => l.id !== listenerIdOrComponent)
       );
@@ -227,13 +203,25 @@ class WebSocketManager {
     }
   }
 
-  send(data) {
+  async send(data) {
     if (!this.isConnectionValid()) {
       console.warn("[WS] Cannot send message - connection not ready");
       return Promise.reject(new Error("WebSocket connection not ready"));
     }
 
+    if (data.action === "cleanup" && this._cleanupInProgress) {
+      console.debug("[WS] Cleanup already in progress, skipping");
+      return Promise.resolve();
+    }
+
     try {
+      if (data.action === "cleanup") {
+        this._cleanupInProgress = true;
+        setTimeout(() => {
+          this._cleanupInProgress = false;
+        }, 1000);
+      }
+
       const formattedMessage =
         typeof data === "string" ? data : JSON.stringify(data);
       this.ws.send(formattedMessage);
@@ -254,6 +242,25 @@ class WebSocketManager {
       console.log("[WS] WebSocket closed gracefully");
     }
   }
+
+  startHealthCheck(interval = 30000) {
+    if (this._healthCheckInterval) return;
+
+    this._healthCheckInterval = setInterval(() => {
+      if (!this.isConnectionValid()) {
+        this.connect().catch((err) => {
+          console.warn("[WS] Reconnection attempt failed:", err);
+        });
+      }
+    }, interval);
+  }
+
+  stopHealthCheck() {
+    if (this._healthCheckInterval) {
+      clearInterval(this._healthCheckInterval);
+      this._healthCheckInterval = null;
+    }
+  }
 }
 
 let wsInstance = null;
@@ -266,11 +273,10 @@ export function createWebSocketManager(eventBus) {
 }
 
 export function useWebSocket() {
-  const wsManager = inject("wsManager");
-  if (!wsManager && !wsInstance) {
-    throw new Error("WebSocket manager not provided");
+  if (!wsInstance) {
+    wsInstance = new WebSocketManager();
   }
-  return wsManager || wsInstance;
+  return wsInstance;
 }
 
 export function ensureConnection(wsManager = wsInstance) {
@@ -299,7 +305,6 @@ export function ensureConnection(wsManager = wsInstance) {
   return Promise.resolve(wsManager.ws);
 }
 
-// Export the singleton instance for backward compatibility
 export const wsInstanceSingleton = {
   get ws() {
     return wsInstance?.ws;
