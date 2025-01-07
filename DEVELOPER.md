@@ -1,8 +1,30 @@
 # Developer Guide
 
-## 🚀 Overview
+## 🚀 Current Implementation Status
 
-This sandbox environment provides a secure, scalable platform for executing code with Valkey integration. It supports both standalone and cluster modes with real-time visualization capabilities.
+### Core Components
+- ✅ Frontend (Vue.js 3)
+- ✅ Backend (Node.js)
+- ✅ WebSocket Communication
+- ✅ Code Execution System
+- 🟡 Testing Framework (In Progress)
+- 🟡 Documentation System (In Progress)
+
+### Language Support
+- ✅ Node.js (Valkey-glide, iovalkey)
+- ✅ Python (Valkey-glide, Valkey-py)
+- 🟡 Java (Valkey-glide, Valkey-java) - can't run it yet.
+- 🟡 Go (Valkey-go) - can't run it yet.
+
+### Features
+- ✅ Code Editor Integration
+- ✅ Real-time Execution
+- ✅ Basic Error Handling
+- ✅ Template System
+- ✅ Watch-in-Action - Task manager, Leaderboard
+- 🟡 Documentation & Resources - Currently using place holders or minimal example.
+- 🟡 Challenge System (In Progress)
+
 
 ## 🏗️ Architecture
 
